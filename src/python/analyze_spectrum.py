@@ -25,6 +25,7 @@ else:
     plt.figure(figsize=(10, 4))
     # 只画正半轴的频谱
     plt.plot(freqs[:n//2], np.abs(fft_result)[:n//2])
+    plt.xlim(0, 2000)  # 只关注 0-2000 Hz 范围
     plt.title("Audio Spectrum Baseline (Left Channel)")
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Magnitude")

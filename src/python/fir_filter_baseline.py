@@ -11,40 +11,39 @@ if not os.path.exists(audio_path):
     exit()
 
 data, fs = sf.read(audio_path)
-left_channel = data[:, 0]
-print(f"音频读取成功。采样率：{fs} Hz, 长度：{len(left_channel)}")
+left_channel = data[:, 0] + data[:, 1] # 左右声道叠加
 
-# 2. 设计 FIR 低通滤波器
-# 我们的测试音频左声道是 440Hz，右声道是 880Hz
-# 这里设计一个截止频率为 600Hz 的低通滤波器，目的是把 880Hz 滤掉
-numtaps = 65  # 滤波器阶数（抽头数），奇数
-cutoff = 600  # 截止频率 600 Hz
+# 2. 核心步骤：去直流偏移（必须在 FFT 之前执行！）
+left_channel = left_channel - np.mean(left_channel)
+print(f"去直流后的均值（应接近0）：{np.mean(left_channel)}")
+
+# 3. 设计 600Hz 低通 FIR 滤波器
+numtaps = 65
+cutoff = 600
 taps = signal.firwin(numtaps, cutoff, fs=fs)
 print(f"FIR 滤波器设计完成，抽头数：{numtaps}，截止频率：{cutoff} Hz")
 
-# 3. 执行 FIR 滤波 (时域卷积)
-# 我们只对左声道进行滤波
+# 4. 执行 FIR 滤波
 filtered_left = signal.lfilter(taps, 1.0, left_channel)
-# 把右声道复制一份，保持双声道格式
-filtered_data = np.stack((filtered_left, data[:, 1]), axis=1)
 
-# 4. 保存滤波后的音频
-output_audio_path = "data/audio/test_tone_filtered.wav"
-sf.write(output_audio_path, filtered_data, fs)
-print(f"滤波后音频已保存：{output_audio_path}")
-
-# 5. 绘制原始音频与滤波后音频的频谱对比图
-n = min(fs, len(left_channel)) # 取前1秒
+# 5. 绘制原始与滤波后的频谱对比图
+n = min(fs, len(left_channel)) # 取前1秒数据
 freqs = np.fft.fftfreq(n, 1/fs)
+
+# 对信号进行 FFT 并取绝对值
 fft_orig = np.abs(np.fft.fft(left_channel[:n]))
 fft_filt = np.abs(np.fft.fft(filtered_left[:n]))
 
-plt.figure(figsize=(12, 5))
+plt.figure(figsize=(10, 4))
+# 只画正半轴频率 (0 - 2000Hz)
 plt.plot(freqs[:n//2], fft_orig[:n//2], label="Original (440Hz + 880Hz)", alpha=0.7)
 plt.plot(freqs[:n//2], fft_filt[:n//2], label="FIR Filtered (Cutoff 600Hz)", linewidth=2)
+
 plt.title("FIR Filter Baseline: Frequency Domain Comparison")
 plt.xlabel("Frequency (Hz)")
 plt.ylabel("Magnitude")
+plt.xlim(0, 2000)  # 限制横坐标，放大 0-2000Hz 区域
+plt.ylim(0,1000)
 plt.legend()
 plt.grid(True)
 
