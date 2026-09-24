@@ -29,7 +29,7 @@
     ├── design_report_draft.md
     ├── llm_collab_log/ # 大模型协作日志
     └── poster_en/      # 英文海报 (待添加)
-    🚀 快速开始 (Quick Start)
+🚀 快速开始 (Quick Start)
 
 1. 环境配置
 
