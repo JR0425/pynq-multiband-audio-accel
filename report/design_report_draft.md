@@ -17,9 +17,18 @@
 本设计采用 PYNQ-Z2（Zynq-7020）作为核心平台，板载 ADAU1761 音频编解码芯片，提供 I2S 接口进行音频采集与播放。
 
 ### 2.2 自建 Overlay 架构
-我们放弃了修改官方 base overlay 的路线，转而自建标准 Overlay。音频数据流为：
-ADAU1761 -> I2S -> axi_i2s_adi -> AXI-Stream -> FIR加速核 (HLS/RTL) -> axi_i2s_adi -> I2S -> ADAU1761
-PS 侧通过 Python 进行 I2C 配置与性能计数读取。
+我们放弃了修改官方 base overlay 的路线，转而自建标准 Overlay。原因在于官方 base overlay 的音频通路使用了 PYNQ 自研 IP（audio_codec_ctrl 和 audio_direct），修改它需要阅读生产级 RTL 源码，资料少且不划算。自建 Overlay 则完全采用标准 IP（如 axi_i2s_adi），资料丰富，且 block design 由我们自己搭建，能更好地体现系统设计能力。
+
+### 2.3 音频数据流
+本设计的音频数据流如下：
+1. ADAU1761 音频编解码芯片通过 I2S 接口采集模拟音频信号并转换为数字信号。
+2. 数据通过 axi_i2s_adi IP 核转换为 AXI-Stream 流格式。
+3. AXI-Stream 数据流进入 FIR 加速核（HLS 或 RTL 实现）进行多频段滤波和动态范围压缩处理。
+4. 处理后的 AXI-Stream 数据流通过 axi_i2s_adi 转换为 I2S 格式，送回 ADAU1761 播放。
+
+### 2.4 软硬件接口设计
+- **AXI-Lite**：PS 侧通过 AXI-Lite 接口向 FIR 加速核写入滤波器系数、频段参数等配置信息。
+- **AXI-DMA（可选）**：若采用半流式处理，使用 AXI-DMA 进行 DDR 与 PL 之间的批量音频数据搬运。
 
 ## 三、 算法实现与优化
 ### 3.1 Python 软件基线实现
