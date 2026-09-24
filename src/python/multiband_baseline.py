@@ -4,14 +4,14 @@ import soundfile as sf
 import matplotlib.pyplot as plt
 import os
 
-# 1. 读取测试音频
+# 1. 读取音频
 audio_path = "data/audio/test_tone.wav"
 data, fs = sf.read(audio_path)
-x = data[:, 0].copy() # 取左声道
 
-# 2. 去直流偏移
+# 2. 混合左右声道并去直流
+x = data[:, 0] + data[:, 1]
 x = x - np.mean(x)
-print(f"去直流后的均值（应接近0）：{np.mean(x)}")
+print(f"去直流后的均值：{np.mean(x)}")
 
 # 3. 定义 4 个频段
 bands = [(0, 300), (300, 600), (600, 1000), (1000, 8000)]
@@ -34,23 +34,27 @@ for taps in taps_list:
     filtered = signal.lfilter(taps, 1.0, x)
     output += filtered * 0.5 
 
-# 5. 绘制对比图
+# 5. 计算 FFT（带归一化）
 n = min(fs, len(x))
 freqs = np.fft.fftfreq(n, 1/fs)
-fft_orig = np.abs(np.fft.fft(x[:n]))
-fft_multi = np.abs(np.fft.fft(output[:n]))
+# 关键：除以 n 并乘以 2，让 Y 轴刻度正常
+fft_orig = np.abs(np.fft.fft(x[:n])) / n * 2
+fft_multi = np.abs(np.fft.fft(output[:n])) / n * 2
 
+# 6. 画图
 plt.figure(figsize=(10, 4))
-plt.plot(freqs[:n//2], fft_orig[:n//2], label="Original (440Hz + 880Hz)", alpha=0.7)
-plt.plot(freqs[:n//2], fft_multi[:n//2], label="Multiband Processed", linewidth=2)
+# 蓝色线用淡色，橙色线用粗线，防止遮盖
+plt.plot(freqs[:n//2], fft_orig[:n//2], label="Original (440Hz + 880Hz)", color='blue', alpha=0.5)
+plt.plot(freqs[:n//2], fft_multi[:n//2], label="Multiband Processed", color='orange', linewidth=2)
 
 plt.title("Multiband Baseline: Frequency Domain Comparison")
 plt.xlabel("Frequency (Hz)")
-plt.ylabel("Magnitude")
-plt.xlim(0, 2000)  # 限制横坐标
+plt.ylabel("Normalized Magnitude")
+plt.xlim(0, 2000)
+plt.ylim(0, 1.5)  # 限制 Y 轴范围，让曲线可视化更清晰
 plt.legend()
 plt.grid(True)
 
 os.makedirs("data/figures", exist_ok=True)
 plt.savefig("data/figures/multiband_comparison.png")
-print("多频段频谱对比图已保存！")
+print("✅ 多频段频谱图已成功保存！")
