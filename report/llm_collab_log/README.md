@@ -13,3 +13,4 @@
 | 2026-09-26 | `2026-09-26_real_voice_drc.md` | 替换真人语音输入，实现动态范围压缩（DRC）算法，验证音频长度一致性 |
 | 2026-09-26 | `2026-09-26_cpp_simulation.md` | 准备 HLS C++ Testbench 与测试数据导出脚本 |
 | 2026-09-26 | `2026-09-26_pynq_notebook.md` | 建立 PYNQ 板上 Jupyter Notebook 测试模板 |
+| 2026-09-26 | `2026-09-26_mock_test_and_algorithm.md` | 生成模拟硬件输出测试比对脚本，修复了相关系数 `nan` 的除零Bug，并补充了报告的算法设计细节 |

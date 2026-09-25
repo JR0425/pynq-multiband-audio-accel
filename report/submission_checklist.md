@@ -10,15 +10,15 @@
 - [ ] .gitignore 生效，无临时/缓存文件混入
 - [ ] 大文件（.bit 等）通过 Git LFS 管理，仓库体积正常
 - [ ] 干净环境复现验证（换台机器照 BUILD_GUIDE.md 跑一遍成功）
-- [ ] 软件基线数据（data/results/baseline_metrics.md）齐全
-- [ ] 硬件接口规格（report/hardware_interface_spec.md）齐全
+- [x] 软件基线数据（data/results/baseline_metrics.md）齐全
+- [x] 硬件接口规格（report/hardware_interface_spec.md）齐全
 
 ## 📄 文档与报告
 - [ ] 设计报告定稿（选题背景、架构、算法、测试、协作、总结）
 - [ ] 演示视频剪辑完成，链接放 README
 - [ ] 一页英文 PPT 海报（决赛用，提前准备）
-- [ ] 大模型协作日志按主题归档（report/llm_collab_log/）
-- [ ] 技能包（skill/）四类内容齐全
+- [x] 大模型协作日志按主题归档（report/llm_collab_log/）
+- [x] 技能包（skill/）四类内容齐全
 
 ## 🔧 绝对不能砍的三样
 - [ ] 实时出声（板上跑通，耳机能听到处理后的声音）
