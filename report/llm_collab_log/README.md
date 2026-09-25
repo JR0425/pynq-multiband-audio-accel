@@ -6,11 +6,14 @@
 
 | 日期 | 日志文件 | 核心内容 |
 | :--- | :--- | :--- |
-| 2026-09-25 | `2026-09-25_github_setup.md` | 在 Windows 下成功创建 GitHub 仓库，解决 443 端口封锁与 Token 认证问题 |
+| 2026-09-25 | `2026-09-25_github_setup.md` | 创建 GitHub 仓库，解决 443 端口封锁与 Token 认证问题 |
 | 2026-09-25 | `2026-09-25_python_baseline.md` | 搭建 Python 环境，解决 Miniconda 安装与 SSL 断连问题 |
-| 2026-09-25 | `2026-09-25_fir_baseline.md` | 编写单频段 FIR 滤波脚本，修复频谱图直流偏移与坐标轴可视化问题 |
-| 2026-09-25 | `2026-09-25_multiband_baseline.md` | 实现 4 频段多频段处理，修复声道重合与音频截断 Bug |
-| 2026-09-26 | `2026-09-26_real_voice_drc.md` | 替换真人语音输入，实现动态范围压缩（DRC）算法，验证音频长度一致性 |
-| 2026-09-26 | `2026-09-26_cpp_simulation.md` | 准备 HLS C++ Testbench 与测试数据导出脚本 |
-| 2026-09-26 | `2026-09-26_pynq_notebook.md` | 建立 PYNQ 板上 Jupyter Notebook 测试模板 |
-| 2026-09-26 | `2026-09-26_mock_test_and_algorithm.md` | 生成模拟硬件输出测试比对脚本，修复了相关系数 `nan` 的除零Bug，并补充了报告的算法设计细节 |
+| 2026-09-25 | `2026-09-25_fir_baseline.md` | 编写单频段 FIR 滤波脚本，修复频谱图直流偏移 |
+| 2026-09-25 | `2026-09-25_multiband_baseline.md` | 实现 4 频段多频段处理，修复声道重合与音频截断 |
+| 2026-09-25 | `2026-09-25_real_voice_drc.md` | 替换真人语音输入，实现动态范围压缩（DRC）算法 |
+| 2026-09-25 | `2026-09-25_cpp_simulation.md` | 准备 HLS C++ Testbench 与测试数据导出脚本 |
+| 2026-09-25 | `2026-09-25_export_coefficients.md` | 为 HLS/RTL 导出 4 频段 FIR 滤波器系数 |
+| 2026-09-25 | `2026-09-25_pynq_notebook.md` | 建立 PYNQ 板上 Jupyter Notebook 测试模板 |
+| 2026-09-25 | `2026-09-25_mock_test_fix.md` | 修复软硬件比对脚本中相关系数 nan 的除零 Bug |
+| 2026-09-25 | `2026-09-25_mock_test_and_algorithm.md` | 生成模拟硬件输出测试比对脚本，补充算法设计 |
+| 2026-09-25 | `2026-09-25_project_prep.md` | 扩充测试数据集，建复现指南与提交检查清单 |
