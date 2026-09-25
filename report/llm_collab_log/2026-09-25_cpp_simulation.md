@@ -1,9 +1,17 @@
-1 任务：为 HLS 加速核准备 C++ 仿真激励（Testbench）和测试数据。
+【任务】为 HLS 加速核准备 C++ 仿真激励（Testbench）和测试数据。
 
-2 问题（团队需求）：硬件团队需要在 Vitis HLS 中验证 FIR 算法，需要纯 C++ 的测试激励，并要从 Python 导出标准输入数据供对比验证。
+【提示词】
+「帮我写一个 HLS C++ 的 FIR 测试激励，需要读取 Python 导出的数据」
+「硬件团队怎么验证 FIR 算法？」
 
-3 应用模型：DeepSeek
+【模型回答】
+AI 建议在 sim/hls_csim 目录下建立 C++ 文件，编写标准 FIR 滤波函数及读取逻辑，并建议用 Python 脚本将音频导出为文本文件供 C++ 读取。
 
-4 模型回答：AI 建议在 sim/hls_csim 目录下建立 C++ 文件，编写标准 FIR 滤波函数及文件读取逻辑；同时编写 Python 脚本将 audio 数据导出为 text 格式，供 C++ 通过 ifstream 读取。
+【哪里错了】
+（本步骤未报错，为纯开发任务）
 
-5 收获：成功搭建 Python 与 C++ 的联调数据通道。生成了 C++ 测试激励文件 test_fir.cpp 和 1000 个点的测试数据 test_input.txt。这为后续“Python 基线 vs HLS 加速核”的正确性对撞做好了前置准备。
+【怎么修正】
+按标准流程完成 C++ 代码和 Python 导出脚本，确保通过测试数据将软硬件连接起来。
+
+【沉淀】
+→ 形成 HLS C++ Testbench 模板，放进 skill/templates/ 目录中。
