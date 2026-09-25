@@ -14,7 +14,7 @@ else:
 x = x - np.mean(x)
 
 # 截取前 1000 个点作为测试激励（足够 C++ 仿真用）
-x_test = x[:1000]
+x_test = x[10000:11000]
 
 # 确保目录存在
 os.makedirs("data/audio", exist_ok=True)

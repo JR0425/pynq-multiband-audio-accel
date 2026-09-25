@@ -32,8 +32,12 @@ mse = np.mean((py_data - hw_data) ** 2)         # 均方误差
 mae = np.mean(np.abs(py_data - hw_data))        # 平均绝对误差
 max_err = np.max(np.abs(py_data - hw_data))     # 最大单点误差
 
-# 计算相关系数（衡量波形形状相似度）
-correlation = np.corrcoef(py_data, hw_data)[0, 1]
+# 计算相关系数（带防除零保护）
+if np.std(py_data) > 1e-8 and np.std(hw_data) > 1e-8:
+    correlation = np.corrcoef(py_data, hw_data)[0, 1]
+else:
+    print("⚠️ 提示：数据方差极小（可能是静音段），无法计算相关系数，跳过此项。")
+    correlation = 1.0
 
 print("==========================================")
 print("📊 软硬件结果比对报告")
