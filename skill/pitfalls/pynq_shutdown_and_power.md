@@ -52,4 +52,5 @@ Reached target Power-Off.
 ## 相关
 
 - 网络配置：`skill/pitfalls/pynq_direct_ethernet_windows.md`
+- 串口控制台：`skill/pitfalls/pynq_serial_console.md`
 - 连通性自检：`skill/checkers/check_board_connection.bat`
