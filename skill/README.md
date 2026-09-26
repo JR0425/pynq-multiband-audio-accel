@@ -5,8 +5,8 @@
 ## 📁 目录说明
 - `prompts/`：常用大模型提示词工作流（FIR、FFT、DRC 设计场景）。
 - `templates/`：HLS C++ Testbench 模板、硬件接口需求规格模板。
-- `checkers/`：自动化校验脚本（如 check_audio_length.py）。
-- `pitfalls/`：踩坑记录清单（GitHub 网络、FFT 直流偏移等）。
+- `checkers/`：自动化校验脚本（音频长度校验、板子连通自检、串口控制台）。
+- `pitfalls/`：踩坑记录清单（PYNQ 板级连通、Overlay 加载、音频算法、GitHub 网络等）。
 
 ## 🚀 如何使用本技能包？
 1. **新手入门**：先阅读 `pitfalls/` 中的踩坑清单。

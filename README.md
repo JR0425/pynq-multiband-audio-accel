@@ -24,22 +24,25 @@ PYNQ Multiband Audio Accelerator
 
 运行后，结果图片将保存在 data/figures/，处理后的音频在 data/audio/。
 
-3. 硬件加速与上板 (待技术队友完成)
+3. 硬件加速与上板
 
-· HLS 加速核编译与综合在 src/hls/。
-· 上板测试脚本见 board/notebooks/test_multiband.ipynb。
+· 板级通路已验证：在 PYNQ-Z2 上加载参考 overlay 并完成端到端跑通，数据见 data/results/reference\_overlay\_metrics.md。
+· 自研 HLS 加速核的编译与综合在 src/hls/。
+· 上板测试脚本见 board/notebooks/test\_multiband.ipynb。
 
 性能基线
 
-软件基线数据已记录在 data/results/baseline_metrics.md。
-（硬件资源占用与端到端延迟数据待上板后填入）
+· 软件基线：data/results/baseline\_metrics.md
+· 板级通路验证（开源参考 overlay）：data/results/reference\_overlay\_metrics.md
+· 自研加速核的资源占用与端到端延迟：待综合后填入
 
 文档与日志
 
-· 设计报告草稿：report/design_report_draft.md
-· 大模型协作日志：report/llm_collab_log/
+· 设计报告草稿：report/design\_report\_draft.md
+· 大模型协作日志：report/llm\_collab\_log/
 · 技能包：skill/
 
 开源协议
 
 本项目基于 MIT 协议开源，详见 LICENSE。
+
