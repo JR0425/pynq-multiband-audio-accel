@@ -36,7 +36,43 @@ $p.ReadExisting()     # 板子回了什么
 $p.Close()
 ```
 
-`ReadExisting()` 只读一次会漏，要循环读几秒。完整脚本：`skill/checkers/pynq_serial_console.ps1`。
+`ReadExisting()` 只读一次会漏，要循环读几秒。完整脚本：`skill/checkers/pynq_serial_console.ps1`；
+要**发命令**而不只是读，用 `skill/checkers/pynq_serial_send.ps1`。
+
+## 中文显示成全问号 `??????`
+
+**板子没问题，是 PC 这侧三个编码默认值。** 查板子会白费功夫：
+
+```
+$ echo $LANG                          ->  en_US.UTF-8
+$ python3 -c "import sys;print(sys.stdout.encoding)"  ->  utf-8
+```
+
+三个默认值：
+
+| 哪一处 | 默认值 | 后果 |
+|---|---|---|
+| `SerialPort.Encoding` | ASCII | **收发双向**把非 ASCII 换成 `?` |
+| `[Console]::OutputEncoding` | OEM 代码页（本机 936） | 文字到终端前又被重编一次 |
+| `Get-Content` | ANSI 代码页 | 用 UTF-8 写的命令行读成乱码 |
+
+第一条是病根。诊断方法：发一句 `print('中文测试')` 看**回显**——
+回显都是 `?`，说明字符在**发出去之前**就丢了。
+
+修法是三行：
+
+```powershell
+$utf8 = New-Object System.Text.UTF8Encoding $false
+$port.Encoding = $utf8                  # 收发
+[Console]::OutputEncoding = $utf8       # 显示
+$lines = Get-Content -LiteralPath $f -Encoding UTF8   # 读命令行文件
+```
+
+第三条最阴：命令行里全是 ASCII 时它不暴露。一旦命令带中文，
+它和第一条叠在一起，现象几乎一样。
+
+排查纪律：**输出是乱码时，先发一句纯 ASCII 的对照，把问题切到链路某一段**，
+不要在板子和脚本两端同时改。
 
 ## 怎么判断读到了
 

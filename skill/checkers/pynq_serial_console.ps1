@@ -1,9 +1,11 @@
 # Read the PYNQ-Z2 serial console with no extra software.
-# Windows PowerShell, .NET SerialPort. ASCII only on purpose.
+# Windows PowerShell, .NET SerialPort.
 #
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File pynq_serial_console.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File pynq_serial_console.ps1 -PortName COM4 -Seconds 20
+#
+# To SEND commands instead of just reading, use pynq_serial_send.ps1.
 
 param(
     [string]$PortName = "COM6",
@@ -21,6 +23,16 @@ $port.Parity = [System.IO.Ports.Parity]::None
 $port.DataBits = 8
 $port.StopBits = [System.IO.Ports.StopBits]::One
 $port.ReadTimeout = 500
+
+# Encoding. SerialPort.Encoding defaults to ASCII, which silently replaces every
+# non-ASCII byte with '?' -- the board's Chinese output arrives as ?????? and
+# anything you send gets mangled the same way. [Console]::OutputEncoding defaults
+# to the OEM codepage, which re-encodes the text again on the way to the terminal.
+# Measured 2026-09-27: the board itself is fine (LANG=en_US.UTF-8, Python stdout
+# is utf-8), so both bugs are on the PC side.
+$utf8 = New-Object System.Text.UTF8Encoding $false
+$port.Encoding = $utf8
+[Console]::OutputEncoding = $utf8
 
 # NOTE: DtrEnable / RtsEnable are deliberately NOT set.
 # Tested on PYNQ-Z2 (FTDI) 2026-09-26: output arrives either way.
