@@ -2,17 +2,18 @@
 
 用法（在 PYNQ 板子上跑）：
 
-    env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 test_overlay_load.py
+    env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 test_overlay_load.py [xxx.bit]
+
+.hwh 必须和 .bit 同目录、同文件名，否则 PYNQ 只会把它当普通 bit 加载，
+认不出里面有什么 IP（不报错，但 ip_dict 是空的）。不传参数就用下面的默认值。
 
 这两处都不能省，缺一个就会报 `No Devices Found`：
   1. 必须用 venv 里的 python —— 系统 /usr/bin/python3 里没有 pynq
   2. 必须带上 XILINX_XRT=/usr —— 登录 shell 会自动设这个变量，SSH 直连跑命令不会
-
-换成自己的 overlay：把 BITFILE 改成你的 .bit 路径（.hwh 必须同目录、同文件名）。
 """
 import sys
 
-BITFILE = "fir_accel2.bit"
+BITFILE = sys.argv[1] if len(sys.argv) > 1 else "fir_accel2.bit"
 
 print("python", sys.version.split()[0])
 try:
