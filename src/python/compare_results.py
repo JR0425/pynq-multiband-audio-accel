@@ -7,10 +7,12 @@ import os
 # ==========================================
 
 # 1. 定义文件路径
-# Python 黄金参考（软件基线结果，我们之前导出过 test_input.txt，这是输入数据）
-# 硬件团队会根据这个输入算出输出，存为 hw_output.txt
-python_output_path = "data/audio/test_input.txt"    # 目前用测试数据占位
-hw_output_path = "data/results/hw_output.txt"        # 等待技术队友生成
+# Python 黄金参考：用与硬件**完全相同的那组系数**（sim/hls_csim/fir_coeffs_{1..4}.txt）
+# 对同一批输入算出来的结果，由 src/python/export_golden.py 生成。
+# ⚠️ 不能拿 data/audio/test_input.txt 当基准 —— 那是输入，不是输出，
+#    拿输入和输出比，相关系数一样会很高，但什么都证明不了。
+python_output_path = "data/results/python_golden.txt"
+hw_output_path = "data/results/hw_output.txt"        # HLS/RTL 跑出来的结果
 
 if not os.path.exists(hw_output_path):
     print("⚠️ 硬件输出文件尚未生成，请等 HLS/RTL 测试完成后放入 data/results/ 目录。")
