@@ -31,6 +31,9 @@ __pycache__/
 # Build artifacts (但保留 board/overlay 下的最终产物)
 build/*.bit
 build/*.hwh
+# build/vivado 下是 Vivado 工程本体，整个不进仓库 —— 上面那些 *.cache/ *.runs/
+# 之类只是挡住了里面的大头，剩下的 .Xil / NA / webtalk 报告还是会漏出来。
+build/vivado/
 
 # OS
 .DS_Store
