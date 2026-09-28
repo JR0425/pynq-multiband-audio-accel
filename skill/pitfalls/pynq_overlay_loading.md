@@ -57,7 +57,72 @@ best = max(range(-30, 31),
 - 20 万点 int32 输入，DMA 传输约 **3.1 ms**
 - 同一任务：软件 0.0922 s / 硬件 0.00469 s → **19.67 倍**
 
+## 自己出 bit 时另外两个坑
+
+实测：Vivado 2020.2 batch 模式，建一个只放 Zynq PS 的最小 overlay，2026-09-27。
+
+**1. `write_hwdef` 出的不是 `.hwh` 文件，是一个 zip 包**
+
+```
+write_hwdef -force -file ps_only.hwdef
+```
+
+出来的 `ps_only.hwdef` 用 `file` 一看是 `Zip archive data`。包里装的是：
+
+```
+    1210  hwdef.xml          <- 索引清单，不是 hwh
+  119162  ps_only.hwh        <- 这个才是
+  499373  ps7_init.c
+2761441  ps7_init.html
+   33923  ps7_init.tcl
+   ...
+```
+
+PYNQ 是拿 `ElementTree.parse()` 直接把这个文件当 XML 读的：
+
+```
+# pynq/pl_server/hwh_parser.py 第 159 行
+tree = ElementTree.parse(hwh_name)
+```
+
+塞一个 zip 进去，`Overlay()` 当场挂。**要的是包里那个根标签 `<EDKSYSTEM>`、
+一百多 KB 的 `<名字>.hwh`**，拆出来单独存：
+
+```python
+import zipfile
+zipfile.ZipFile("ps_only.hwdef").extract("ps_only.hwh", ".")
+```
+
+判据（不用跑板子就能验）：文件头应该是 `<?xml`，根标签 `<EDKSYSTEM>`，
+里面 `<MODULE INSTANCE="ps7_0" ...>`。若根标签是 `<Project>`、只有 1 KB，那是 `hwdef.xml`，拿错了。
+
+**2. PS 使能的每个 AXI 端口，时钟脚都要接**
+
+只给 `M_AXI_GP0_ACLK` 和 `S_AXI_GP0_ACLK` 接上时钟不够。PS 配置里
+`M_AXI_GP1` / `S_AXI_HP0` / `S_AXI_HP2` 只要是开的，它们的 ACLK 也必须接，
+否则 `validate_bd_design` 直接失败：
+
+```
+ERROR: [BD 41-758] The following clock pins are not connected to a valid clock source:
+/ps7_0/M_AXI_GP1_ACLK
+/ps7_0/S_AXI_HP0_ACLK
+/ps7_0/S_AXI_HP2_ACLK
+```
+
+官方 base overlay 的接法是（`base.tcl` 第 4640 / 4642 行）：
+
+```tcl
+connect_bd_net [get_bd_pins ps7_0/FCLK_CLK1] [get_bd_pins ps7_0/S_AXI_HP0_ACLK]
+connect_bd_net [get_bd_pins ps7_0/FCLK_CLK3] \
+               [get_bd_pins ps7_0/M_AXI_GP1_ACLK] \
+               [get_bd_pins ps7_0/S_AXI_HP2_ACLK]
+```
+
+**为什么值得先建一个空的 PS 工程**：这个错停在 `validate_bd_design`，
+还没进综合，几十秒就报出来；要是等整套音频 IP 都画完再跑，同样的错要几分钟才知道。
+
 ## 相关
 
 - 串口进板子：`skill/pitfalls/pynq_serial_console.md`
 - 网络配置：`skill/pitfalls/pynq_direct_ethernet_windows.md`
+- 整条音频通路是怎么接的（源码级）：`skill/pitfalls/pynq_audio_playback.md`
