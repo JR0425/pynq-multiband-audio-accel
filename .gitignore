@@ -34,6 +34,9 @@ build/*.hwh
 # build/vivado 下是 Vivado 工程本体，整个不进仓库 —— 上面那些 *.cache/ *.runs/
 # 之类只是挡住了里面的大头，剩下的 .Xil / NA / webtalk 报告还是会漏出来。
 build/vivado/
+# build/hls 下只留 .tcl 构建脚本，HLS 工程本体（csim_proj 等）不进仓库
+build/hls/*
+!build/hls/*.tcl
 
 # OS
 .DS_Store
