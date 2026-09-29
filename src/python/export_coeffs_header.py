@@ -45,15 +45,25 @@ def main():
  *   2: 带通 300-600 Hz
  *   3: 带通 600-1000 Hz
  *   4: 高通 1000-8000 Hz
+ *
+ * ⚠️ 表的类型是 coef_t，不是 float —— 由 fir_types.h 按编译开关定：
+ *     浮点模式  coef_t = float
+ *     定点模式  coef_t = ap_fixed<FIR_CW,1>
+ *   表写成 coef_t 是**故意的，不是随手**:实测过写成 const float、在循环里再转定点，
+ *   HLS 不会在综合时折掉那个转换，而是生成 65 个 float→double 扩位器，
+ *   系数表也从 8 块 BRAM 涨到 128 块，LUT 炸到 232% 装不下。
+ *   表本身就是定点的，硬件里就一次转换都不用做。
  */
 
 #ifndef FIR_COEFFS_H
 #define FIR_COEFFS_H
 
+#include "fir_types.h"
+
 #define N_TAPS {N_TAPS}
 #define N_BANDS {N_BANDS}
 
-static const float FIR_COEFFS[N_BANDS][N_TAPS] = {{
+static const coef_t FIR_COEFFS[N_BANDS][N_TAPS] = {{
 {body}
 }};
 

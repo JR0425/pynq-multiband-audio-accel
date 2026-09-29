@@ -104,15 +104,72 @@
 #error "FIR_PARTIAL must divide N_TAPS (65 -> 1, 5, 13, 65)"
 #endif
 
+/* ---- FIR_FIXED：把数据通路从浮点换成定点 ----
+ *
+ * 为什么要试：上面那套结构优化是在**浮点**这条线上量的。浮点加法电路
+ * （fadd）本身 5 拍延迟，是那条线所有瓶颈的根源；定点加法只要 1 拍，
+ * 这条链根本不存在。而且浮点乘法在 FPGA 上要吃掉好几个 DSP，
+ * 定点 18 位乘法一个 DSP 就够 —— 面积上多半是一大笔。
+ *
+ * 代价是精度。所以这个实验要产出的是**一张"位宽换精度"的表**：
+ * 每种位宽组合跑一遍 csim，和 float64 黄金参考比，看差多少。
+ * 判据用信噪比（SNR，dB）而不是"误差小于多少" —— 音频里 SNR 才是行话，
+ * 而且它和位宽的关系是线性的（每多 1 位约 +6 dB），一眼能看出够不够。
+ *
+ * ---- 位宽怎么定的 ----
+ *   采样  [-0.55, 0.55]，输出 [-0.70, 0.92]  → 都在 [-1,1) 里，用 Q1.15（16 位）
+ *   系数  最大 0.958、最小非零 1.14e-4（差 8000 倍）→ 16 位不够，给 18 位
+ *   累加  65 个乘积之和，最坏情况放大 65 倍 → 留 8 位整数位、共 40 位
+ *
+ * ---- 量化方式 ----
+ *   采样：截断（AP_TRN）+ 饱和（AP_SAT）。截断在硬件里不花钱；
+ *         饱和是多一个比较器，但保证输入超范围时不会绕回成一个反号的大数。
+ *   系数：四舍五入（AP_RND）。这一步是编译期常量转换，硬件里不花钱，
+ *         白拿一半的误差。
+ *   累加：截断 + 饱和。位宽给得足够宽，实际不会触发饱和。
+ *
+ * ⚠️ 定点版**不能用本机 g++ 先验语法** —— ap_fixed.h 是 Xilinx 的头文件，
+ *    g++ 没有。这条只能交给 HLS 编。
+ *
+ * ⚠️ 位宽的**真实成本，第一次量的时候被我搞错了**：
+ *    第一版把系数表写成 `const float`、在循环里再转成定点，结果 HLS 没有在
+ *    综合时折掉这个转换，而是在硬件里放了 **65 个 float→double 扩位器**，
+ *    系数表也从 8 块 BRAM 涨到 128 块。LUT 直接炸到 123550（232%，装不下）。
+ *    → 正确做法是**让系数表本身就是定点类型**（见 fir_coeffs.h + fir_types.h），
+ *      这样表里存的就是 18 位数本身，硬件里一次转换都不需要。
+ *
+ * 0 = 原来的浮点（默认），1 = 定点。
+ * 位宽用 -DFIR_DW= / -DFIR_CW= / -DFIR_ACC_W= 单独调，默认 16 / 18 / 40。
+ * 类型定义在 fir_types.h 里（系数表也要用它，所以抽出去公用）。 */
+#include "fir_types.h"
+
 /* 单频段动态范围压缩：小信号原样过，超过阈值的部分按 0.7 的比例压下来。
- * 与 np.where(np.abs(f) > 0.1, np.sign(f) * (0.1 + (np.abs(f)-0.1)*0.7), f) 等价。 */
-static float drc(float x) {
-    float a = (x < 0.0f) ? -x : x;
-    if (a <= DRC_THRESHOLD) {
+ * 与 np.where(np.abs(f) > 0.1, np.sign(f) * (0.1 + (np.abs(f)-0.1)*0.7), f) 等价。
+ * 写成 drc_t 是为了浮点/定点共用同一份代码 —— 定点下这几种运算的写法是一样的。
+ *
+ * ⚠️ 参数类型是 drc_t（不是 acc_t）—— 这是**故意的，不是随手**。
+ *    DRC 的输入是单个频段已经算完的输出，量级在 ±1 附近，
+ *    用 40 位的累加器类型去算它，会合出一个 40x40 的乘法器（实测 33x33），
+ *    这块逻辑 HLS 塞不进 DSP，全部落进 LUT 里。换成 24 位之后这一项小一个数量级。
+ *    量化代价见 fir_types.h 里 drc_t 那段。
+ *
+ * ⚠️ 取绝对值不要写成三元表达式 `(x<0) ? -x : x`：定点下 `-x` 会比 `x` 宽一位，
+ *    三元表达式要求两个分支类型相同，会直接编译不过（实测报
+ *    "operands to ?: have different types"）。拆成 if 赋值就没这个问题 ——
+ *    窄类型接收宽结果是允许的，这正是量化发生的地方。 */
+static drc_t drc(drc_t x) {
+    drc_t a = x;
+    if (x < (drc_t)0) {
+        a = -x;
+    }
+    if (a <= (drc_t)DRC_THRESHOLD) {
         return x;
     }
-    float sign = (x < 0.0f) ? -1.0f : 1.0f;
-    return sign * (DRC_THRESHOLD + (a - DRC_THRESHOLD) * DRC_SLOPE);
+    drc_t sign = (drc_t)1;
+    if (x < (drc_t)0) {
+        sign = (drc_t)(-1);
+    }
+    return sign * ((drc_t)DRC_THRESHOLD + (a - (drc_t)DRC_THRESHOLD) * (drc_t)DRC_SLOPE);
 }
 
 /* 处理 length 个采样：in -> out。
@@ -120,7 +177,7 @@ static float drc(float x) {
 void fir_multiband(const float *in, float *out, int length) {
     /* 抽头延迟线：hist[0] 是最新采样，hist[N_TAPS-1] 是最旧的。
      * 初值全 0，对应 Python lfilter 的零初始状态 —— 两边必须一样。 */
-    float hist[N_TAPS];
+    data_t hist[N_TAPS];
 #if FIR_PRAGMA
     /* 按 5 路循环拆分（cyclic），与 FIR_PARTIAL 对齐：
      * 第 k 个抽头固定落在第 (k % 5) 路。这样内层 p 循环展开之后，
@@ -141,7 +198,7 @@ void fir_multiband(const float *in, float *out, int length) {
 #endif
 #endif
     for (int k = 0; k < N_TAPS; k++) {
-        hist[k] = 0.0f;
+        hist[k] = (data_t)0;
     }
 
     for (int n = 0; n < length; n++) {
@@ -154,16 +211,18 @@ void fir_multiband(const float *in, float *out, int length) {
         for (int k = N_TAPS - 1; k > 0; k--) {
             hist[k] = hist[k - 1];
         }
-        hist[0] = in[n];
+        /* 浮点下这个转换是恒等；定点下就是**量化发生的地方** ——
+         * 采样从 float 截断成 Q1.15，这是全链路第一处误差来源。 */
+        hist[0] = (data_t)in[n];
 
         /* 4 个频段各自算一遍，各自压缩，再相加 */
-        float acc = 0.0f;
+        acc_t acc = (acc_t)0;
         for (int b = 0; b < N_BANDS; b++) {
             /* FIR_PARTIAL 个部分和：每个负责 1/FIR_PARTIAL 的抽头。
              * 它们之间没有依赖，硬件里可以同时算 —— 这就是并行度的来源。 */
-            float y[FIR_PARTIAL];
+            acc_t y[FIR_PARTIAL];
             for (int p = 0; p < FIR_PARTIAL; p++) {
-                y[p] = 0.0f;
+                y[p] = (acc_t)0;
             }
 
 #if FIR_FOLD
@@ -178,11 +237,11 @@ void fir_multiband(const float *in, float *out, int length) {
                  * 和直算那条路用的是同一把闸，这样才能公平对比。 */
 #pragma HLS UNROLL
 #endif
-                float f = hist[k];
+                data_t f = hist[k];
                 if (k != N_FOLD - 1) {
                     f += hist[N_TAPS - 1 - k];
                 }
-                y[k % FIR_PARTIAL] += f * FIR_COEFFS[b][k];
+                y[k % FIR_PARTIAL] += (acc_t)(f * FIR_COEFFS[b][k]);
             }
 #else
             /* k 每轮跳 FIR_PARTIAL 个，内层 p 把这一组的抽头分给各个部分和 */
@@ -195,19 +254,32 @@ void fir_multiband(const float *in, float *out, int length) {
 #pragma HLS UNROLL
 #endif
                 for (int p = 0; p < FIR_PARTIAL; p++) {
-                    y[p] += hist[k + p] * FIR_COEFFS[b][k + p];
+                    /* ⚠️ 两个操作数**不能**先转成 acc_t 再乘。
+                     *    原来写的是 (acc_t)hist * (acc_t)coef，两边都撑到 40 位，
+                     *    HLS 就去综合 40×40 的乘法器 —— 实测出来是 65 个
+                     *    `mul_33s_33s_65`，**一个 DSP 都用不上**，全落在逻辑格子里，
+                     *    LUT 因此下不来。
+                     *    改成在各自的原始位宽上乘（16 位 × 18 位，正好塞进
+                     *    一个 DSP48 的 25×18 输入），乘完再把积转进累加器 ——
+                     *    量化仍然发生在"接收"这一步，数值结果完全一样。
+                     *    系数是编译期常量，它在硬件里只是一张表，
+                     *    所以系数位数不花运算代价，只花存储和布线。
+                     *    浮点模式下三个类型都是 float，加不加转换等价 ——
+                     *    所以这一改不会动到浮点版的综合结果。 */
+                    acc_t prod = (acc_t)(hist[k + p] * FIR_COEFFS[b][k + p]);
+                    y[p] += prod;
                 }
             }
 #endif
 
             /* 部分和合并（FIR_PARTIAL=1 时这一步就是恒等，不产生额外加法） */
-            float ys = 0.0f;
+            acc_t ys = (acc_t)0;
             for (int p = 0; p < FIR_PARTIAL; p++) {
                 ys += y[p];
             }
 
-            acc += drc(ys);
+            acc += (acc_t)drc((drc_t)ys);
         }
-        out[n] = acc;
+        out[n] = (float)acc;
     }
 }
