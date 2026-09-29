@@ -1,0 +1,69 @@
+Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
+| Date         : Tue Sep 29 19:44:41 2026
+| Host         : yu running 64-bit major release  (build 9200)
+| Command      : report_utilization -hierarchical -file D:/pynq-multiband-audio-accel/build/hls/reports/v11_fixed_nosat_mul5_impl/utilization_impl_hier.rpt
+| Design       : fir_multiband
+| Device       : 7z020clg400-1
+| Design State : Routed
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Utilization Design Information
+
+Table of Contents
+-----------------
+1. Utilization by Hierarchy
+
+1. Utilization by Hierarchy
+---------------------------
+
++------------------------------------------------------+-------------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+
+|                       Instance                       |                      Module                     | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | DSP Blocks |
++------------------------------------------------------+-------------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+
+| fir_multiband                                        |                                           (top) |       3506 |       3430 |      64 |   12 | 4645 |      0 |      4 |         35 |
+|   (fir_multiband)                                    |                                           (top) |       2311 |       2306 |       0 |    5 | 4171 |      0 |      0 |         26 |
+|   FIR_COEFFS_V_U                                     |                      fir_multiband_FIR_COEFFS_V |        253 |        253 |       0 |    0 |   45 |      0 |      3 |          0 |
+|     fir_multiband_FIR_COEFFS_V_rom_U                 |                  fir_multiband_FIR_COEFFS_V_rom |        253 |        253 |       0 |    0 |   45 |      0 |      3 |          0 |
+|   fpext_32ns_64_2_no_dsp_1_U7                        |          fir_multiband_fpext_32ns_64_2_no_dsp_1 |         48 |         48 |       0 |    0 |   32 |      0 |      0 |          0 |
+|     (fpext_32ns_64_2_no_dsp_1_U7)                    |          fir_multiband_fpext_32ns_64_2_no_dsp_1 |         10 |         10 |       0 |    0 |   32 |      0 |      0 |          0 |
+|     fir_multiband_ap_fpext_0_no_dsp_32_u             |              fir_multiband_ap_fpext_0_no_dsp_32 |         38 |         38 |       0 |    0 |    0 |      0 |      0 |          0 |
+|       inst                                           |                          floating_point_v7_1_11 |         38 |         38 |       0 |    0 |    0 |      0 |      0 |          0 |
+|         i_synth                                      |                      floating_point_v7_1_11_viv |         38 |         38 |       0 |    0 |    0 |      0 |      0 |          0 |
+|           (i_synth)                                  |                      floating_point_v7_1_11_viv |         32 |         32 |       0 |    0 |    0 |      0 |      0 |          0 |
+|           FLT_TO_FLT_OP.SPD.OP                       |                                 flt_to_flt_conv |          6 |          6 |       0 |    0 |    0 |      0 |      0 |          0 |
+|             EXP                                      |                             flt_to_flt_conv_exp |          6 |          6 |       0 |    0 |    0 |      0 |      0 |          0 |
+|               COND_DET                               |                                  special_detect |          6 |          6 |       0 |    0 |    0 |      0 |      0 |          0 |
+|                 MANT_CARRY.MANT_ALL_ZERO_DET         |                                   compare_eq_im |          6 |          6 |       0 |    0 |    0 |      0 |      0 |          0 |
+|                   CARRY_ZERO_DET                     |                                     carry_chain |          6 |          6 |       0 |    0 |    0 |      0 |      0 |          0 |
+|   hist_V_0_U                                         |                          fir_multiband_hist_V_0 |          9 |          9 |       0 |    0 |    0 |      0 |      1 |          0 |
+|     fir_multiband_hist_V_0_ram_U                     |                      fir_multiband_hist_V_0_ram |          9 |          9 |       0 |    0 |    0 |      0 |      1 |          0 |
+|   hist_V_1_U                                         |                          fir_multiband_hist_V_1 |         19 |          3 |      16 |    0 |   32 |      0 |      0 |          0 |
+|     fir_multiband_hist_V_1_ram_U                     |                   fir_multiband_hist_V_1_ram_11 |         19 |          3 |      16 |    0 |   32 |      0 |      0 |          0 |
+|   hist_V_2_U                                         |                        fir_multiband_hist_V_1_0 |         33 |         17 |      16 |    0 |   32 |      0 |      0 |          0 |
+|     fir_multiband_hist_V_1_ram_U                     |                   fir_multiband_hist_V_1_ram_10 |         33 |         17 |      16 |    0 |   32 |      0 |      0 |          0 |
+|   hist_V_3_U                                         |                        fir_multiband_hist_V_1_1 |         18 |          2 |      16 |    0 |   32 |      0 |      0 |          0 |
+|     fir_multiband_hist_V_1_ram_U                     |                    fir_multiband_hist_V_1_ram_9 |         18 |          2 |      16 |    0 |   32 |      0 |      0 |          0 |
+|   hist_V_4_U                                         |                        fir_multiband_hist_V_1_2 |         25 |          9 |      16 |    0 |   32 |      0 |      0 |          0 |
+|     fir_multiband_hist_V_1_ram_U                     |                      fir_multiband_hist_V_1_ram |         25 |          9 |      16 |    0 |   32 |      0 |      0 |          0 |
+|   mul_18s_16s_34_1_1_U1                              |                fir_multiband_mul_18s_16s_34_1_1 |        146 |        146 |       0 |    0 |   68 |      0 |      0 |          1 |
+|     fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U  | fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_8 |        146 |        146 |       0 |    0 |   68 |      0 |      0 |          1 |
+|   mul_18s_16s_34_1_1_U2                              |              fir_multiband_mul_18s_16s_34_1_1_3 |        140 |        140 |       0 |    0 |    0 |      0 |      0 |          1 |
+|     fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U  | fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_7 |        140 |        140 |       0 |    0 |    0 |      0 |      0 |          1 |
+|   mul_18s_16s_34_1_1_U3                              |              fir_multiband_mul_18s_16s_34_1_1_4 |        117 |        117 |       0 |    0 |    0 |      0 |      0 |          1 |
+|     fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U  | fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_6 |        117 |        117 |       0 |    0 |    0 |      0 |      0 |          1 |
+|   mul_18s_16s_34_1_1_U5                              |              fir_multiband_mul_18s_16s_34_1_1_5 |        148 |        148 |       0 |    0 |  136 |      0 |      0 |          1 |
+|     fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U  |   fir_multiband_mul_18s_16s_34_1_1_Multiplier_0 |        148 |        148 |       0 |    0 |  136 |      0 |      0 |          1 |
+|   mul_26s_24s_47_1_1_U4                              |                fir_multiband_mul_26s_24s_47_1_1 |        192 |        192 |       0 |    0 |   34 |      0 |      0 |          2 |
+|     fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U  |   fir_multiband_mul_26s_24s_47_1_1_Multiplier_1 |        192 |        192 |       0 |    0 |   34 |      0 |      0 |          2 |
+|   mul_47ns_24s_71_5_1_U6                             |               fir_multiband_mul_47ns_24s_71_5_1 |          8 |          8 |       0 |    0 |    0 |      0 |      0 |          3 |
+|     fir_multiband_mul_47ns_24s_71_5_1_Multiplier_2_U |  fir_multiband_mul_47ns_24s_71_5_1_Multiplier_2 |          8 |          8 |       0 |    0 |    0 |      0 |      0 |          3 |
+|   mux_564_16_1_1_U9                                  |                    fir_multiband_mux_564_16_1_1 |         16 |         16 |       0 |    0 |    0 |      0 |      0 |          0 |
+|   urem_7ns_4ns_7_11_1_U8                             |               fir_multiband_urem_7ns_4ns_7_11_1 |         30 |         23 |       0 |    7 |   31 |      0 |      0 |          0 |
+|     fir_multiband_urem_7ns_4ns_7_11_1_div_U          |           fir_multiband_urem_7ns_4ns_7_11_1_div |         30 |         23 |       0 |    7 |   31 |      0 |      0 |          0 |
+|       (fir_multiband_urem_7ns_4ns_7_11_1_div_U)      |           fir_multiband_urem_7ns_4ns_7_11_1_div |          0 |          0 |       0 |    0 |    3 |      0 |      0 |          0 |
+|       fir_multiband_urem_7ns_4ns_7_11_1_div_u_0      |         fir_multiband_urem_7ns_4ns_7_11_1_div_u |         30 |         23 |       0 |    7 |   28 |      0 |      0 |          0 |
++------------------------------------------------------+-------------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+
+* Note: The sum of lower-level cells may be larger than their parent cells total, due to cross-hierarchy LUT combining
+
+

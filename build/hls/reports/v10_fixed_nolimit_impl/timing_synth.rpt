@@ -1,0 +1,997 @@
+Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
+| Date         : Tue Sep 29 20:38:10 2026
+| Host         : yu running 64-bit major release  (build 9200)
+| Command      : report_timing_summary -delay_type max -max_paths 10 -file D:/pynq-multiband-audio-accel/build/hls/reports/v10_fixed_nolimit_impl/timing_synth.rpt
+| Design       : fir_multiband
+| Device       : 7z020-clg400
+| Speed File   : -1  PRODUCTION 1.12 2019-11-22
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Summary Report
+
+------------------------------------------------------------------------------------------------
+| Timer Settings
+| --------------
+------------------------------------------------------------------------------------------------
+
+  Enable Multi Corner Analysis               :  Yes
+  Enable Pessimism Removal                   :  Yes
+  Pessimism Removal Resolution               :  Nearest Common Node
+  Enable Input Delay Default Clock           :  No
+  Enable Preset / Clear Arcs                 :  No
+  Disable Flight Delays                      :  No
+  Ignore I/O Paths                           :  No
+  Timing Early Launch at Borrowing Latches   :  No
+  Borrow Time for Max Delay Exceptions       :  Yes
+  Merge Timing Exceptions                    :  Yes
+
+  Corner  Analyze    Analyze    
+  Name    Max Paths  Min Paths  
+  ------  ---------  ---------  
+  Slow    Yes        Yes        
+  Fast    Yes        Yes        
+
+
+
+check_timing report
+
+Table of Contents
+-----------------
+1. checking no_clock (0)
+2. checking constant_clock (0)
+3. checking pulse_width_clock (0)
+4. checking unconstrained_internal_endpoints (0)
+5. checking no_input_delay (66)
+6. checking no_output_delay (36)
+7. checking multiple_clock (0)
+8. checking generated_clocks (0)
+9. checking loops (0)
+10. checking partial_input_delay (0)
+11. checking partial_output_delay (0)
+12. checking latch_loops (0)
+
+1. checking no_clock (0)
+------------------------
+ There are 0 register/latch pins with no clock.
+
+
+2. checking constant_clock (0)
+------------------------------
+ There are 0 register/latch pins with constant_clock.
+
+
+3. checking pulse_width_clock (0)
+---------------------------------
+ There are 0 register/latch pins which need pulse_width check
+
+
+4. checking unconstrained_internal_endpoints (0)
+------------------------------------------------
+ There are 0 pins that are not constrained for maximum delay.
+
+ There are 0 pins that are not constrained for maximum delay due to constant clock.
+
+
+5. checking no_input_delay (66)
+-------------------------------
+ There are 66 input ports with no input delay specified. (HIGH)
+
+ There are 0 input ports with no input delay but user has a false path constraint.
+
+
+6. checking no_output_delay (36)
+--------------------------------
+ There are 36 ports with no output delay specified. (HIGH)
+
+ There are 0 ports with no output delay but user has a false path constraint
+
+ There are 0 ports with no output delay but with a timing clock defined on it or propagating through it
+
+
+7. checking multiple_clock (0)
+------------------------------
+ There are 0 register/latch pins with multiple clocks.
+
+
+8. checking generated_clocks (0)
+--------------------------------
+ There are 0 generated clocks that are not connected to a clock source.
+
+
+9. checking loops (0)
+---------------------
+ There are 0 combinational loops in the design.
+
+
+10. checking partial_input_delay (0)
+------------------------------------
+ There are 0 input ports with partial input delay specified.
+
+
+11. checking partial_output_delay (0)
+-------------------------------------
+ There are 0 ports with partial output delay specified.
+
+
+12. checking latch_loops (0)
+----------------------------
+ There are 0 combinational latch loops in the design through latch input
+
+
+
+------------------------------------------------------------------------------------------------
+| Design Timing Summary
+| ---------------------
+------------------------------------------------------------------------------------------------
+
+    WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
+    -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
+      1.652        0.000                      0                11529        3.750        0.000                       0                  2922  
+
+
+All user specified timing constraints are met.
+
+
+------------------------------------------------------------------------------------------------
+| Clock Summary
+| -------------
+------------------------------------------------------------------------------------------------
+
+Clock   Waveform(ns)       Period(ns)      Frequency(MHz)
+-----   ------------       ----------      --------------
+ap_clk  {0.000 5.000}      10.000          100.000         
+
+
+------------------------------------------------------------------------------------------------
+| Intra Clock Table
+| -----------------
+------------------------------------------------------------------------------------------------
+
+Clock             WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
+-----             -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
+ap_clk              1.652        0.000                      0                11529        3.750        0.000                       0                  2922  
+
+
+------------------------------------------------------------------------------------------------
+| Inter Clock Table
+| -----------------
+------------------------------------------------------------------------------------------------
+
+From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints  
+----------    --------          -------      -------  ---------------------  -------------------  
+
+
+------------------------------------------------------------------------------------------------
+| Other Path Groups Table
+| -----------------------
+------------------------------------------------------------------------------------------------
+
+Path Group    From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints  
+----------    ----------    --------          -------      -------  ---------------------  -------------------  
+
+
+------------------------------------------------------------------------------------------------
+| Timing Details
+| --------------
+------------------------------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  ap_clk
+  To Clock:  ap_clk
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.652ns,  Total Violation        0.000ns
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        3.750ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[0]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_0_0/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_0_0/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[0]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[0]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[0]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[0]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[10]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_10_10/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_10_10/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[10]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[10]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[10]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[10]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[11]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_11_11/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_11_11/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[11]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[11]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[11]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[11]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[12]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_12_12/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_12_12/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[12]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[12]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[12]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[12]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[13]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_13_13/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_13_13/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[13]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[13]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[13]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[13]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[14]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_14_14/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_14_14/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[14]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[14]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[14]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[14]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[15]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_15_15/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_15_15/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[15]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[15]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[15]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[15]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[1]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_1_1/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_1_1/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[1]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[1]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[1]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[1]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[2]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_2_2/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_2_2/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[2]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[2]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[2]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[2]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+Slack (MET) :             1.652ns  (required time - arrival time)
+  Source:                 k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[3]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        8.119ns  (logic 3.343ns (41.175%)  route 4.776ns (58.825%))
+  Logic Levels:           9  (CARRY4=4 LUT3=1 LUT5=1 LUT6=2 RAMD32=1)
+  Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.128ns = ( 12.128 - 10.000 ) 
+    Source Clock Delay      (SCD):    2.456ns
+    Clock Pessimism Removal (CPR):    0.184ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.972     0.972 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.800     1.771    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.101     1.872 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.584     2.456    ap_clk_IBUF_BUFG
+                         FDRE                                         r  k_1_reg_1917_pp1_iter5_reg_reg[1]/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.478     2.934 r  k_1_reg_1917_pp1_iter5_reg_reg[1]/Q
+                         net (fo=11, unplaced)        0.712     3.646    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/k_1_reg_1917_pp1_iter5_reg[1]
+                         CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.808     4.454 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry/CO[3]
+                         net (fo=1, unplaced)         0.009     4.463    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry_n_0
+                         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.331     4.794 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0/O[3]
+                         net (fo=3, unplaced)         0.636     5.430    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p_carry__0_n_4
+                         LUT5 (Prop_lut5_I4_O)        0.307     5.737 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3/O
+                         net (fo=1, unplaced)         0.639     6.376    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_i_3_n_0
+                         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.520     6.896 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0/CO[3]
+                         net (fo=1, unplaced)         0.000     6.896    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__0_n_0
+                         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.232     7.128 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/p__41_carry__1/O[0]
+                         net (fo=1, unplaced)         0.311     7.439    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/mul_ln212_1_fu_2146_p2[11]
+                         LUT6 (Prop_lut6_I0_O)        0.295     7.734 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31/O
+                         net (fo=2, unplaced)         0.460     8.194    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_i_31_n_0
+                         LUT6 (Prop_lut6_I1_O)        0.124     8.318 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10/O
+                         net (fo=1, unplaced)         0.449     8.767    mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_10_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     8.891 r  mul_7ns_9ns_15_1_1_U4/fir_multiband_mul_7ns_9ns_15_1_1_Multiplier_1_U/ram_reg_0_15_0_0_i_3/O
+                         net (fo=192, unplaced)       1.227    10.118    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_3_3/A1
+                         RAMD32 (Prop_ramd32_RADR1_O)
+                                                      0.124    10.242 r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_3_3/SP/O
+                         net (fo=1, unplaced)         0.333    10.575    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q00[3]
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[3]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+                         IBUF (Prop_ibuf_I_O)         0.838    10.838 r  ap_clk_IBUF_inst/O
+                         net (fo=1, unplaced)         0.760    11.598    ap_clk_IBUF
+                         BUFG (Prop_bufg_I_O)         0.091    11.689 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=2922, unplaced)      0.439    12.128    hist_V_1_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+                         FDRE                                         r  hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[3]/C
+                         clock pessimism              0.184    12.311    
+                         clock uncertainty           -0.035    12.276    
+                         FDRE (Setup_fdre_C_D)       -0.049    12.227    hist_V_1_U/fir_multiband_hist_V_1_ram_U/q0_reg[3]
+  -------------------------------------------------------------------
+                         required time                         12.227    
+                         arrival time                         -10.575    
+  -------------------------------------------------------------------
+                         slack                                  1.652    
+
+
+
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         ap_clk
+Waveform(ns):       { 0.000 5.000 }
+Period(ns):         10.000
+Sources:            { ap_clk }
+
+Check Type        Corner  Lib Pin             Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location  Pin
+Min Period        n/a     DSP48E1/CLK         n/a            3.884         10.000      6.116                mul_47ns_24s_71_5_1_U7/fir_multiband_mul_47ns_24s_71_5_1_Multiplier_3_U/buff0_reg/CLK
+Min Period        n/a     DSP48E1/CLK         n/a            3.687         10.000      6.313                mul_25ns_23ns_47_1_1_U6/fir_multiband_mul_25ns_23ns_47_1_1_Multiplier_2_U/p__0/CLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.944         10.000      7.056                hist_V_0_U/fir_multiband_hist_V_0_ram_U/ram_reg/CLKARDCLK
+Min Period        n/a     RAMB18E1/CLKBWRCLK  n/a            2.944         10.000      7.056                hist_V_0_U/fir_multiband_hist_V_0_ram_U/ram_reg/CLKBWRCLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.576         10.000      7.424                FIR_COEFFS_V_U/fir_multiband_FIR_COEFFS_V_rom_U/q10_reg/CLKARDCLK
+Min Period        n/a     RAMB18E1/CLKBWRCLK  n/a            2.576         10.000      7.424                FIR_COEFFS_V_U/fir_multiband_FIR_COEFFS_V_rom_U/q10_reg/CLKBWRCLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.576         10.000      7.424                FIR_COEFFS_V_U/fir_multiband_FIR_COEFFS_V_rom_U/q12_reg/CLKARDCLK
+Min Period        n/a     RAMB18E1/CLKBWRCLK  n/a            2.576         10.000      7.424                FIR_COEFFS_V_U/fir_multiband_FIR_COEFFS_V_rom_U/q12_reg/CLKBWRCLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.576         10.000      7.424                FIR_COEFFS_V_U/fir_multiband_FIR_COEFFS_V_rom_U/q13_reg/CLKARDCLK
+Min Period        n/a     RAMB18E1/CLKBWRCLK  n/a            2.576         10.000      7.424                FIR_COEFFS_V_U/fir_multiband_FIR_COEFFS_V_rom_U/q13_reg/CLKBWRCLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_0_0/DP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_0_0/SP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_10_10/DP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_10_10/SP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_11_11/DP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_11_11/SP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_12_12/DP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_12_12/SP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_13_13/DP/CLK
+Low Pulse Width   Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_13_13/SP/CLK
+High Pulse Width  Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_0_0/DP/CLK
+High Pulse Width  Fast    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_0_0/DP/CLK
+High Pulse Width  Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_0_0/SP/CLK
+High Pulse Width  Fast    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_0_0/SP/CLK
+High Pulse Width  Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_10_10/DP/CLK
+High Pulse Width  Fast    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_10_10/DP/CLK
+High Pulse Width  Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_10_10/SP/CLK
+High Pulse Width  Fast    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_10_10/SP/CLK
+High Pulse Width  Slow    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_11_11/DP/CLK
+High Pulse Width  Fast    RAMD32/CLK          n/a            1.250         5.000       3.750                hist_V_1_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_11_11/DP/CLK
+
+
+

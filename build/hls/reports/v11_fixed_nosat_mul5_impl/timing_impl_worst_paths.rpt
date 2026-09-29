@@ -1,0 +1,430 @@
+Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
+| Date         : Tue Sep 29 20:25:56 2026
+| Host         : yu running 64-bit major release  (build 9200)
+| Command      : report_timing -delay_type max -max_paths 5 -path_type full_clock_expanded -file D:/pynq-multiband-audio-accel/build/hls/reports/v11_fixed_nosat_mul5_impl/timing_impl_worst_paths.rpt
+| Design       : fir_multiband
+| Device       : 7z020-clg400
+| Speed File   : -1  PRODUCTION 1.12 2019-11-22
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (VIOLATED) :        -1.819ns  (required time - arrival time)
+  Source:                 sext_ln1116_59_reg_6605_reg[12]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[22]_i_1_psdsp_1/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        11.678ns  (logic 6.630ns (56.775%)  route 5.048ns (43.225%))
+  Logic Levels:           7  (DSP48E1=2 LUT6=5)
+  Clock Path Skew:        -0.061ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    5.420ns = ( 15.420 - 10.000 ) 
+    Source Clock Delay      (SCD):    6.032ns
+    Clock Pessimism Removal (CPR):    0.550ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.146     3.527    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.101     3.628 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.146     3.774    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.101     3.875 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          0.146     4.021    ap_clk_IBUF_BUFG_repN_1
+    BUFGCTRL_X0Y17       BUFG (Prop_bufg_I_O)         0.101     4.122 r  ap_clk_IBUF_BUFG_inst_replica/O
+                         net (fo=32, routed)          0.146     4.268    ap_clk_IBUF_BUFG_repN
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     4.369 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=5141, routed)        1.663     6.032    ap_clk_IBUF_BUFG
+    SLICE_X45Y14         FDRE                                         r  sext_ln1116_59_reg_6605_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X45Y14         FDRE (Prop_fdre_C_Q)         0.456     6.488 r  sext_ln1116_59_reg_6605_reg[12]/Q
+                         net (fo=1, routed)           0.977     7.465    mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_117_1[12]
+    SLICE_X49Y12         LUT6 (Prop_lut6_I0_O)        0.124     7.589 f  mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_119__0/O
+                         net (fo=1, routed)           0.567     8.156    mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_119__0_n_0
+    SLICE_X50Y13         LUT6 (Prop_lut6_I4_O)        0.124     8.280 r  mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_85/O
+                         net (fo=1, routed)           0.305     8.585    mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_85_n_0
+    SLICE_X49Y13         LUT6 (Prop_lut6_I3_O)        0.124     8.709 r  mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_43__1/O
+                         net (fo=1, routed)           0.452     9.161    mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_43__1_n_0
+    SLICE_X45Y12         LUT6 (Prop_lut6_I5_O)        0.124     9.285 r  mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_22__0/O
+                         net (fo=2, routed)           0.797    10.082    mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_22__0_n_0
+    DSP48_X2Y0           DSP48E1 (Prop_dsp48e1_A[12]_PCOUT[47])
+                                                      4.036    14.118 r  mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, routed)           0.002    14.120    mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_n_106
+    DSP48_X2Y1           DSP48E1 (Prop_dsp48e1_PCIN[47]_P[5])
+                                                      1.518    15.638 r  mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p__0/P[5]
+                         net (fo=14, routed)          1.451    17.089    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/P[5]
+    SLICE_X44Y18         LUT6 (Prop_lut6_I3_O)        0.124    17.213 r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[22]_i_1/O
+                         net (fo=5, routed)           0.497    17.709    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/mul_18s_16s_34_1_1_U5_n_63_alias
+    SLICE_X42Y17         FDRE                                         r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[22]_i_1_psdsp_1/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+    U14                                               0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         0.940    10.940 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.006    12.946    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.091    13.037 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.133    13.170    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.091    13.261 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.133    13.394    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.091    13.485 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          0.133    13.618    ap_clk_IBUF_BUFG_repN_1
+    BUFGCTRL_X0Y17       BUFG (Prop_bufg_I_O)         0.091    13.709 r  ap_clk_IBUF_BUFG_inst_replica/O
+                         net (fo=32, routed)          0.133    13.842    ap_clk_IBUF_BUFG_repN
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.091    13.933 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=5141, routed)        1.487    15.420    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ap_clk_IBUF_BUFG
+    SLICE_X42Y17         FDRE                                         r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[22]_i_1_psdsp_1/C
+                         clock pessimism              0.550    15.971    
+                         clock uncertainty           -0.035    15.935    
+    SLICE_X42Y17         FDRE (Setup_fdre_C_D)       -0.045    15.890    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[22]_i_1_psdsp_1
+  -------------------------------------------------------------------
+                         required time                         15.890    
+                         arrival time                         -17.709    
+  -------------------------------------------------------------------
+                         slack                                 -1.819    
+
+Slack (VIOLATED) :        -1.809ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[29]_replica_4/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            hist_V_2_U/fir_multiband_hist_V_1_ram_U/q0_reg[9]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        11.714ns  (logic 4.980ns (42.514%)  route 6.734ns (57.486%))
+  Logic Levels:           8  (DSP48E1=1 LUT2=1 LUT6=5 RAMD32=1)
+  Clock Path Skew:        0.032ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    5.470ns = ( 15.470 - 10.000 ) 
+    Source Clock Delay      (SCD):    5.851ns
+    Clock Pessimism Removal (CPR):    0.413ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.146     3.527    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.101     3.628 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.146     3.774    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.101     3.875 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          0.146     4.021    ap_clk_IBUF_BUFG_repN_1
+    BUFGCTRL_X0Y17       BUFG (Prop_bufg_I_O)         0.101     4.122 r  ap_clk_IBUF_BUFG_inst_replica/O
+                         net (fo=32, routed)          1.729     5.851    ap_clk_IBUF_BUFG_repN
+    SLICE_X65Y11         FDRE                                         r  ap_CS_fsm_reg[29]_replica_4/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X65Y11         FDRE (Prop_fdre_C_Q)         0.456     6.307 r  ap_CS_fsm_reg[29]_replica_4/Q
+                         net (fo=1, routed)           0.603     6.910    mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/ap_CS_fsm_pp2_stage13_repN_4_alias
+    SLICE_X59Y15         LUT2 (Prop_lut2_I0_O)        0.124     7.034 r  mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/p_i_80__2_replica_1/O
+                         net (fo=17, routed)          0.890     7.923    mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ap_CS_fsm_reg[29]_repN_1_alias
+    SLICE_X57Y15         LUT6 (Prop_lut6_I3_O)        0.124     8.047 f  mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_95/O
+                         net (fo=1, routed)           0.463     8.511    mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_95_n_0
+    SLICE_X54Y16         LUT6 (Prop_lut6_I2_O)        0.124     8.635 f  mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_50__1/O
+                         net (fo=1, routed)           0.865     9.500    mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_50__1_n_0
+    SLICE_X42Y15         LUT6 (Prop_lut6_I3_O)        0.124     9.624 r  mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_6/O
+                         net (fo=8, routed)           0.594    10.218    mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/B[10]
+    DSP48_X2Y7           DSP48E1 (Prop_dsp48e1_B[10]_P[11])
+                                                      3.656    13.874 r  mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p/P[11]
+                         net (fo=5, routed)           0.728    14.602    mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/P[11]
+    SLICE_X44Y17         LUT6 (Prop_lut6_I3_O)        0.124    14.726 r  mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ram_reg_i_31/O
+                         net (fo=2, routed)           0.511    15.237    mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ram_reg_i_31_n_0
+    SLICE_X48Y20         LUT6 (Prop_lut6_I5_O)        0.124    15.361 r  mul_18s_16s_34_1_1_U2/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ram_reg_0_15_0_0_i_4/O
+                         net (fo=192, routed)         1.498    16.858    hist_V_2_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_9_9/A2
+    SLICE_X58Y24         RAMD32 (Prop_ramd32_RADR2_O)
+                                                      0.124    16.982 r  hist_V_2_U/fir_multiband_hist_V_1_ram_U/ram_reg_0_15_9_9/SP/O
+                         net (fo=1, routed)           0.582    17.564    hist_V_2_U/fir_multiband_hist_V_1_ram_U/q00__0[9]
+    SLICE_X59Y24         FDRE                                         r  hist_V_2_U/fir_multiband_hist_V_1_ram_U/q0_reg[9]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+    U14                                               0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         0.940    10.940 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.006    12.946    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.091    13.037 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.133    13.170    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.091    13.261 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.133    13.394    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.091    13.485 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          0.133    13.618    ap_clk_IBUF_BUFG_repN_1
+    BUFGCTRL_X0Y17       BUFG (Prop_bufg_I_O)         0.091    13.709 r  ap_clk_IBUF_BUFG_inst_replica/O
+                         net (fo=32, routed)          0.133    13.842    ap_clk_IBUF_BUFG_repN
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.091    13.933 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=5141, routed)        1.537    15.470    hist_V_2_U/fir_multiband_hist_V_1_ram_U/ap_clk_IBUF_BUFG
+    SLICE_X59Y24         FDRE                                         r  hist_V_2_U/fir_multiband_hist_V_1_ram_U/q0_reg[9]/C
+                         clock pessimism              0.413    15.883    
+                         clock uncertainty           -0.035    15.848    
+    SLICE_X59Y24         FDRE (Setup_fdre_C_D)       -0.092    15.756    hist_V_2_U/fir_multiband_hist_V_1_ram_U/q0_reg[9]
+  -------------------------------------------------------------------
+                         required time                         15.756    
+                         arrival time                         -17.564    
+  -------------------------------------------------------------------
+                         slack                                 -1.809    
+
+Slack (VIOLATED) :        -1.806ns  (required time - arrival time)
+  Source:                 sext_ln1116_64_reg_6630_reg[14]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            reg_1872_reg[1]/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        11.493ns  (logic 4.991ns (43.425%)  route 6.502ns (56.575%))
+  Logic Levels:           7  (DSP48E1=1 LUT5=2 LUT6=4)
+  Clock Path Skew:        -0.217ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    5.423ns = ( 15.423 - 10.000 ) 
+    Source Clock Delay      (SCD):    6.090ns
+    Clock Pessimism Removal (CPR):    0.450ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.146     3.527    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.101     3.628 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.146     3.774    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.101     3.875 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          0.146     4.021    ap_clk_IBUF_BUFG_repN_1
+    BUFGCTRL_X0Y17       BUFG (Prop_bufg_I_O)         0.101     4.122 r  ap_clk_IBUF_BUFG_inst_replica/O
+                         net (fo=32, routed)          0.146     4.268    ap_clk_IBUF_BUFG_repN
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     4.369 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=5141, routed)        1.721     6.090    ap_clk_IBUF_BUFG
+    SLICE_X69Y30         FDRE                                         r  sext_ln1116_64_reg_6630_reg[14]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X69Y30         FDRE (Prop_fdre_C_Q)         0.419     6.509 r  sext_ln1116_64_reg_6630_reg[14]/Q
+                         net (fo=1, routed)           1.227     7.735    mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_103_1[14]
+    SLICE_X61Y22         LUT6 (Prop_lut6_I0_O)        0.296     8.031 f  mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_120/O
+                         net (fo=1, routed)           0.629     8.660    mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_120_n_0
+    SLICE_X54Y18         LUT6 (Prop_lut6_I1_O)        0.124     8.784 f  mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_104/O
+                         net (fo=1, routed)           0.171     8.955    mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_104_n_0
+    SLICE_X54Y18         LUT6 (Prop_lut6_I2_O)        0.124     9.079 f  mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_75__1/O
+                         net (fo=1, routed)           0.650     9.729    mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_75__1_n_0
+    SLICE_X59Y23         LUT6 (Prop_lut6_I5_O)        0.124     9.853 r  mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_36__0/O
+                         net (fo=1, routed)           0.779    10.633    mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_36__0_n_0
+    SLICE_X53Y23         LUT5 (Prop_lut5_I4_O)        0.124    10.757 r  mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_2__1/O
+                         net (fo=9, routed)           1.049    11.805    mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/B[14]
+    DSP48_X2Y9           DSP48E1 (Prop_dsp48e1_B[14]_P[1])
+                                                      3.656    15.461 r  mul_18s_16s_34_1_1_U3/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p/P[1]
+                         net (fo=3, routed)           1.010    16.471    mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/P[1]
+    SLICE_X29Y20         LUT5 (Prop_lut5_I2_O)        0.124    16.595 r  mul_26s_24s_47_1_1_U4/fir_multiband_mul_26s_24s_47_1_1_Multiplier_1_U/reg_1872[1]_i_1/O
+                         net (fo=6, routed)           0.987    17.583    mul_26s_24s_47_1_1_U4_n_83
+    SLICE_X37Y14         FDRE                                         r  reg_1872_reg[1]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+    U14                                               0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         0.940    10.940 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.006    12.946    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.091    13.037 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.133    13.170    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.091    13.261 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.133    13.394    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.091    13.485 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          0.133    13.618    ap_clk_IBUF_BUFG_repN_1
+    BUFGCTRL_X0Y17       BUFG (Prop_bufg_I_O)         0.091    13.709 r  ap_clk_IBUF_BUFG_inst_replica/O
+                         net (fo=32, routed)          0.133    13.842    ap_clk_IBUF_BUFG_repN
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.091    13.933 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=5141, routed)        1.490    15.423    ap_clk_IBUF_BUFG
+    SLICE_X37Y14         FDRE                                         r  reg_1872_reg[1]/C
+                         clock pessimism              0.450    15.873    
+                         clock uncertainty           -0.035    15.838    
+    SLICE_X37Y14         FDRE (Setup_fdre_C_D)       -0.061    15.777    reg_1872_reg[1]
+  -------------------------------------------------------------------
+                         required time                         15.777    
+                         arrival time                         -17.583    
+  -------------------------------------------------------------------
+                         slack                                 -1.806    
+
+Slack (VIOLATED) :        -1.793ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[28]_replica_2/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1_psdsp/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        11.927ns  (logic 4.856ns (40.716%)  route 7.071ns (59.284%))
+  Logic Levels:           7  (DSP48E1=1 LUT6=6)
+  Clock Path Skew:        0.209ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    5.421ns = ( 15.421 - 10.000 ) 
+    Source Clock Delay      (SCD):    5.602ns
+    Clock Pessimism Removal (CPR):    0.390ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.146     3.527    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.101     3.628 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.146     3.774    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.101     3.875 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          1.727     5.602    ap_clk_IBUF_BUFG_repN_1
+    SLICE_X63Y12         FDRE                                         r  ap_CS_fsm_reg[28]_replica_2/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X63Y12         FDRE (Prop_fdre_C_Q)         0.456     6.058 r  ap_CS_fsm_reg[28]_replica_2/Q
+                         net (fo=7, routed)           1.179     7.237    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ap_CS_fsm_pp2_stage12_repN_2_alias
+    SLICE_X56Y11         LUT6 (Prop_lut6_I3_O)        0.124     7.361 f  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_112__0/O
+                         net (fo=1, routed)           0.441     7.802    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_112__0_n_0
+    SLICE_X59Y13         LUT6 (Prop_lut6_I0_O)        0.124     7.926 f  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_106__2/O
+                         net (fo=1, routed)           0.431     8.357    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_106__2_n_0
+    SLICE_X57Y13         LUT6 (Prop_lut6_I0_O)        0.124     8.481 f  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_80__0/O
+                         net (fo=1, routed)           0.151     8.633    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_80__0_n_0
+    SLICE_X57Y13         LUT6 (Prop_lut6_I1_O)        0.124     8.757 f  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_46__2/O
+                         net (fo=1, routed)           0.591     9.348    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_46__2_n_0
+    SLICE_X54Y15         LUT6 (Prop_lut6_I4_O)        0.124     9.472 r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_15__0/O
+                         net (fo=7, routed)           1.592    11.063    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/B[1]
+    DSP48_X3Y9           DSP48E1 (Prop_dsp48e1_B[1]_P[31])
+                                                      3.656    14.719 r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p/P[31]
+                         net (fo=5, routed)           2.170    16.890    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_0[31]
+    SLICE_X44Y17         LUT6 (Prop_lut6_I0_O)        0.124    17.014 r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1/O
+                         net (fo=5, routed)           0.515    17.528    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/mul_18s_16s_34_1_1_U5_n_54_alias
+    SLICE_X43Y16         FDRE                                         r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1_psdsp/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+    U14                                               0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         0.940    10.940 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.006    12.946    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.091    13.037 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.133    13.170    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.091    13.261 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.133    13.394    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.091    13.485 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          0.133    13.618    ap_clk_IBUF_BUFG_repN_1
+    BUFGCTRL_X0Y17       BUFG (Prop_bufg_I_O)         0.091    13.709 r  ap_clk_IBUF_BUFG_inst_replica/O
+                         net (fo=32, routed)          0.133    13.842    ap_clk_IBUF_BUFG_repN
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.091    13.933 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=5141, routed)        1.488    15.421    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ap_clk_IBUF_BUFG
+    SLICE_X43Y16         FDRE                                         r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1_psdsp/C
+                         clock pessimism              0.390    15.811    
+                         clock uncertainty           -0.035    15.776    
+    SLICE_X43Y16         FDRE (Setup_fdre_C_D)       -0.040    15.736    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1_psdsp
+  -------------------------------------------------------------------
+                         required time                         15.736    
+                         arrival time                         -17.528    
+  -------------------------------------------------------------------
+                         slack                                 -1.793    
+
+Slack (VIOLATED) :        -1.789ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[28]_replica_2/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1_psdsp_2/D
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        11.927ns  (logic 4.856ns (40.716%)  route 7.071ns (59.284%))
+  Logic Levels:           7  (DSP48E1=1 LUT6=6)
+  Clock Path Skew:        0.209ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    5.421ns = ( 15.421 - 10.000 ) 
+    Source Clock Delay      (SCD):    5.602ns
+    Clock Pessimism Removal (CPR):    0.390ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.146     3.527    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.101     3.628 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.146     3.774    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.101     3.875 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          1.727     5.602    ap_clk_IBUF_BUFG_repN_1
+    SLICE_X63Y12         FDRE                                         r  ap_CS_fsm_reg[28]_replica_2/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X63Y12         FDRE (Prop_fdre_C_Q)         0.456     6.058 r  ap_CS_fsm_reg[28]_replica_2/Q
+                         net (fo=7, routed)           1.179     7.237    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ap_CS_fsm_pp2_stage12_repN_2_alias
+    SLICE_X56Y11         LUT6 (Prop_lut6_I3_O)        0.124     7.361 f  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_112__0/O
+                         net (fo=1, routed)           0.441     7.802    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_112__0_n_0
+    SLICE_X59Y13         LUT6 (Prop_lut6_I0_O)        0.124     7.926 f  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_106__2/O
+                         net (fo=1, routed)           0.431     8.357    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_106__2_n_0
+    SLICE_X57Y13         LUT6 (Prop_lut6_I0_O)        0.124     8.481 f  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_80__0/O
+                         net (fo=1, routed)           0.151     8.633    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_80__0_n_0
+    SLICE_X57Y13         LUT6 (Prop_lut6_I1_O)        0.124     8.757 f  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_46__2/O
+                         net (fo=1, routed)           0.591     9.348    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_46__2_n_0
+    SLICE_X54Y15         LUT6 (Prop_lut6_I4_O)        0.124     9.472 r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_i_15__0/O
+                         net (fo=7, routed)           1.592    11.063    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/B[1]
+    DSP48_X3Y9           DSP48E1 (Prop_dsp48e1_B[1]_P[31])
+                                                      3.656    14.719 r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p/P[31]
+                         net (fo=5, routed)           2.170    16.890    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/p_0[31]
+    SLICE_X44Y17         LUT6 (Prop_lut6_I0_O)        0.124    17.014 r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1/O
+                         net (fo=5, routed)           0.515    17.528    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/mul_18s_16s_34_1_1_U5_n_54_alias
+    SLICE_X42Y16         FDRE                                         r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1_psdsp_2/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+    U14                                               0.000    10.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000    10.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         0.940    10.940 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.006    12.946    ap_clk_IBUF
+    BUFGCTRL_X0Y20       BUFG (Prop_bufg_I_O)         0.091    13.037 r  ap_clk_IBUF_BUFG_inst_replica_3/O
+                         net (fo=3, routed)           0.133    13.170    ap_clk_IBUF_BUFG_repN_3
+    BUFGCTRL_X0Y19       BUFG (Prop_bufg_I_O)         0.091    13.261 r  ap_clk_IBUF_BUFG_inst_replica_2/O
+                         net (fo=24, routed)          0.133    13.394    ap_clk_IBUF_BUFG_repN_2
+    BUFGCTRL_X0Y18       BUFG (Prop_bufg_I_O)         0.091    13.485 r  ap_clk_IBUF_BUFG_inst_replica_1/O
+                         net (fo=30, routed)          0.133    13.618    ap_clk_IBUF_BUFG_repN_1
+    BUFGCTRL_X0Y17       BUFG (Prop_bufg_I_O)         0.091    13.709 r  ap_clk_IBUF_BUFG_inst_replica/O
+                         net (fo=32, routed)          0.133    13.842    ap_clk_IBUF_BUFG_repN
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.091    13.933 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=5141, routed)        1.488    15.421    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/ap_clk_IBUF_BUFG
+    SLICE_X42Y16         FDRE                                         r  mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1_psdsp_2/C
+                         clock pessimism              0.390    15.811    
+                         clock uncertainty           -0.035    15.776    
+    SLICE_X42Y16         FDRE (Setup_fdre_C_D)       -0.036    15.740    mul_18s_16s_34_1_1_U5/fir_multiband_mul_18s_16s_34_1_1_Multiplier_0_U/reg_1912[31]_i_1_psdsp_2
+  -------------------------------------------------------------------
+                         required time                         15.740    
+                         arrival time                         -17.528    
+  -------------------------------------------------------------------
+                         slack                                 -1.789    
+
+
+
+
