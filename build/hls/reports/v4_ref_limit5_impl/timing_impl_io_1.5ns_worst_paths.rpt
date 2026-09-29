@@ -1,0 +1,283 @@
+Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
+| Date         : Tue Sep 29 20:44:16 2026
+| Host         : yu running 64-bit major release  (build 9200)
+| Command      : report_timing -delay_type max -max_paths 5 -path_type full_clock_expanded -file D:/pynq-multiband-audio-accel/build/hls/reports/v4_ref_limit5_impl/timing_impl_io_1.5ns_worst_paths.rpt
+| Design       : fir_multiband
+| Device       : 7z020-clg400
+| Speed File   : -1  PRODUCTION 1.12 2019-11-22
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (VIOLATED) :        -8.750ns  (required time - arrival time)
+  Source:                 n_reg_1514_reg[12]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            ap_ready
+                            (output port clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Max at Slow Process Corner
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        11.965ns  (logic 4.503ns (37.638%)  route 7.461ns (62.362%))
+  Logic Levels:           5  (CARRY4=2 LUT2=1 LUT6=1 OBUF=1)
+  Output Delay:           1.500ns
+  Clock Path Skew:        -5.251ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.000ns = ( 10.000 - 10.000 ) 
+    Source Clock Delay      (SCD):    5.251ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=11721, routed)       1.870     5.251    ap_clk_IBUF_BUFG
+    SLICE_X113Y19        FDRE                                         r  n_reg_1514_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X113Y19        FDRE (Prop_fdre_C_Q)         0.456     5.707 r  n_reg_1514_reg[12]/Q
+                         net (fo=2, routed)           1.492     7.198    n_reg_1514[12]
+    SLICE_X113Y25        LUT6 (Prop_lut6_I0_O)        0.124     7.322 r  ap_done_OBUF_inst_i_11/O
+                         net (fo=1, routed)           0.000     7.322    ap_done_OBUF_inst_i_11_n_0
+    SLICE_X113Y25        CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.532     7.854 r  ap_done_OBUF_inst_i_3/CO[3]
+                         net (fo=1, routed)           0.000     7.854    ap_done_OBUF_inst_i_3_n_0
+    SLICE_X113Y26        CARRY4 (Prop_carry4_CI_CO[2])
+                                                      0.228     8.082 r  ap_done_OBUF_inst_i_2/CO[2]
+                         net (fo=6, routed)           2.054    10.136    icmp_ln204_fu_2230_p2
+    SLICE_X105Y4         LUT2 (Prop_lut2_I0_O)        0.341    10.477 r  ap_done_OBUF_inst_i_1/O
+                         net (fo=2, routed)           3.916    14.393    ap_ready_OBUF
+    R18                  OBUF (Prop_obuf_I_O)         2.822    17.215 r  ap_ready_OBUF_inst/O
+                         net (fo=0)                   0.000    17.215    ap_ready
+    R18                                                               r  ap_ready (OUT)
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                         clock pessimism              0.000    10.000    
+                         clock uncertainty           -0.035     9.965    
+                         output delay                -1.500     8.465    
+  -------------------------------------------------------------------
+                         required time                          8.465    
+                         arrival time                         -17.215    
+  -------------------------------------------------------------------
+                         slack                                 -8.750    
+
+Slack (VIOLATED) :        -8.638ns  (required time - arrival time)
+  Source:                 n_reg_1514_reg[12]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            ap_done
+                            (output port clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Max at Slow Process Corner
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        11.852ns  (logic 4.534ns (38.255%)  route 7.318ns (61.745%))
+  Logic Levels:           5  (CARRY4=2 LUT2=1 LUT6=1 OBUF=1)
+  Output Delay:           1.500ns
+  Clock Path Skew:        -5.251ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.000ns = ( 10.000 - 10.000 ) 
+    Source Clock Delay      (SCD):    5.251ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=11721, routed)       1.870     5.251    ap_clk_IBUF_BUFG
+    SLICE_X113Y19        FDRE                                         r  n_reg_1514_reg[12]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X113Y19        FDRE (Prop_fdre_C_Q)         0.456     5.707 r  n_reg_1514_reg[12]/Q
+                         net (fo=2, routed)           1.492     7.198    n_reg_1514[12]
+    SLICE_X113Y25        LUT6 (Prop_lut6_I0_O)        0.124     7.322 r  ap_done_OBUF_inst_i_11/O
+                         net (fo=1, routed)           0.000     7.322    ap_done_OBUF_inst_i_11_n_0
+    SLICE_X113Y25        CARRY4 (Prop_carry4_S[0]_CO[3])
+                                                      0.532     7.854 r  ap_done_OBUF_inst_i_3/CO[3]
+                         net (fo=1, routed)           0.000     7.854    ap_done_OBUF_inst_i_3_n_0
+    SLICE_X113Y26        CARRY4 (Prop_carry4_CI_CO[2])
+                                                      0.228     8.082 r  ap_done_OBUF_inst_i_2/CO[2]
+                         net (fo=6, routed)           2.054    10.136    icmp_ln204_fu_2230_p2
+    SLICE_X105Y4         LUT2 (Prop_lut2_I0_O)        0.341    10.477 r  ap_done_OBUF_inst_i_1/O
+                         net (fo=2, routed)           3.773    14.250    ap_ready_OBUF
+    V18                  OBUF (Prop_obuf_I_O)         2.853    17.103 r  ap_done_OBUF_inst/O
+                         net (fo=0)                   0.000    17.103    ap_done
+    V18                                                               r  ap_done (OUT)
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                         clock pessimism              0.000    10.000    
+                         clock uncertainty           -0.035     9.965    
+                         output delay                -1.500     8.465    
+  -------------------------------------------------------------------
+                         required time                          8.465    
+                         arrival time                         -17.103    
+  -------------------------------------------------------------------
+                         slack                                 -8.638    
+
+Slack (VIOLATED) :        -4.074ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[0]/C
+                            (rising edge-triggered cell FDSE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            ap_idle
+                            (output port clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Max at Slow Process Corner
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        7.277ns  (logic 3.239ns (44.509%)  route 4.038ns (55.491%))
+  Logic Levels:           2  (LUT2=1 OBUF=1)
+  Output Delay:           1.500ns
+  Clock Path Skew:        -5.262ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.000ns = ( 10.000 - 10.000 ) 
+    Source Clock Delay      (SCD):    5.262ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=11721, routed)       1.881     5.262    ap_clk_IBUF_BUFG
+    SLICE_X106Y5         FDSE                                         r  ap_CS_fsm_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X106Y5         FDSE (Prop_fdse_C_Q)         0.456     5.718 r  ap_CS_fsm_reg[0]/Q
+                         net (fo=5, routed)           0.525     6.242    ap_CS_fsm_reg_n_0_[0]
+    SLICE_X106Y5         LUT2 (Prop_lut2_I0_O)        0.124     6.366 r  ap_idle_OBUF_inst_i_1/O
+                         net (fo=1, routed)           3.513     9.880    ap_idle_OBUF
+    V17                  OBUF (Prop_obuf_I_O)         2.659    12.538 r  ap_idle_OBUF_inst/O
+                         net (fo=0)                   0.000    12.538    ap_idle
+    V17                                                               r  ap_idle (OUT)
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                         clock pessimism              0.000    10.000    
+                         clock uncertainty           -0.035     9.965    
+                         output delay                -1.500     8.465    
+  -------------------------------------------------------------------
+                         required time                          8.465    
+                         arrival time                         -12.538    
+  -------------------------------------------------------------------
+                         slack                                 -4.074    
+
+Slack (VIOLATED) :        -4.008ns  (required time - arrival time)
+  Source:                 acc_reg_1548_reg[6]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            out_r[6]
+                            (output port clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Max at Slow Process Corner
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        7.425ns  (logic 3.094ns (41.672%)  route 4.331ns (58.328%))
+  Logic Levels:           1  (OBUF=1)
+  Output Delay:           1.500ns
+  Clock Path Skew:        -5.048ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.000ns = ( 10.000 - 10.000 ) 
+    Source Clock Delay      (SCD):    5.048ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=11721, routed)       1.667     5.048    ap_clk_IBUF_BUFG
+    SLICE_X41Y41         FDRE                                         r  acc_reg_1548_reg[6]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X41Y41         FDRE (Prop_fdre_C_Q)         0.456     5.504 r  acc_reg_1548_reg[6]/Q
+                         net (fo=1, routed)           4.331     9.834    out_r_OBUF[6]
+    W18                  OBUF (Prop_obuf_I_O)         2.638    12.473 r  out_r_OBUF[6]_inst/O
+                         net (fo=0)                   0.000    12.473    out_r[6]
+    W18                                                               r  out_r[6] (OUT)
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                         clock pessimism              0.000    10.000    
+                         clock uncertainty           -0.035     9.965    
+                         output delay                -1.500     8.465    
+  -------------------------------------------------------------------
+                         required time                          8.465    
+                         arrival time                         -12.473    
+  -------------------------------------------------------------------
+                         slack                                 -4.008    
+
+Slack (VIOLATED) :        -3.836ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[28]_lopt_replica/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            out_r_ap_vld
+                            (output port clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Max at Slow Process Corner
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        7.189ns  (logic 3.086ns (42.923%)  route 4.103ns (57.077%))
+  Logic Levels:           1  (OBUF=1)
+  Output Delay:           1.500ns
+  Clock Path Skew:        -5.112ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.000ns = ( 10.000 - 10.000 ) 
+    Source Clock Delay      (SCD):    5.112ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+    U14                                               0.000     0.000 r  ap_clk (IN)
+                         net (fo=0)                   0.000     0.000    ap_clk
+    U14                  IBUF (Prop_ibuf_I_O)         1.075     1.075 r  ap_clk_IBUF_inst/O
+                         net (fo=1, routed)           2.205     3.280    ap_clk_IBUF
+    BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     3.381 r  ap_clk_IBUF_BUFG_inst/O
+                         net (fo=11721, routed)       1.731     5.112    ap_clk_IBUF_BUFG
+    SLICE_X79Y12         FDRE                                         r  ap_CS_fsm_reg[28]_lopt_replica/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X79Y12         FDRE (Prop_fdre_C_Q)         0.456     5.568 r  ap_CS_fsm_reg[28]_lopt_replica/Q
+                         net (fo=1, routed)           4.103     9.671    ap_CS_fsm_reg[28]_lopt_replica_1
+    T17                  OBUF (Prop_obuf_I_O)         2.630    12.301 r  out_r_ap_vld_OBUF_inst/O
+                         net (fo=0)                   0.000    12.301    out_r_ap_vld
+    T17                                                               r  out_r_ap_vld (OUT)
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                         clock pessimism              0.000    10.000    
+                         clock uncertainty           -0.035     9.965    
+                         output delay                -1.500     8.465    
+  -------------------------------------------------------------------
+                         required time                          8.465    
+                         arrival time                         -12.301    
+  -------------------------------------------------------------------
+                         slack                                 -3.836    
+
+
+
+
