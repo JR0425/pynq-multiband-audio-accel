@@ -143,6 +143,20 @@ def main():
             "面积却翻到 79 DSP。原因是这条线的瓶颈在浮点加法的延迟链，不在乘法 —— "
             "折叠减掉的是不紧张的乘法，加的却是紧张的加法。详见 "
             "`src/hls/fir_multiband.cpp` 里 `FIR_FOLD` 那一段注释。\n\n"
+            "`v5*` / `v6*` / `v7*` 这一组量的是「定点化」（`-DFIR_FIXED=1`，"
+            "采样 16 位 × 系数 18 位）。结论**和直觉相反**：定点确实更快、更省 DSP，"
+            "但**更费 LUT**。以同为乘法器上限 5 的 `v4_ref_limit5`（浮点）和 "
+            "`v6_fixed_mul5`（定点）对比：327 拍 / 27 DSP / 9936 LUT 对 "
+            "253 拍 / 8 DSP / 19130 LUT —— 快了 1.3 倍、DSP 少 19 个，"
+            "LUT 却几乎翻倍。原因看报告里的分项就清楚：浮点版的算术被绑成 "
+            "`fadd` / `fmul` 实例（Instance 占 4885 LUT，Expression 只占 1303），"
+            "而定点版的算术留在表达式层，全落到逻辑格子里（Expression 占 16575 LUT）。"
+            "把 DRC 的中间位宽从 40 位收到 24 位（`v7_fixed_drc24`）只省下 374 LUT，"
+            "说明这笔 LUT 是 `ap_fixed` 逐次运算的延位/饱和逻辑本身的开销，不是哪一处写错了。\n\n"
+            "`v5_fixed_naive` 是**故意留着的反例**：系数表写成 `const float`、"
+            "在循环里现转定点，HLS 不折这个转换，生成 65 个 float→double 扩位器，"
+            "LUT 炸到 123550（232.2%，装不下）。修正成「表本身就是定点类型」之后"
+            "降到 28309。\n\n"
         )
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(header + table)
