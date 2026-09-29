@@ -40,6 +40,10 @@ build/hls/*
 # directives/ 是逐版优化指令；reports/ 是每版综合出来的资源表与 II 表 —— 都是要进仓库的证据
 !build/hls/directives/
 !build/hls/reports/
+# 但 reports/ 里的 `.dcp` 是布线检查点，二进制、单个几 MB 到十几 MB，不进仓库。
+# 这条必须写在 `!build/hls/reports/` **后面** —— gitignore 后写的规则优先，
+# 写在前面会被那句放行盖掉。文件本身留在本地（report_io_timing.tcl 要用它补 I/O 约束）。
+*.dcp
 
 # OS
 .DS_Store
