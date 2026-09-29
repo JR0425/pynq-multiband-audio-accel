@@ -23,7 +23,14 @@ set tb_file    [file join $repo_dir src hls fir_tb.cpp]
 set in_file    [file join $repo_dir data audio test_input.txt]
 set out_file   [file join $repo_dir data results hw_output.txt]
 
-# C 编译选项（可选）—— 用来切 FIR_PARTIAL 这种结构开关。例：HLS_CFLAGS=-DFIR_PARTIAL=5
+# 输出文件可以被 HLS_OUT 覆盖（相对仓库根），用于位宽扫描时每个组合存一份输出。
+# 例：HLS_OUT=data/results/fixed_dw16_cw18.txt
+if {[info exists ::env(HLS_OUT)] && [string length $::env(HLS_OUT)] > 0} {
+    set out_file [file join $repo_dir $::env(HLS_OUT)]
+}
+
+# C 编译选项（可选）—— 用来切 FIR_PARTIAL / FIR_FIXED 这类开关。
+# 例：HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18"
 set cflags ""
 if {[info exists ::env(HLS_CFLAGS)]} {
     set cflags $::env(HLS_CFLAGS)
