@@ -34,7 +34,10 @@ PYNQ Multiband Audio Accelerator
 
 · 软件基线：data/results/baseline\_metrics.md
 · 板级通路验证（开源参考 overlay）：data/results/reference\_overlay\_metrics.md
-· 自研加速核的资源占用与端到端延迟：待综合后填入
+· 自研加速核的资源与频率（Vivado 综合 + 布局布线实测）：data/results/impl\_metrics.md
+　选定配置为「定点 16×18 位、乘法器不限流」：2493 LUT / 2624 FF / 70 DSP / 17 BRAM，
+　在 100 MHz（10 ns）约束下 WNS +0.639 ns，时序收敛。
+· 自研加速核的端到端延迟：待上板实测
 
 文档与日志
 
