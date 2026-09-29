@@ -49,6 +49,47 @@
 #define FIR_PARTIAL 5
 #endif
 
+/* ---- FIR_FOLD：利用系数对称性做"折叠"，把乘法次数砍掉一半 ----
+ *     四组系数都是严格对称的（c[k] == c[N_TAPS-1-k]，已逐个核对过），
+ *     因为 firwin 生成的线性相位 FIR 必然对称。既然两头乘的是同一个数，
+ *     就可以先把两个采样加起来，再只乘一次：
+ *
+ *         c[k]*h[k] + c[64-k]*h[64-k]   ==   c[k] * ( h[k] + h[64-k] )
+ *
+ *     65 个抽头 -> 33 次乘法（32 对 + 1 个中心抽头）。四段合计 260 -> 132。
+ *     代价是多 32 次加法；但 FPGA 上加法用普通逻辑格子，乘法要吃掉稀缺的
+ *     DSP（板上只有 220 个），所以这笔换算是划算的。
+ *
+ *     数学上与直算完全等价，只有浮点加法的结合顺序变了 ——
+ *     和 FIR_PARTIAL 是同一量级（1e-7）的差异，改完必须重跑 csim。
+ *
+ *     ⚠️ 实测结论：**在这套结构下不划算，默认关闭。**
+ *        同为"乘法器上限 5"：直算 327 拍 / 27 DSP，折叠 1247 拍 / 25 DSP。
+ *        把 hist 拆得更开能救回来一些（拆成 65 个寄存器：663 拍），
+ *        面积却涨到 79 DSP / 19924 LUT，仍然比直算慢一倍。
+ *
+ *        原因不是读口不够，而是**瓶颈根本不在乘法**：
+ *          直算：每项 = 1 次乘法 + 1 次累加
+ *          折叠：每项 = 1 次先加 + 1 次乘法 + 1 次累加
+ *        乘法从 65 次减到 33 次（真的减半了），但加法从 65 次变成 66 次。
+ *        而这条线的瓶颈是浮点加法的延迟链（fadd 有 5 拍延迟），乘法靠
+ *        allocation 限流就能复用 —— 于是折叠减掉的是不紧张的资源，
+ *        加的却是最紧张的那个。旁证：把乘法器上限从 5 提到 10，拍数
+ *        一动不动（都是 1247），说明乘法器数量压根不是约束。
+ *
+ *        留在这里是因为"试过、量过、知道为什么不划算"本身就是结论，
+ *        换个数结构（比如定点化之后加法变便宜）时值得再试一次。
+ *
+ *     0 = 直算（与折叠前逐字相同，用于做对照），1 = 折叠。
+ *     默认 0：不开这个开关时，编出来的结构和以前一模一样，
+ *     所以 build/hls/reports/ 下早先那批报告仍然对得上。 */
+#ifndef FIR_FOLD
+#define FIR_FOLD 0
+#endif
+
+/* 折叠后要算多少项：32 对 + 1 个中心 */
+#define N_FOLD ((N_TAPS + 1) / 2)
+
 /* 硬件 pragma 的总开关（0 = 只改结构、不展开不拆分；1 = 把并行度真的做进硬件里）。
  * 分成两个开关是为了让"改了结构"和"又加了 pragma"两版能分别综合出来对比 ——
  * 否则会分不清提速是哪一步带来的。
@@ -57,7 +98,9 @@
 #define FIR_PRAGMA 1
 #endif
 
-#if (N_TAPS % FIR_PARTIAL) != 0
+/* 直算那条路要靠"k 每轮跳 FIR_PARTIAL 个"来分组，所以要求整除；
+ * 折叠那条路是逐项累加，没有这个要求（33 不能被 5 整除）。 */
+#if !FIR_FOLD && ((N_TAPS % FIR_PARTIAL) != 0)
 #error "FIR_PARTIAL must divide N_TAPS (65 -> 1, 5, 13, 65)"
 #endif
 
@@ -84,9 +127,18 @@ void fir_multiband(const float *in, float *out, int length) {
      * hist[k+p] 的"落在哪一路"是编译期就知道的常量，不需要任何选择器。
      * 如果改用 -type complete（每格一个寄存器），索引会变成 65 选 1 的大选择器，
      * 面积会失控；用 block 则跨块移动会变多。
-     * ⚠️ pragma 里写不了宏（HLS 不展开），因子只能写死成数字，
-     *    所以它和 FIR_PARTIAL 必须一起改。 */
+     * ⚠️ pragma 里写不了宏（HLS 不展开），因子只能写死成数字，所以这里用
+     *    条件编译给出几种写法，靠编译开关切换 —— 用于排查"折叠后读口不够"的猜想：
+     *      -DFIR_HIST_CYC13  拆成 13 路
+     *      -DFIR_HIST_FULL   完全拆开（65 个独立寄存器）
+     *     默认（都不给）保持 5 路，和以前一模一样。 */
+#if defined(FIR_HIST_FULL)
+#pragma HLS ARRAY_PARTITION variable=hist complete dim=1
+#elif defined(FIR_HIST_CYC13)
+#pragma HLS ARRAY_PARTITION variable=hist cyclic factor=13 dim=1
+#else
 #pragma HLS ARRAY_PARTITION variable=hist cyclic factor=5 dim=1
+#endif
 #endif
     for (int k = 0; k < N_TAPS; k++) {
         hist[k] = 0.0f;
@@ -114,6 +166,25 @@ void fir_multiband(const float *in, float *out, int length) {
                 y[p] = 0.0f;
             }
 
+#if FIR_FOLD
+            /* ---- 折叠结构：先加、后乘 ----
+             * 每一项 k 代表"一对"：h[k] 和 h[N_TAPS-1-k]，它们乘的是同一个系数。
+             * 最后一项（k == N_FOLD-1 == 32）是正中间那个，没有配对的，单独算。
+             * 展开之后 "k != N_FOLD-1" 这个判断是编译期常量，硬件里不产生任何比较器。 */
+            for (int k = 0; k < N_FOLD; k++) {
+#if FIR_PRAGMA
+                /* 整个 k 循环展开：33 项全部变成独立的乘加。
+                 * 并行度不在这里控制，而是用 allocation 限死乘法器个数 ——
+                 * 和直算那条路用的是同一把闸，这样才能公平对比。 */
+#pragma HLS UNROLL
+#endif
+                float f = hist[k];
+                if (k != N_FOLD - 1) {
+                    f += hist[N_TAPS - 1 - k];
+                }
+                y[k % FIR_PARTIAL] += f * FIR_COEFFS[b][k];
+            }
+#else
             /* k 每轮跳 FIR_PARTIAL 个，内层 p 把这一组的抽头分给各个部分和 */
             for (int k = 0; k < N_TAPS; k += FIR_PARTIAL) {
 #if FIR_PRAGMA
@@ -127,6 +198,7 @@ void fir_multiband(const float *in, float *out, int length) {
                     y[p] += hist[k + p] * FIR_COEFFS[b][k + p];
                 }
             }
+#endif
 
             /* 部分和合并（FIR_PARTIAL=1 时这一步就是恒等，不产生额外加法） */
             float ys = 0.0f;
