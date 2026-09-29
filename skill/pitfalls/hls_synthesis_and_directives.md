@@ -6,7 +6,8 @@
 
 | 写法 | 管用吗 | 说明 |
 |---|---|---|
-| `set_directive_allocation -limit N -type operation ... fmul` | ✅ **最有效** | 限死乘法器个数，是控制面积的主闸门 |
+| `set_directive_allocation -limit N -type operation ... fmul` | ✅ **最有效** | 限死**浮点**乘法器个数，是控制面积的主闸门 |
+| `set_directive_allocation -limit N -type operation ... mul` | ✅ **最有效** | 同上，但限的是**定点/整数**乘法器。⚠️ 两个名字不能混用：从浮点版把 `fmul` 抄到定点版会**完全不生效、也不报错**（详见 `hls_fixed_point_types.md`） |
 | `set_directive_array_partition` | ✅ 管用 | 但和源码里的 `#pragma` 冲突会直接报错（见下） |
 | `set_directive_unroll` | ❌ **不可靠** | 对"循环里还套着循环"的那种，静默失效 |
 | 源码里的 `#pragma HLS UNROLL` | ✅ 管用 | 前提是写对位置（写在真的需要展开的那个循环上） |
