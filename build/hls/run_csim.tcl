@@ -23,10 +23,17 @@ set tb_file    [file join $repo_dir src hls fir_tb.cpp]
 set in_file    [file join $repo_dir data audio test_input.txt]
 set out_file   [file join $repo_dir data results hw_output.txt]
 
+# C 编译选项（可选）—— 用来切 FIR_PARTIAL 这种结构开关。例：HLS_CFLAGS=-DFIR_PARTIAL=5
+set cflags ""
+if {[info exists ::env(HLS_CFLAGS)]} {
+    set cflags $::env(HLS_CFLAGS)
+}
+
 puts "==== C simulation only ===="
 puts "repo : $repo_dir"
 puts "input: $in_file"
 puts "out  : $out_file"
+puts "cflags: $cflags"
 
 # open_project 要的是**工程名**，不是路径 —— 传带盘符或斜杠的路径进去会报
 # [HLS 200-70] contains illegal character ':' / '/'。所以先切到该目录再建工程，
@@ -34,7 +41,11 @@ puts "out  : $out_file"
 cd $script_dir
 open_project -reset csim_proj
 set_top fir_multiband
-add_files $src_file
+if {[string length $cflags] > 0} {
+    add_files $src_file -cflags $cflags
+} else {
+    add_files $src_file
+}
 add_files -tb $tb_file
 
 open_solution -reset "solution1" -flow_target vivado
