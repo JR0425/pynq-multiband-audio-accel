@@ -35,8 +35,20 @@ data, fs = sf.read(audio_path)   # fs 跟着文件走
 ## 解决
 
 黄金参考不要用 `multiband_baseline.py` 现算，而是**用和硬件完全相同的那组系数**去算。
-`src/python/export_golden.py` 就是干这个的：它读 `sim/hls_csim/fir_coeffs_{1..4}.txt`
-（也就是导出成 `fir_coeffs.h` 给硬件用的那几份），再对同一段输入做卷积。
+`src/python/export_golden.py` 就是干这个的：它读 `sim/hls_csim/lp_*.txt` ——
+和硬件 `fir_coeffs_n<N>.h` 是**同一批**文件（两者都出自
+`src/python/export_coefficients.py`，而系数只在 `band_design.py` 里设计一次），
+再对同一段输入做卷积。
+
+> 补记（2026-09-30）：本文写的时候系数是 `sim/hls_csim/fir_coeffs_{1..4}.txt`
+> 那四份（每段一个带通）。后来频段划分改成相减式，系数也换成
+> `lp_<截止>_n<抽头>.txt`（三个低通），文件名不再是那四个了。
+>
+> 而且这个坑**已经从根上堵掉**：采样率 `FS`、边界、设计法现在都只在
+> `band_design.py` 里定义一次，`multiband_baseline.py` 也改成先
+> `resample_poly` 到 48 kHz 再处理 —— 两边不会再各拿一个 `fs`。
+> 留着这篇是因为「同一个 firwin、fs 不同 → 系数不是同一组数」这件事本身
+> 不容易想到，以后接别的东西（比如换采样率的音频源）还会再撞上。
 
 判定标准（`src/python/compare_golden_vs_hw.py`）：相关系数 ≥ 0.999、
 最大单点误差 ≤ 1e-3，且要扫描 ±16 个采样的位移之后再比。

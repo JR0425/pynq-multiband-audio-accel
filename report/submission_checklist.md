@@ -9,9 +9,15 @@
 - [ ] LICENSE 已加（MIT 协议）
 - [ ] .gitignore 生效，无临时/缓存文件混入
 - [ ] 大文件（.bit 等）通过 Git LFS 管理，仓库体积正常
-- [ ] 干净环境复现验证（换台机器照 BUILD_GUIDE.md 跑一遍成功）
+- [ ] 干净环境复现验证（换台机器照 README 的「快速开始」跑一遍成功）
+      ⚠️ 2026-09-30 核实：本项原来写的 `BUILD_GUIDE.md` **仓库里没有**，只在协作日志里
+      提过"计划编写"。要么补一份，要么把这一项改成照 README 跑（README 已有快速开始章节）。
 - [x] 软件基线数据（data/results/baseline_metrics.md）齐全
-- [x] 硬件接口规格（report/hardware_interface_spec.md）齐全
+      ⚠️ 该表是 9/25 的旧参数基线（按 44100 Hz、65 抽头、4 段带通）；
+      当前设计是 48 kHz、193 抽头、3 低通相减。表内已加补记，交付前需重新量一遍。
+- [x] 硬件接口规格：**当前有效的是 `report/interface_spec_hw.md`**
+      （`report/hardware_interface_spec.md` 是队友 9/25 的原始需求，其中
+      `CTRL/NUM_TAPS/FREQ_BAND_1~4` 已被推翻，留作对照）
 
 ## 📄 文档与报告
 - [ ] 设计报告定稿（选题背景、架构、算法、测试、协作、总结）
