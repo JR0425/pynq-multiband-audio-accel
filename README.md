@@ -4,8 +4,8 @@ PYNQ Multiband Audio Accelerator
 
 项目结构
 
-· src/ - HLS、RTL 与 Python 源代码
-· sim/ - 仿真验证与 HLS C++ Testbench
+· src/ - HLS 核与测试台 (src/hls/)、RTL 与 Python 源代码
+· sim/ - 仿真素材（C 仿真用的系数表在 sim/hls_csim/；测试台本身在 src/hls/fir_tb.cpp）
 · build/ - 构建脚本与依赖清单 (requirements.txt)
 · board/ - 上板工程、Overlay 文件与 Jupyter Notebook
 · data/ - 测试音频、频谱图、性能数据表
@@ -35,8 +35,10 @@ PYNQ Multiband Audio Accelerator
 · 软件基线：data/results/baseline\_metrics.md
 · 板级通路验证（开源参考 overlay）：data/results/reference\_overlay\_metrics.md
 · 自研加速核的资源与频率（Vivado 综合 + 布局布线实测）：data/results/impl\_metrics.md
-　选定配置为「定点 16×18 位、乘法器不限流」：2493 LUT / 2624 FF / 70 DSP / 17 BRAM，
-　在 100 MHz（10 ns）约束下 WNS +0.639 ns，时序收敛。
+　选定配置为「相减式 3 低通 / 193 抽头 / 定点 16×18 位 / 乘法器不限流」：
+　3962 LUT (7.5%) / 5514 FF (5.2%) / 202 DSP (91.8%) / 51.5 BRAM (36.8%)，
+　在 100 MHz（10 ns）约束下 WNS +1.624 ns，时序收敛。
+　（独立综合（OOC）的数字，不含外围 AXI / 音频通路；并进 overlay 后须重新量。）
 · 自研加速核的端到端延迟：待上板实测
 
 文档与日志
