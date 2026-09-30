@@ -85,4 +85,58 @@ typedef float drc_t;
 
 #endif /* FIR_FIXED */
 
+
+/* ---- 对外接口的采样类型：int16 / Q1.15 ----
+ *
+ * 核的入出口是 int16，不是 float。原因：板上音频链路本来就是 int16 ——
+ * I2S 送进来的就是 Q1.15 那 16 个比特，codec 收到的也是同一串比特。
+ * 接口用 float 等于凭空多两次转换，而且是**在硬件里**多两次（浮点转换很贵）。
+ *
+ * 定点模式下这四个函数应当**一根线都不花**：
+ *     Q1.15 的 int16 和 data_t（就是 ap_fixed<16,1>）是同一串比特，
+ *     差别只是"怎么解释它"，所以直接贴过去即可 —— ap_fixed 的 .range()
+ *     拿到的正是那 16 个原始比特，不是数值。
+ * ⚠️ 这一步搞错的话，输出会整体差 32768 倍（csim 一眼能看出来）。
+ *
+ * 浮点模式下（FIR_FIXED=0，只用来做对照/回归，不上板）就得真的换算一遍：
+ * 除以 32768 进来、乘回 32768 出去。乘除都是 2 的幂，编译器会折成指数偏置。
+ */
+#if FIR_FIXED
+
+#include <ap_int.h>
+#include <stdint.h>
+
+typedef ap_int<16> samp_int_t;
+
+static inline data_t samp_in(int16_t q) {
+    data_t s;
+    s.range() = (samp_int_t)q;
+    return s;
+}
+
+static inline int16_t samp_out(data_t s) {
+    return (int16_t)s.range();
+}
+
+#else
+
+#include <stdint.h>
+
+#define SAMP_SCALE (1.0f / 32768.0f)
+
+static inline data_t samp_in(int16_t q) {
+    return (float)q * SAMP_SCALE;
+}
+
+/* 四舍五入 + 饱和。定点那边的 (data_t)acc 是截断，
+   两边差 ≤1 个最低位（约 −90 dB），远低于本项目关心的 70 dB 判据。 */
+static inline int16_t samp_out(data_t s) {
+    float v = s * 32768.0f;
+    if (v > 32767.0f) v = 32767.0f;
+    if (v < -32768.0f) v = -32768.0f;
+    return (int16_t)(v + (v >= 0.0f ? 0.5f : -0.5f));
+}
+
+#endif
+
 #endif /* FIR_TYPES_H */

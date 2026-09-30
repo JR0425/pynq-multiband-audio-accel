@@ -1,36 +1,35 @@
 """把硬件（或 HLS C 仿真）的输出与 Python 黄金参考逐点比对。
 
-它回答一个问题：**硬件算的，和理论上应该算出来的，是不是同一个东西。**
+它回答两个问题：
+    1. **硬件算的，和理论上应该算出来的，是不是同一个东西**（SNR / 相关系数）
+    2. **结构搭对了没有**（直通检验：不做压缩时输出应当逐位等于延迟 D 拍的输入）
 
-输出的四项误差指标是设计报告里要填的数据，所以数字都按可复现的方式给全。
+第 2 项比第 1 项硬得多。SNR 是"差多少 dB"，它只会告诉你"不够好"；
+而逐位比对是"对不对"，对不上就是结构错了 —— 两件事必须分开，
+否则会拿"量化误差大"去解释一个其实是接错了的问题。
 
-为什么要先扫位移、再看最佳位移：
-    逐点直接比对，只要两边差了一点点相位，得到的相关系数就会很低，
-    **看起来像"算错了"，其实只是错开了**。
-    所以脚本先在一段位移范围内扫一遍，报出最佳位移是多少。
-    最佳位移应该等于滤波器的群延迟差 —— 如果它不等于 0，说明两边的
-    延迟结构不一致，得先查清楚再谈误差。
-    （FIR 的线性相位群延迟 = (抽头数-1)/2，本项目 65 抽头 = 32。）
+写入 log 的验收判据是 **SNR ≥ 70 dB**（见 PROGRESS.md）。这个数不是拍的：
+采样 16 位本身的理论上限约 96 dB，本项目只要求"助听器听起来干净"，
+70 dB 已远高于这个要求。
 
 用法（在仓库根目录）：
     python src/python/compare_golden_vs_hw.py
-
-输出：屏幕上的比对报告；退出码 0 = 通过，1 = 不通过。
+退出码 0 = 通过，1 = 不通过。
 """
 
+import os
 import sys
 
 import numpy as np
 
 GOLDEN = "data/results/python_golden.txt"
 HW = "data/results/hw_output.txt"
+TRANSPARENT = "data/results/hw_transparent_i16.txt"
+INPUT = "data/audio/test_input.txt"
 
-# 通过判据：相关系数要够高，且最大单点误差不超过这个值。
-# 当前 HLS 核用 float32、黄金参考用 float64，差异只应来自浮点舍入，
-# 实测在 1e-5 量级；留到 1e-3 是给后面的定点版本留余地。
-MIN_CORRELATION = 0.999
+SNR_MIN_DB = 70.0
 MAX_ABS_ERROR = 1e-3
-LAG_RANGE = 16
+LAG_RANGE = 16          # 位移搜索范围。正常情况下最佳位移应当是 0。
 
 
 def best_lag(ref, hw, span):
@@ -49,54 +48,112 @@ def best_lag(ref, hw, span):
     return best
 
 
-def main():
+def snr_db(ref, hw):
+    """信噪比：把 (硬件 − 参考) 当成噪声，参考当成信号。"""
+    noise = float(np.sum((hw - ref) ** 2))
+    if noise <= 0.0:
+        return float("inf")
+    return 10.0 * np.log10(float(np.sum(ref ** 2)) / noise)
+
+
+def compare_main():
     try:
         ref = np.loadtxt(GOLDEN, dtype=np.float64)
         hw = np.loadtxt(HW, dtype=np.float64)
     except OSError as exc:
         print(f"读不到文件：{exc}")
-        print(f"  黄金参考 {GOLDEN} —— 跑 src/python/export_golden.py 生成")
-        print(f"  硬件输出 {HW} —— 跑 build/hls/run_csim.tcl 生成")
-        return 1
+        print(f"  黄金参考 {GOLDEN} —— 跑 src/python/export_golden.py")
+        print(f"  硬件输出 {HW} —— 跑 build/hls/run_csim.tcl")
+        return None, False
 
     if len(ref) != len(hw):
         print(f"长度不一致：黄金 {len(ref)}，硬件 {len(hw)} —— 直接判不通过")
-        return 1
+        return None, False
 
     err = hw - ref
     mse = float(np.mean(err ** 2))
-    mae = float(np.mean(np.abs(err)))
     max_err = float(np.max(np.abs(err)))
     denom = float(np.sqrt(np.sum(ref ** 2) * np.sum(hw ** 2)))
     correlation = float(np.sum(ref * hw) / denom) if denom > 0 else 1.0
-
+    snr = snr_db(ref, hw)
     lag, lag_corr = best_lag(ref, hw, LAG_RANGE)
 
-    print("=" * 56)
-    print("软硬件结果比对")
+    print("=" * 60)
+    print("一、与黄金参考比对（SNR 是验收判据）")
     print(f"  样本数            {len(ref)}")
-    print(f"  均方误差 MSE      {mse:.3e}")
-    print(f"  平均绝对误差 MAE  {mae:.3e}")
-    print(f"  最大单点误差      {max_err:.3e}")
+    print(f"  信噪比 SNR        {snr:.1f} dB   （判据 ≥ {SNR_MIN_DB:.0f} dB）")
     print(f"  相关系数          {correlation:.9f}")
+    print(f"  均方误差 MSE      {mse:.3e}")
+    print(f"  最大单点误差      {max_err:.3e}   （判据 ≤ {MAX_ABS_ERROR:.0e}）")
     print(f"  最佳位移          {lag:+d}  (该位移下相关系数 {lag_corr:.9f})")
     print(f"  参考 max|y|       {np.max(np.abs(ref)):.6f}")
     print(f"  硬件 max|y|       {np.max(np.abs(hw)):.6f}")
-    print("=" * 56)
 
     ok = True
     if lag != 0:
         print(f"!! 最佳位移是 {lag:+d} 而不是 0：两边的延迟结构不一致，先查这个，别急着看误差。")
         ok = False
-    if correlation < MIN_CORRELATION:
-        print(f"!! 相关系数 {correlation:.6f} 低于判据 {MIN_CORRELATION}")
+    if snr < SNR_MIN_DB:
+        print(f"!! SNR {snr:.1f} dB 低于判据 {SNR_MIN_DB:.0f} dB")
         ok = False
     if max_err > MAX_ABS_ERROR:
         print(f"!! 最大单点误差 {max_err:.3e} 超过判据 {MAX_ABS_ERROR:.0e}")
         ok = False
+    print("  小结：" + ("通过。" if ok else "不通过，见上面的 !! 行。"))
+    return snr, ok
 
-    print("结论：通过 —— 硬件输出与黄金参考一致。" if ok else "结论：不通过，见上面的 !! 行。")
-    return 0 if ok else 1
+
+def transparent_main():
+    """直通检验：压缩比设成 1.0（等于不压缩）时，输出应当逐位等于延迟 D 拍的输入。
+
+    相减式结构各段之和恒等于延迟 D 拍的输入，所以这一项**必须精确成立**。
+    它同时验三件事：频段相减接对了、第 4 段用的 hist[D] 延迟对、入出的 Q1.15 没差 2 的幂。
+    """
+    if not os.path.exists(TRANSPARENT):
+        print(f"\n（跳过直通检验：没有 {TRANSPARENT}）")
+        return True
+
+    x = np.loadtxt(INPUT, dtype=np.float64)
+    xq = np.clip(np.round(x * 32768.0), -32768, 32767).astype(np.int64)
+    t = np.loadtxt(TRANSPARENT, dtype=np.int64)
+
+    if len(t) != len(xq):
+        print(f"\n!! 直通检验：长度不一致 {len(t)} vs {len(xq)}")
+        return False
+
+    # 找错配最少的位移。不预设 D —— 让它自己报出来，才能发现"延迟量算错了"。
+    best_lag, best_bad = -1, None
+    for lag in range(0, min(len(xq), 512)):
+        bad = int(np.sum(t[lag:] != xq[: len(xq) - lag]))
+        if best_bad is None or bad < best_bad:
+            best_lag, best_bad = lag, bad
+
+    print("\n二、直通检验（压缩比 = 1.0，输出应逐位等于延迟 D 拍的输入）")
+    print(f"  最佳位移 {best_lag}   错配 {best_bad} / {len(xq)} 个采样")
+
+    if best_bad == 0:
+        print(f"  结论：通过 —— 群延迟 D = {best_lag}，逐位一致。")
+        return True
+
+    # 允许的非零错配只有一种来源：输入恰好到满量程 ±1.0，
+    # 而阈值 32767/32768 = 0.99997 挡不住它，于是落进了压缩支路。
+    idx = np.nonzero(t[best_lag:] != xq[: len(xq) - best_lag])[0]
+    vals = np.unique(xq[idx])
+    print(f"  错配处的输入取值：{vals[:8]}（共 {len(vals)} 种）")
+    if np.all(np.abs(vals) >= 32767):
+        print("  结论：通过 —— 全部错配都发生在输入满量程处（阈值挡不住 ±1.0），"
+              "不是结构问题。")
+        return True
+    print("  结论：不通过 —— 有非满量程的错配，说明结构或延迟对不上。")
+    return False
+
+
+def main():
+    snr, ok = compare_main()
+    ok2 = transparent_main()
+    print("\n" + "=" * 60)
+    print("总结论：" + ("通过。" if (ok and ok2) else "不通过。"))
+    return 0 if (ok and ok2) else 1
 
 
 if __name__ == "__main__":
