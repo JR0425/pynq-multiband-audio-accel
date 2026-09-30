@@ -1,0 +1,139 @@
+Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
+| Date         : Wed Sep 30 18:03:32 2026
+| Host         : yu running 64-bit major release  (build 9200)
+| Command      : report_utilization -hierarchical -file D:/pynq-multiband-audio-accel/build/hls/reports/v14_sub_n193_mul96_impl/utilization_synth_hier.rpt
+| Design       : fir_multiband
+| Device       : 7z020clg400-1
+| Design State : Synthesized
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Utilization Design Information
+
+Table of Contents
+-----------------
+1. Utilization by Hierarchy
+
+1. Utilization by Hierarchy
+---------------------------
+
++-----------------------------------------------------+--------------------------------------------------+------------+------------+---------+------+-------+--------+--------+------------+
+|                       Instance                      |                      Module                      | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs  | RAMB36 | RAMB18 | DSP Blocks |
++-----------------------------------------------------+--------------------------------------------------+------------+------------+---------+------+-------+--------+--------+------------+
+| fir_multiband                                       |                                            (top) |      10051 |       9961 |       0 |   90 | 10393 |      0 |     38 |        132 |
+|   (fir_multiband)                                   |                                            (top) |       5714 |       5632 |       0 |   82 | 10354 |      0 |      0 |         82 |
+|   FIR_LP_V_U                                        |                           fir_multiband_FIR_LP_V |       2320 |       2320 |       0 |    0 |     0 |      0 |     33 |          0 |
+|     fir_multiband_FIR_LP_V_rom_U                    |                       fir_multiband_FIR_LP_V_rom |       2320 |       2320 |       0 |    0 |     0 |      0 |     33 |          0 |
+|   hist_V_0_U                                        |                           fir_multiband_hist_V_4 |         53 |         53 |       0 |    0 |     0 |      0 |      1 |          0 |
+|     fir_multiband_hist_V_4_ram_U                    |                    fir_multiband_hist_V_4_ram_95 |         53 |         53 |       0 |    0 |     0 |      0 |      1 |          0 |
+|   hist_V_1_U                                        |                         fir_multiband_hist_V_4_0 |         55 |         55 |       0 |    0 |     0 |      0 |      1 |          0 |
+|     fir_multiband_hist_V_4_ram_U                    |                    fir_multiband_hist_V_4_ram_94 |         55 |         55 |       0 |    0 |     0 |      0 |      1 |          0 |
+|   hist_V_2_U                                        |                         fir_multiband_hist_V_4_1 |         33 |         33 |       0 |    0 |     0 |      0 |      1 |          0 |
+|     fir_multiband_hist_V_4_ram_U                    |                    fir_multiband_hist_V_4_ram_93 |         33 |         33 |       0 |    0 |     0 |      0 |      1 |          0 |
+|   hist_V_3_U                                        |                         fir_multiband_hist_V_4_2 |         76 |         76 |       0 |    0 |     0 |      0 |      1 |          0 |
+|     fir_multiband_hist_V_4_ram_U                    |                    fir_multiband_hist_V_4_ram_92 |         76 |         76 |       0 |    0 |     0 |      0 |      1 |          0 |
+|   hist_V_4_U                                        |                         fir_multiband_hist_V_4_3 |          1 |          1 |       0 |    0 |     0 |      0 |      1 |          0 |
+|     fir_multiband_hist_V_4_ram_U                    |                       fir_multiband_hist_V_4_ram |          1 |          1 |       0 |    0 |     0 |      0 |      1 |          0 |
+|   mul_15s_16s_31_1_1_U13                            |                 fir_multiband_mul_15s_16s_31_1_1 |         32 |         32 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_91 |         32 |         32 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U14                            |               fir_multiband_mul_15s_16s_31_1_1_4 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_90 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U15                            |               fir_multiband_mul_15s_16s_31_1_1_5 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_89 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U19                            |               fir_multiband_mul_15s_16s_31_1_1_6 |        109 |        109 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_88 |        109 |        109 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U2                             |               fir_multiband_mul_15s_16s_31_1_1_7 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_87 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U20                            |               fir_multiband_mul_15s_16s_31_1_1_8 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_86 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U21                            |               fir_multiband_mul_15s_16s_31_1_1_9 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_85 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U23                            |              fir_multiband_mul_15s_16s_31_1_1_10 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_84 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U24                            |              fir_multiband_mul_15s_16s_31_1_1_11 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_83 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U25                            |              fir_multiband_mul_15s_16s_31_1_1_12 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_82 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U28                            |              fir_multiband_mul_15s_16s_31_1_1_13 |         32 |         32 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_81 |         32 |         32 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U3                             |              fir_multiband_mul_15s_16s_31_1_1_14 |         33 |         33 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_80 |         33 |         33 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U30                            |              fir_multiband_mul_15s_16s_31_1_1_15 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_79 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U32                            |              fir_multiband_mul_15s_16s_31_1_1_16 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_78 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U34                            |              fir_multiband_mul_15s_16s_31_1_1_17 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_77 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U37                            |              fir_multiband_mul_15s_16s_31_1_1_18 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_76 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U40                            |              fir_multiband_mul_15s_16s_31_1_1_19 |         80 |         80 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_75 |         80 |         80 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U43                            |              fir_multiband_mul_15s_16s_31_1_1_20 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_74 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U45                            |              fir_multiband_mul_15s_16s_31_1_1_21 |         35 |         35 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_73 |         35 |         35 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U47                            |              fir_multiband_mul_15s_16s_31_1_1_22 |         78 |         78 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_72 |         78 |         78 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U5                             |              fir_multiband_mul_15s_16s_31_1_1_23 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_71 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U50                            |              fir_multiband_mul_15s_16s_31_1_1_24 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_70 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U53                            |              fir_multiband_mul_15s_16s_31_1_1_25 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_69 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U57                            |              fir_multiband_mul_15s_16s_31_1_1_26 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_68 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U59                            |              fir_multiband_mul_15s_16s_31_1_1_27 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_67 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U6                             |              fir_multiband_mul_15s_16s_31_1_1_28 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_66 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U62                            |              fir_multiband_mul_15s_16s_31_1_1_29 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_65 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U64                            |              fir_multiband_mul_15s_16s_31_1_1_30 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_64 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U65                            |              fir_multiband_mul_15s_16s_31_1_1_31 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_63 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U66                            |              fir_multiband_mul_15s_16s_31_1_1_32 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_62 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U68                            |              fir_multiband_mul_15s_16s_31_1_1_33 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_61 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U70                            |              fir_multiband_mul_15s_16s_31_1_1_34 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_60 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U75                            |              fir_multiband_mul_15s_16s_31_1_1_35 |        109 |        109 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_59 |        109 |        109 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U78                            |              fir_multiband_mul_15s_16s_31_1_1_36 |        109 |        109 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_58 |        109 |        109 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U79                            |              fir_multiband_mul_15s_16s_31_1_1_37 |        109 |        109 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_57 |        109 |        109 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U8                             |              fir_multiband_mul_15s_16s_31_1_1_38 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_56 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U81                            |              fir_multiband_mul_15s_16s_31_1_1_39 |        112 |        112 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_55 |        112 |        112 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U82                            |              fir_multiband_mul_15s_16s_31_1_1_40 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_54 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U85                            |              fir_multiband_mul_15s_16s_31_1_1_41 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_53 |         47 |         47 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U86                            |              fir_multiband_mul_15s_16s_31_1_1_42 |        111 |        111 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_52 |        111 |        111 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U88                            |              fir_multiband_mul_15s_16s_31_1_1_43 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_51 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U92                            |              fir_multiband_mul_15s_16s_31_1_1_44 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_50 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U93                            |              fir_multiband_mul_15s_16s_31_1_1_45 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_49 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U94                            |              fir_multiband_mul_15s_16s_31_1_1_46 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U | fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_48 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_15s_16s_31_1_1_U95                            |              fir_multiband_mul_15s_16s_31_1_1_47 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|     fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U |    fir_multiband_mul_15s_16s_31_1_1_Multiplier_0 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          1 |
+|   mul_25s_24s_49_1_1_U44                            |                 fir_multiband_mul_25s_24s_49_1_1 |         72 |         72 |       0 |    0 |     0 |      0 |      0 |          2 |
+|     fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U |    fir_multiband_mul_25s_24s_49_1_1_Multiplier_1 |         72 |         72 |       0 |    0 |     0 |      0 |      0 |          2 |
+|   mul_49s_24s_72_5_1_U97                            |                 fir_multiband_mul_49s_24s_72_5_1 |          2 |          2 |       0 |    0 |     0 |      0 |      0 |          3 |
+|     fir_multiband_mul_49s_24s_72_5_1_Multiplier_2_U |    fir_multiband_mul_49s_24s_72_5_1_Multiplier_2 |          2 |          2 |       0 |    0 |     0 |      0 |      0 |          3 |
+|   mux_564_16_1_1_U99                                |                     fir_multiband_mux_564_16_1_1 |         16 |         16 |       0 |    0 |     0 |      0 |      0 |          0 |
+|   urem_8ns_4ns_8_12_1_U98                           |                fir_multiband_urem_8ns_4ns_8_12_1 |         56 |         48 |       0 |    8 |    39 |      0 |      0 |          0 |
+|     fir_multiband_urem_8ns_4ns_8_12_1_div_U         |            fir_multiband_urem_8ns_4ns_8_12_1_div |         56 |         48 |       0 |    8 |    39 |      0 |      0 |          0 |
+|       (fir_multiband_urem_8ns_4ns_8_12_1_div_U)     |            fir_multiband_urem_8ns_4ns_8_12_1_div |          3 |          3 |       0 |    0 |     3 |      0 |      0 |          0 |
+|       fir_multiband_urem_8ns_4ns_8_12_1_div_u_0     |          fir_multiband_urem_8ns_4ns_8_12_1_div_u |         53 |         45 |       0 |    8 |    36 |      0 |      0 |          0 |
++-----------------------------------------------------+--------------------------------------------------+------------+------------+---------+------+-------+--------+--------+------------+
+
+

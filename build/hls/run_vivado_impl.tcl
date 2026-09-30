@@ -33,6 +33,9 @@
 #   量别的版本时用 HLS_SOL 指到另一份 solution 目录（HLS 每次综合都会覆盖
 #   impl_proj，所以要先 `cp -r impl_proj/solution1 <别处>` 把 RTL 存下来）。
 #
+#   **定点版（`-DFIR_FIXED=1`）走这条路是必选，不是备选** —— 它没有 Xilinx IP，
+#   不受上面那个 Y2K22 影响（export_design 照样在打包那步失败，但 RTL 已经生成好了）。
+#
 # 产物：build/hls/reports/<label>_impl/ 下的实测报告 + 布线后的 checkpoint
 
 set script_dir [file normalize [file dirname [info script]]]
@@ -53,10 +56,13 @@ set ip_dir   [file join $sol_dir impl ip]
 set work_dir [file join $repo_dir build hls vivado_work $label]
 set rpt_dir  [file join $repo_dir build hls reports ${label}_impl]
 
-if {[llength [glob -nocomplain [file join $ip_dir subcore *.tcl]]] == 0} {
-    puts "ERROR: 没找到 IP 的子核 tcl：$ip_dir/subcore"
-    puts "       先让 HLS 跑一次 export_design（会在打包那步失败，但文件都生成好了）。"
-    exit 1
+# 子核 tcl 只有**浮点版**才有（HLS 会给每个 floating_point IP 打包一个）。
+# 定点版（`-DFIR_FIXED=1`）乘加全落在 DSP48 上，一个 Xilinx IP 都不生成，
+# `subcore` 是空目录 —— 这时候**没有 IP 要实例化**，不是出错。
+# 所以这里不能硬报错：判据改成"有 tcl 才 source"，没有就跳过下面整段 IP 处理。
+set subcore_tcls [glob -nocomplain [file join $ip_dir subcore *.tcl]]
+if {[llength $subcore_tcls] == 0} {
+    puts "NOTE: $ip_dir/subcore 是空的 —— 本版没有 Xilinx IP 子核（定点版正常如此），跳过 IP 处理。"
 }
 
 # 工作目录每次从零开始。**别复用** —— 里面留着上一次跑出来的
@@ -91,31 +97,33 @@ puts "report : $rpt_dir"
 # 纯粹是没被纳入综合。
 # **所以这里不依赖 Vivado 的 IP 机制，直接把它生成出来的 HDL 读进来。**
 # 代价是可能和工程里的 IP 定义重名（Vivado 会告警，通常无害）。
-# `create_ip` 要有一个打开的工程（非工程模式下直接调会报 "No open project"）。
-# 开一个**内存工程**当落脚点：不落盘、不建 fileset，只为把 IP 生成出来。
-create_project -in_memory -part xc7z020clg400-1
+if {[llength $subcore_tcls] > 0} {
+    # `create_ip` 要有一个打开的工程（非工程模式下直接调会报 "No open project"）。
+    # 开一个**内存工程**当落脚点：不落盘、不建 fileset，只为把 IP 生成出来。
+    create_project -in_memory -part xc7z020clg400-1
 
-foreach t [glob -nocomplain [file join $sol_dir impl ip subcore *.tcl]] {
-    source $t
-}
-generate_target synthesis [get_ips]
+    foreach t $subcore_tcls {
+        source $t
+    }
+    generate_target synthesis [get_ips]
 
-# IP 生成的 HDL **必须手动读进来**。
-# `create_ip` 已经把每个 IP 作为 sub-design（.xci）挂进工程了，但非工程模式下
-# `synth_design` 不会顺着 .xci 去链它生成的 HDL —— 实测删掉这段就报
-#     ERROR: [Synth 8-439] module 'FAcc' not found
-# 所以这段不是冗余，是必需的。
-#
-# 代价是这样会跟 .xci 里那份定义撞名（Vivado 报
-#     CRITICAL WARNING: [Synth 8-2490] overwriting previous definition of module ...
-# 但两份内容同源、参数相同，实测无害：v11 用这份脚本跑出的资源数和时序，
-# 跟完全不用这份脚本的项目模式流程逐位相同。**只要每种 IP 只有一份**。
-# 多份的来源是工作目录残留（见上面 file delete 那段）。
-set ip_gen_root [file join $work_dir .gen sources_1 ip]
-foreach d [glob -nocomplain [file join $ip_gen_root *]] {
-    # 先 hdl（IP 真正的实现），后 synth（包在外面的那层壳）
-    foreach f [lsort [glob -nocomplain [file join $d hdl *.v]]]   { read_verilog $f }
-    foreach f [lsort [glob -nocomplain [file join $d synth *.v]]] { read_verilog $f }
+    # IP 生成的 HDL **必须手动读进来**。
+    # `create_ip` 已经把每个 IP 作为 sub-design（.xci）挂进工程了，但非工程模式下
+    # `synth_design` 不会顺着 .xci 去链它生成的 HDL —— 实测删掉这段就报
+    #     ERROR: [Synth 8-439] module 'FAcc' not found
+    # 所以这段不是冗余，是必需的。
+    #
+    # 代价是这样会跟 .xci 里那份定义撞名（Vivado 报
+    #     CRITICAL WARNING: [Synth 8-2490] overwriting previous definition of module ...
+    # 但两份内容同源、参数相同，实测无害：v11 用这份脚本跑出的资源数和时序，
+    # 跟完全不用这份脚本的项目模式流程逐位相同。**只要每种 IP 只有一份**。
+    # 多份的来源是工作目录残留（见上面 file delete 那段）。
+    set ip_gen_root [file join $work_dir .gen sources_1 ip]
+    foreach d [glob -nocomplain [file join $ip_gen_root *]] {
+        # 先 hdl（IP 真正的实现），后 synth（包在外面的那层壳）
+        foreach f [lsort [glob -nocomplain [file join $d hdl *.v]]]   { read_verilog $f }
+        foreach f [lsort [glob -nocomplain [file join $d synth *.v]]] { read_verilog $f }
+    }
 }
 
 # HLS 生成的 RTL（跳过 *_ip.tcl，那是 IP 描述不是 RTL）
@@ -127,10 +135,44 @@ foreach f [glob -nocomplain [file join $rtl_dir *.v]] {
 puts "==== synth_design ===="
 # PerformanceOptimized：默认那一档在这种扁平 RTL 上调度很差，
 # 实测最差路径 12.9 ns 里有 7.7 ns 是走线，逻辑只有 7 级 —— 不是逻辑深，是布得散。
-synth_design -top fir_multiband -part xc7z020clg400-1 -directive PerformanceOptimized
+#
+# -mode out_of_context（OOC）—— **这一条是必需的，不是优化**：
+#   普通模式下 Vivado 把顶层端口当"真管脚"，布局第一步就得给它们找物理位置。
+#   而本核的顶层有 185 个端口位（in_r 32 + out_r 32 + length_r 32 + 两个
+#   DRC 参数数组的存储器接口 80 + 握手位），clg400 封装**总共只有 125 个可用管脚位**，
+#   于是 place_design 在第一步就退：
+#       ERROR: [Place 30-58] IO placement is infeasible.
+#       Number of unplaced terminals (178) is greater than number of available sites (125).
+#   这不是设计的问题 —— 核将来是**被实例化进 overlay 的**（参数走 AXI-Lite 寄存器、
+#   数据走 DMA），从来没有"核自己是一颗芯片"这个用法。
+#   OOC 模式不插 I/O 缓冲，顶层端口不是物理对象，布局就不需要给它们找位置。
+#   这正是测一颗 IP 核该用的模式。
+#
+#   代价：v10 / v11 那两行实测是在普通模式下量的，和 OOC 的数不能逐位对照
+#   （I/O 缓冲那一小块没了，其余逻辑相同）。要复现它们就 HLS_OOC=0。
+set ooc "-mode out_of_context"
+if {[info exists ::env(HLS_OOC)] && $::env(HLS_OOC) == "0"} {
+    puts "NOTE: HLS_OOC=0 —— 按普通模式综合（顶层端口要占真管脚，端口多的版本会布局失败）"
+    set ooc ""
+}
+synth_design -top fir_multiband -part xc7z020clg400-1 -directive PerformanceOptimized {*}$ooc
 
-# 时序约束：目标 100 MHz（10 ns），和 HLS 里 `create_clock -period 10` 是同一条。
-create_clock -period 10.000 -name ap_clk [get_ports ap_clk]
+# 时序约束：默认目标 100 MHz（10 ns），和 HLS 里 `create_clock -period 10` 是同一条。
+#
+# 可以用 HLS_CLK_MHZ 改成别的频率。**为什么需要**：这个核是整条音频通路里唯一的
+# 运算单元，它的时序只跟自己有关；时钟降下来不动功能，只是每块多花几微秒
+# （48 kHz 下每采样有 1/f s 的预算，余量本来就很大）。
+# 什么时候用：100 MHz 下差一点点过不去时，先看**降频**是不是比"加硬件"更划算。
+# 注意降频必须重新布局布线（不是重算报告）—— 周期变了 Vivado 会布出不同的结果，
+# 拿 100 MHz 的布线去算 80 MHz 的 slack 只是个估计。想省时间就用
+# `report_alt_clock.tcl` 先估，确认有戏再真跑一遍。
+set clk_mhz 100
+if {[info exists ::env(HLS_CLK_MHZ)] && [string length $::env(HLS_CLK_MHZ)] > 0} {
+    set clk_mhz $::env(HLS_CLK_MHZ)
+}
+set clk_period [expr {1000.0 / double($clk_mhz)}]
+puts "==== 时钟目标：$clk_mhz MHz（周期 $clk_period ns）===="
+create_clock -period $clk_period -name ap_clk [get_ports ap_clk]
 
 write_checkpoint -force [file join $rpt_dir post_synth.dcp]
 report_utilization           -file [file join $rpt_dir utilization_synth.rpt]

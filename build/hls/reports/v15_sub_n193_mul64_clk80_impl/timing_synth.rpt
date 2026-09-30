@@ -1,0 +1,837 @@
+Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
+| Date         : Wed Sep 30 18:47:58 2026
+| Host         : yu running 64-bit major release  (build 9200)
+| Command      : report_timing_summary -delay_type max -max_paths 10 -file D:/pynq-multiband-audio-accel/build/hls/reports/v15_sub_n193_mul64_clk80_impl/timing_synth.rpt
+| Design       : fir_multiband
+| Device       : 7z020-clg400
+| Speed File   : -1  PRODUCTION 1.12 2019-11-22
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Summary Report
+
+------------------------------------------------------------------------------------------------
+| Timer Settings
+| --------------
+------------------------------------------------------------------------------------------------
+
+  Enable Multi Corner Analysis               :  Yes
+  Enable Pessimism Removal                   :  Yes
+  Pessimism Removal Resolution               :  Nearest Common Node
+  Enable Input Delay Default Clock           :  No
+  Enable Preset / Clear Arcs                 :  No
+  Disable Flight Delays                      :  No
+  Ignore I/O Paths                           :  No
+  Timing Early Launch at Borrowing Latches   :  No
+  Borrow Time for Max Delay Exceptions       :  Yes
+  Merge Timing Exceptions                    :  Yes
+
+  Corner  Analyze    Analyze    
+  Name    Max Paths  Min Paths  
+  ------  ---------  ---------  
+  Slow    Yes        Yes        
+  Fast    Yes        Yes        
+
+
+
+check_timing report
+
+Table of Contents
+-----------------
+1. checking no_clock (0)
+2. checking constant_clock (0)
+3. checking pulse_width_clock (0)
+4. checking unconstrained_internal_endpoints (0)
+5. checking no_input_delay (178)
+6. checking no_output_delay (28)
+7. checking multiple_clock (0)
+8. checking generated_clocks (0)
+9. checking loops (0)
+10. checking partial_input_delay (0)
+11. checking partial_output_delay (0)
+12. checking latch_loops (0)
+
+1. checking no_clock (0)
+------------------------
+ There are 0 register/latch pins with no clock.
+
+
+2. checking constant_clock (0)
+------------------------------
+ There are 0 register/latch pins with constant_clock.
+
+
+3. checking pulse_width_clock (0)
+---------------------------------
+ There are 0 register/latch pins which need pulse_width check
+
+
+4. checking unconstrained_internal_endpoints (0)
+------------------------------------------------
+ There are 0 pins that are not constrained for maximum delay.
+
+ There are 0 pins that are not constrained for maximum delay due to constant clock.
+
+
+5. checking no_input_delay (178)
+--------------------------------
+ There are 178 input ports with no input delay specified. (HIGH)
+
+ There are 0 input ports with no input delay but user has a false path constraint.
+
+
+6. checking no_output_delay (28)
+--------------------------------
+ There are 28 ports with no output delay specified. (HIGH)
+
+ There are 0 ports with no output delay but user has a false path constraint
+
+ There are 0 ports with no output delay but with a timing clock defined on it or propagating through it
+
+
+7. checking multiple_clock (0)
+------------------------------
+ There are 0 register/latch pins with multiple clocks.
+
+
+8. checking generated_clocks (0)
+--------------------------------
+ There are 0 generated clocks that are not connected to a clock source.
+
+
+9. checking loops (0)
+---------------------
+ There are 0 combinational loops in the design.
+
+
+10. checking partial_input_delay (0)
+------------------------------------
+ There are 0 input ports with partial input delay specified.
+
+
+11. checking partial_output_delay (0)
+-------------------------------------
+ There are 0 ports with partial output delay specified.
+
+
+12. checking latch_loops (0)
+----------------------------
+ There are 0 combinational latch loops in the design through latch input
+
+
+
+------------------------------------------------------------------------------------------------
+| Design Timing Summary
+| ---------------------
+------------------------------------------------------------------------------------------------
+
+    WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
+    -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
+      1.374        0.000                      0                27688        5.270        0.000                       0                 11636  
+
+
+All user specified timing constraints are met.
+
+
+------------------------------------------------------------------------------------------------
+| Clock Summary
+| -------------
+------------------------------------------------------------------------------------------------
+
+Clock   Waveform(ns)       Period(ns)      Frequency(MHz)
+-----   ------------       ----------      --------------
+ap_clk  {0.000 6.250}      12.500          80.000          
+
+
+------------------------------------------------------------------------------------------------
+| Intra Clock Table
+| -----------------
+------------------------------------------------------------------------------------------------
+
+Clock             WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
+-----             -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
+ap_clk              1.374        0.000                      0                27688        5.270        0.000                       0                 11636  
+
+
+------------------------------------------------------------------------------------------------
+| Inter Clock Table
+| -----------------
+------------------------------------------------------------------------------------------------
+
+From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints  
+----------    --------          -------      -------  ---------------------  -------------------  
+
+
+------------------------------------------------------------------------------------------------
+| Other Path Groups Table
+| -----------------------
+------------------------------------------------------------------------------------------------
+
+Path Group    From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints  
+----------    ----------    --------          -------      -------  ---------------------  -------------------  
+
+
+------------------------------------------------------------------------------------------------
+| Timing Details
+| --------------
+------------------------------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------------------------------
+From Clock:  ap_clk
+  To Clock:  ap_clk
+
+Setup :            0  Failing Endpoints,  Worst Slack        1.374ns,  Total Violation        0.000ns
+Hold  :           NA  Failing Endpoints,  Worst Slack           NA  ,  Total Violation           NA
+PW    :            0  Failing Endpoints,  Worst Slack        5.270ns,  Total Violation        0.000ns
+---------------------------------------------------------------------------------------------------
+
+
+Max Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[17]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[0])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[0]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[0]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_15/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_45
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[17]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[17])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[18]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[1])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[1]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[1]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_14/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_44
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[18]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[18])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[19]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[2])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[2]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[2]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_13/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_43
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[19]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[19])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[20]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[3])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[3]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[3]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_12/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_42
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[20]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[20])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[21]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[4])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[4]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[4]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_11/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_41
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[21]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[21])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[22]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[5])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[5]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[5]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_10/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_40
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[22]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[22])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[23]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[6])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[6]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[6]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_9/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_39
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[23]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[23])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[24]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[7])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[7]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[7]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_8/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_38
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[24]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[24])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[25]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[8])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[8]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[8]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_7/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_37
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[25]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[25])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+Slack (MET) :             1.374ns  (required time - arrival time)
+  Source:                 ap_CS_fsm_reg[49]_rep/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Destination:            add_ln703_63_fu_27887_p2/C[26]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@6.250ns period=12.500ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            12.500ns  (ap_clk rise@12.500ns - ap_clk rise@0.000ns)
+  Data Path Delay:        10.809ns  (logic 6.739ns (62.345%)  route 4.070ns (37.655%))
+  Logic Levels:           6  (DSP48E1=2 LUT2=1 LUT3=1 LUT5=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 13.424 - 12.500 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.973     0.973    ap_clk
+                         FDRE                                         r  ap_CS_fsm_reg[49]_rep/C
+  -------------------------------------------------------------------    -------------------
+                         FDRE (Prop_fdre_C_Q)         0.518     1.491 r  ap_CS_fsm_reg[49]_rep/Q
+                         net (fo=96, unplaced)        0.569     2.060    mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_5
+                         LUT2 (Prop_lut2_I0_O)        0.295     2.355 r  mul_15s_16s_31_1_1_U33/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/p_i_34__1/O
+                         net (fo=115, unplaced)       0.552     2.907    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_2
+                         LUT6 (Prop_lut6_I4_O)        0.124     3.031 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52/O
+                         net (fo=11, unplaced)        0.495     3.526    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_52_n_0
+                         LUT3 (Prop_lut3_I2_O)        0.124     3.650 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_i_18__31/O
+                         net (fo=12, unplaced)        0.800     4.450    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/A[24]
+                         DSP48E1 (Prop_dsp48e1_A[29]_PCOUT[47])
+                                                      4.036     8.486 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p/PCOUT[47]
+                         net (fo=1, unplaced)         0.055     8.541    mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p_n_106
+                         DSP48E1 (Prop_dsp48e1_PCIN[47]_P[9])
+                                                      1.518    10.059 r  mul_25s_24s_49_1_1_U5/fir_multiband_mul_25s_24s_49_1_1_Multiplier_1_U/p__0/P[9]
+                         net (fo=1, unplaced)         0.800    10.858    mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_1[9]
+                         LUT5 (Prop_lut5_I4_O)        0.124    10.982 r  mul_15s_16s_31_1_1_U57/fir_multiband_mul_15s_16s_31_1_1_Multiplier_0_U/add_ln703_63_fu_27887_p2_i_6/O
+                         net (fo=2, unplaced)         0.800    11.782    mul_15s_16s_31_1_1_U57_n_36
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/C[26]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    12.500    12.500 r  
+                                                      0.000    12.500 r  ap_clk (IN)
+                         net (fo=11644, unset)        0.924    13.424    ap_clk
+                         DSP48E1                                      r  add_ln703_63_fu_27887_p2/CLK
+                         clock pessimism              0.000    13.424    
+                         clock uncertainty           -0.035    13.389    
+                         DSP48E1 (Setup_dsp48e1_CLK_C[26])
+                                                     -0.233    13.156    add_ln703_63_fu_27887_p2
+  -------------------------------------------------------------------
+                         required time                         13.156    
+                         arrival time                         -11.782    
+  -------------------------------------------------------------------
+                         slack                                  1.374    
+
+
+
+
+
+Pulse Width Checks
+--------------------------------------------------------------------------------------
+Clock Name:         ap_clk
+Waveform(ns):       { 0.000 6.250 }
+Period(ns):         12.500
+Sources:            { ap_clk }
+
+Check Type        Corner  Lib Pin             Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location  Pin
+Min Period        n/a     DSP48E1/CLK         n/a            3.884         12.500      8.616                mul_49s_24s_72_5_1_U65/fir_multiband_mul_49s_24s_72_5_1_Multiplier_2_U/buff0_reg/CLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.944         12.500      9.556                hist_V_0_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKARDCLK
+Min Period        n/a     RAMB18E1/CLKBWRCLK  n/a            2.944         12.500      9.556                hist_V_0_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKBWRCLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.944         12.500      9.556                hist_V_1_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKARDCLK
+Min Period        n/a     RAMB18E1/CLKBWRCLK  n/a            2.944         12.500      9.556                hist_V_1_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKBWRCLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.944         12.500      9.556                hist_V_2_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKARDCLK
+Min Period        n/a     RAMB18E1/CLKBWRCLK  n/a            2.944         12.500      9.556                hist_V_2_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKBWRCLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.944         12.500      9.556                hist_V_3_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKARDCLK
+Min Period        n/a     RAMB18E1/CLKBWRCLK  n/a            2.944         12.500      9.556                hist_V_3_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKBWRCLK
+Min Period        n/a     RAMB18E1/CLKARDCLK  n/a            2.944         12.500      9.556                hist_V_4_U/fir_multiband_hist_V_4_ram_U/ram_reg/CLKARDCLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[0]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[10]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[11]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[12]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[13]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[14]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[15]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[16]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[17]_srl6/CLK
+Low Pulse Width   Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[18]_srl6/CLK
+High Pulse Width  Slow    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[0]_srl6/CLK
+High Pulse Width  Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[0]_srl6/CLK
+High Pulse Width  Slow    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[10]_srl6/CLK
+High Pulse Width  Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[10]_srl6/CLK
+High Pulse Width  Slow    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[11]_srl6/CLK
+High Pulse Width  Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[11]_srl6/CLK
+High Pulse Width  Slow    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[12]_srl6/CLK
+High Pulse Width  Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[12]_srl6/CLK
+High Pulse Width  Slow    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[13]_srl6/CLK
+High Pulse Width  Fast    SRL16E/CLK          n/a            0.980         6.250       5.270                p_Val2_8_reg_32918_pp2_iter7_reg_reg[13]_srl6/CLK
+
+
+
