@@ -1,5 +1,20 @@
 # Python 软件基线数据表（Baseline Metrics）
 
+> **2026-09-30 补记（下面这张表是 9/25 的旧参数基线，不是当前设计）**
+>
+> 两处会和现状对上不：
+>
+> 1. **采样率写错了。** 第 5 行写素材是 48000 Hz，实测 `real_voice.wav` 是
+>    **44100 Hz**（`python -c "import wave; print(wave.open('data/audio/real_voice.wav').getframerate())"`）。
+>    下表所有耗时都是按 44100 跑的。硬件侧固定 48 kHz，所以软件基线要重采样到
+>    48 kHz 才能和硬件对照 —— 这一步 9/30 才补上（见 `src/python/multiband_baseline.py`）。
+> 2. **算法参数是旧方案。** 第 10~11 行的「65 抽头 / 600 Hz」和「65 抽头 × 4 段」
+>    是各自独立设计的 4 个带通、边界 300/600/1000。现在改成
+>    **3 个低通相减、边界 500/1000/2000、193 抽头**，唯一定义处在
+>    `src/python/band_design.py`。
+>
+> 表格本身留作"旧方案有多快"的历史记录，**不要拿它当当前设计的基线**。
+
 测试日期：2026-09-25
 测试环境：Windows 10 / Miniconda Python 3.9
 音频素材：real_voice.wav (10.58 秒, 48000 Hz, 16-bit Stereo)

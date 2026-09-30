@@ -1,0 +1,431 @@
+Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
+| Date         : Wed Sep 30 17:50:19 2026
+| Host         : yu running 64-bit major release  (build 9200)
+| Command      : report_timing -delay_type max -max_paths 5 -path_type full_clock_expanded -file D:/pynq-multiband-audio-accel/build/hls/reports/v12_sub_n65_impl/timing_impl_worst_paths.rpt
+| Design       : fir_multiband
+| Device       : 7z020-clg400
+| Speed File   : -1  PRODUCTION 1.12 2019-11-22
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             1.547ns  (required time - arrival time)
+  Source:                 overflow_1_reg_6317_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/A[22]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        7.829ns  (logic 3.271ns (41.781%)  route 4.558ns (58.219%))
+  Logic Levels:           13  (CARRY4=11 LUT3=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 10.924 - 10.000 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.973     0.973    ap_clk
+    SLICE_X41Y43         FDRE                                         r  overflow_1_reg_6317_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X41Y43         FDRE (Prop_fdre_C_Q)         0.456     1.429 f  overflow_1_reg_6317_reg[0]/Q
+                         net (fo=88, routed)          0.941     2.370    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/overflow_1_reg_6317
+    SLICE_X47Y44         LUT3 (Prop_lut3_I1_O)        0.124     2.494 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77/O
+                         net (fo=1, routed)           0.379     2.873    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77_n_0
+    SLICE_X46Y45         CARRY4 (Prop_carry4_CYINIT_CO[3])
+                                                      0.595     3.468 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68/CO[3]
+                         net (fo=1, routed)           0.000     3.468    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68_n_0
+    SLICE_X46Y46         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.585 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67/CO[3]
+                         net (fo=1, routed)           0.000     3.585    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67_n_0
+    SLICE_X46Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.702 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66/CO[3]
+                         net (fo=1, routed)           0.000     3.702    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66_n_0
+    SLICE_X46Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.819 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30/CO[3]
+                         net (fo=1, routed)           0.000     3.819    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30_n_0
+    SLICE_X46Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.936 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28/CO[3]
+                         net (fo=1, routed)           0.001     3.937    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28_n_0
+    SLICE_X46Y50         CARRY4 (Prop_carry4_CI_O[2])
+                                                      0.239     4.176 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_22/O[2]
+                         net (fo=77, routed)          0.872     5.048    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/select_ln340_2_reg_6328_reg[23][21]
+    SLICE_X49Y46         LUT6 (Prop_lut6_I1_O)        0.301     5.349 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_51/O
+                         net (fo=1, routed)           0.569     5.917    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_0_in1_in[5]
+    SLICE_X48Y46         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.507     6.424 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16/CO[3]
+                         net (fo=1, routed)           0.000     6.424    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16_n_0
+    SLICE_X48Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.538 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15/CO[3]
+                         net (fo=1, routed)           0.000     6.538    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15_n_0
+    SLICE_X48Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.652 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14/CO[3]
+                         net (fo=1, routed)           0.000     6.652    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14_n_0
+    SLICE_X48Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.766 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13/CO[3]
+                         net (fo=1, routed)           0.001     6.767    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13_n_0
+    SLICE_X48Y50         CARRY4 (Prop_carry4_CI_O[2])
+                                                      0.239     7.006 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_12/O[2]
+                         net (fo=2, routed)           1.796     8.802    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ret_V_2_fu_3732_p2[22]
+    DSP48_X3Y19          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/A[22]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.924    10.924    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ap_clk
+    DSP48_X3Y19          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/CLK
+                         clock pessimism              0.000    10.924    
+                         clock uncertainty           -0.035    10.889    
+    DSP48_X3Y19          DSP48E1 (Setup_dsp48e1_CLK_A[22])
+                                                     -0.540    10.349    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0
+  -------------------------------------------------------------------
+                         required time                         10.349    
+                         arrival time                          -8.802    
+  -------------------------------------------------------------------
+                         slack                                  1.547    
+
+Slack (MET) :             1.579ns  (required time - arrival time)
+  Source:                 overflow_1_reg_6317_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/A[21]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        7.796ns  (logic 3.366ns (43.175%)  route 4.430ns (56.825%))
+  Logic Levels:           13  (CARRY4=11 LUT3=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 10.924 - 10.000 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.973     0.973    ap_clk
+    SLICE_X41Y43         FDRE                                         r  overflow_1_reg_6317_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X41Y43         FDRE (Prop_fdre_C_Q)         0.456     1.429 f  overflow_1_reg_6317_reg[0]/Q
+                         net (fo=88, routed)          0.941     2.370    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/overflow_1_reg_6317
+    SLICE_X47Y44         LUT3 (Prop_lut3_I1_O)        0.124     2.494 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77/O
+                         net (fo=1, routed)           0.379     2.873    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77_n_0
+    SLICE_X46Y45         CARRY4 (Prop_carry4_CYINIT_CO[3])
+                                                      0.595     3.468 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68/CO[3]
+                         net (fo=1, routed)           0.000     3.468    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68_n_0
+    SLICE_X46Y46         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.585 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67/CO[3]
+                         net (fo=1, routed)           0.000     3.585    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67_n_0
+    SLICE_X46Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.702 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66/CO[3]
+                         net (fo=1, routed)           0.000     3.702    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66_n_0
+    SLICE_X46Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.819 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30/CO[3]
+                         net (fo=1, routed)           0.000     3.819    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30_n_0
+    SLICE_X46Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.936 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28/CO[3]
+                         net (fo=1, routed)           0.001     3.937    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28_n_0
+    SLICE_X46Y50         CARRY4 (Prop_carry4_CI_O[2])
+                                                      0.239     4.176 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_22/O[2]
+                         net (fo=77, routed)          0.872     5.048    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/select_ln340_2_reg_6328_reg[23][21]
+    SLICE_X49Y46         LUT6 (Prop_lut6_I1_O)        0.301     5.349 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_51/O
+                         net (fo=1, routed)           0.569     5.917    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_0_in1_in[5]
+    SLICE_X48Y46         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.507     6.424 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16/CO[3]
+                         net (fo=1, routed)           0.000     6.424    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16_n_0
+    SLICE_X48Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.538 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15/CO[3]
+                         net (fo=1, routed)           0.000     6.538    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15_n_0
+    SLICE_X48Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.652 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14/CO[3]
+                         net (fo=1, routed)           0.000     6.652    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14_n_0
+    SLICE_X48Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.766 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13/CO[3]
+                         net (fo=1, routed)           0.001     6.767    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13_n_0
+    SLICE_X48Y50         CARRY4 (Prop_carry4_CI_O[1])
+                                                      0.334     7.101 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_12/O[1]
+                         net (fo=2, routed)           1.668     8.769    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ret_V_2_fu_3732_p2[21]
+    DSP48_X3Y19          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/A[21]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.924    10.924    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ap_clk
+    DSP48_X3Y19          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/CLK
+                         clock pessimism              0.000    10.924    
+                         clock uncertainty           -0.035    10.889    
+    DSP48_X3Y19          DSP48E1 (Setup_dsp48e1_CLK_A[21])
+                                                     -0.541    10.348    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0
+  -------------------------------------------------------------------
+                         required time                         10.348    
+                         arrival time                          -8.769    
+  -------------------------------------------------------------------
+                         slack                                  1.579    
+
+Slack (MET) :             1.589ns  (required time - arrival time)
+  Source:                 overflow_1_reg_6317_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/A[23]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        7.783ns  (logic 3.345ns (42.978%)  route 4.438ns (57.022%))
+  Logic Levels:           13  (CARRY4=11 LUT3=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 10.924 - 10.000 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.973     0.973    ap_clk
+    SLICE_X41Y43         FDRE                                         r  overflow_1_reg_6317_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X41Y43         FDRE (Prop_fdre_C_Q)         0.456     1.429 f  overflow_1_reg_6317_reg[0]/Q
+                         net (fo=88, routed)          0.941     2.370    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/overflow_1_reg_6317
+    SLICE_X47Y44         LUT3 (Prop_lut3_I1_O)        0.124     2.494 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77/O
+                         net (fo=1, routed)           0.379     2.873    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77_n_0
+    SLICE_X46Y45         CARRY4 (Prop_carry4_CYINIT_CO[3])
+                                                      0.595     3.468 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68/CO[3]
+                         net (fo=1, routed)           0.000     3.468    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68_n_0
+    SLICE_X46Y46         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.585 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67/CO[3]
+                         net (fo=1, routed)           0.000     3.585    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67_n_0
+    SLICE_X46Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.702 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66/CO[3]
+                         net (fo=1, routed)           0.000     3.702    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66_n_0
+    SLICE_X46Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.819 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30/CO[3]
+                         net (fo=1, routed)           0.000     3.819    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30_n_0
+    SLICE_X46Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.936 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28/CO[3]
+                         net (fo=1, routed)           0.001     3.937    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28_n_0
+    SLICE_X46Y50         CARRY4 (Prop_carry4_CI_O[2])
+                                                      0.239     4.176 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_22/O[2]
+                         net (fo=77, routed)          0.872     5.048    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/select_ln340_2_reg_6328_reg[23][21]
+    SLICE_X49Y46         LUT6 (Prop_lut6_I1_O)        0.301     5.349 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_51/O
+                         net (fo=1, routed)           0.569     5.917    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_0_in1_in[5]
+    SLICE_X48Y46         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.507     6.424 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16/CO[3]
+                         net (fo=1, routed)           0.000     6.424    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16_n_0
+    SLICE_X48Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.538 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15/CO[3]
+                         net (fo=1, routed)           0.000     6.538    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15_n_0
+    SLICE_X48Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.652 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14/CO[3]
+                         net (fo=1, routed)           0.000     6.652    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14_n_0
+    SLICE_X48Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.766 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13/CO[3]
+                         net (fo=1, routed)           0.001     6.767    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13_n_0
+    SLICE_X48Y50         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.313     7.080 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_12/O[3]
+                         net (fo=2, routed)           1.676     8.756    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ret_V_2_fu_3732_p2[23]
+    DSP48_X3Y19          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/A[23]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.924    10.924    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ap_clk
+    DSP48_X3Y19          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/CLK
+                         clock pessimism              0.000    10.924    
+                         clock uncertainty           -0.035    10.889    
+    DSP48_X3Y19          DSP48E1 (Setup_dsp48e1_CLK_A[23])
+                                                     -0.544    10.345    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0
+  -------------------------------------------------------------------
+                         required time                         10.345    
+                         arrival time                          -8.756    
+  -------------------------------------------------------------------
+                         slack                                  1.589    
+
+Slack (MET) :             1.602ns  (required time - arrival time)
+  Source:                 overflow_1_reg_6317_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/A[29]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        7.777ns  (logic 3.368ns (43.309%)  route 4.409ns (56.691%))
+  Logic Levels:           14  (CARRY4=12 LUT3=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 10.924 - 10.000 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.973     0.973    ap_clk
+    SLICE_X41Y43         FDRE                                         r  overflow_1_reg_6317_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X41Y43         FDRE (Prop_fdre_C_Q)         0.456     1.429 f  overflow_1_reg_6317_reg[0]/Q
+                         net (fo=88, routed)          0.941     2.370    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/overflow_1_reg_6317
+    SLICE_X47Y44         LUT3 (Prop_lut3_I1_O)        0.124     2.494 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77/O
+                         net (fo=1, routed)           0.379     2.873    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77_n_0
+    SLICE_X46Y45         CARRY4 (Prop_carry4_CYINIT_CO[3])
+                                                      0.595     3.468 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68/CO[3]
+                         net (fo=1, routed)           0.000     3.468    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68_n_0
+    SLICE_X46Y46         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.585 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67/CO[3]
+                         net (fo=1, routed)           0.000     3.585    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67_n_0
+    SLICE_X46Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.702 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66/CO[3]
+                         net (fo=1, routed)           0.000     3.702    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66_n_0
+    SLICE_X46Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.819 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30/CO[3]
+                         net (fo=1, routed)           0.000     3.819    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30_n_0
+    SLICE_X46Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.936 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28/CO[3]
+                         net (fo=1, routed)           0.001     3.937    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28_n_0
+    SLICE_X46Y50         CARRY4 (Prop_carry4_CI_O[2])
+                                                      0.239     4.176 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_22/O[2]
+                         net (fo=77, routed)          0.872     5.048    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/select_ln340_2_reg_6328_reg[23][21]
+    SLICE_X49Y46         LUT6 (Prop_lut6_I1_O)        0.301     5.349 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_51/O
+                         net (fo=1, routed)           0.569     5.917    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_0_in1_in[5]
+    SLICE_X48Y46         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.507     6.424 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16/CO[3]
+                         net (fo=1, routed)           0.000     6.424    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16_n_0
+    SLICE_X48Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.538 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15/CO[3]
+                         net (fo=1, routed)           0.000     6.538    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15_n_0
+    SLICE_X48Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.652 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14/CO[3]
+                         net (fo=1, routed)           0.000     6.652    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14_n_0
+    SLICE_X48Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.766 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13/CO[3]
+                         net (fo=1, routed)           0.001     6.767    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13_n_0
+    SLICE_X48Y50         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.881 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_12/CO[3]
+                         net (fo=1, routed)           0.000     6.881    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_12_n_0
+    SLICE_X48Y51         CARRY4 (Prop_carry4_CI_O[0])
+                                                      0.222     7.103 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_11/O[0]
+                         net (fo=12, routed)          1.647     8.750    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ret_V_2_fu_3732_p2[24]
+    DSP48_X3Y19          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/A[29]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.924    10.924    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ap_clk
+    DSP48_X3Y19          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0/CLK
+                         clock pessimism              0.000    10.924    
+                         clock uncertainty           -0.035    10.889    
+    DSP48_X3Y19          DSP48E1 (Setup_dsp48e1_CLK_A[29])
+                                                     -0.537    10.352    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p__0
+  -------------------------------------------------------------------
+                         required time                         10.352    
+                         arrival time                          -8.750    
+  -------------------------------------------------------------------
+                         slack                                  1.602    
+
+Slack (MET) :             1.627ns  (required time - arrival time)
+  Source:                 overflow_1_reg_6317_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p/A[19]
+                            (rising edge-triggered cell DSP48E1 clocked by ap_clk  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             ap_clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (ap_clk rise@10.000ns - ap_clk rise@0.000ns)
+  Data Path Delay:        7.745ns  (logic 3.231ns (41.715%)  route 4.514ns (58.285%))
+  Logic Levels:           12  (CARRY4=10 LUT3=1 LUT6=1)
+  Clock Path Skew:        -0.049ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.924ns = ( 10.924 - 10.000 ) 
+    Source Clock Delay      (SCD):    0.973ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock ap_clk rise edge)     0.000     0.000 r  
+                                                      0.000     0.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.973     0.973    ap_clk
+    SLICE_X41Y43         FDRE                                         r  overflow_1_reg_6317_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X41Y43         FDRE (Prop_fdre_C_Q)         0.456     1.429 f  overflow_1_reg_6317_reg[0]/Q
+                         net (fo=88, routed)          0.941     2.370    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/overflow_1_reg_6317
+    SLICE_X47Y44         LUT3 (Prop_lut3_I1_O)        0.124     2.494 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77/O
+                         net (fo=1, routed)           0.379     2.873    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_77_n_0
+    SLICE_X46Y45         CARRY4 (Prop_carry4_CYINIT_CO[3])
+                                                      0.595     3.468 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68/CO[3]
+                         net (fo=1, routed)           0.000     3.468    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_68_n_0
+    SLICE_X46Y46         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.585 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67/CO[3]
+                         net (fo=1, routed)           0.000     3.585    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_67_n_0
+    SLICE_X46Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.702 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66/CO[3]
+                         net (fo=1, routed)           0.000     3.702    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_66_n_0
+    SLICE_X46Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.819 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30/CO[3]
+                         net (fo=1, routed)           0.000     3.819    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_30_n_0
+    SLICE_X46Y49         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     3.936 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28/CO[3]
+                         net (fo=1, routed)           0.001     3.937    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_28_n_0
+    SLICE_X46Y50         CARRY4 (Prop_carry4_CI_O[2])
+                                                      0.239     4.176 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/icmp_ln1497_reg_6348_reg[0]_i_22/O[2]
+                         net (fo=77, routed)          0.872     5.048    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/select_ln340_2_reg_6328_reg[23][21]
+    SLICE_X49Y46         LUT6 (Prop_lut6_I1_O)        0.301     5.349 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_51/O
+                         net (fo=1, routed)           0.569     5.917    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_0_in1_in[5]
+    SLICE_X48Y46         CARRY4 (Prop_carry4_DI[1]_CO[3])
+                                                      0.507     6.424 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16/CO[3]
+                         net (fo=1, routed)           0.000     6.424    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_16_n_0
+    SLICE_X48Y47         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.538 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15/CO[3]
+                         net (fo=1, routed)           0.000     6.538    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_15_n_0
+    SLICE_X48Y48         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     6.652 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14/CO[3]
+                         net (fo=1, routed)           0.000     6.652    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_14_n_0
+    SLICE_X48Y49         CARRY4 (Prop_carry4_CI_O[3])
+                                                      0.313     6.965 r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p_i_13/O[3]
+                         net (fo=2, routed)           1.753     8.718    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ret_V_2_fu_3732_p2[19]
+    DSP48_X3Y18          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p/A[19]
+  -------------------------------------------------------------------    -------------------
+
+                         (clock ap_clk rise edge)    10.000    10.000 r  
+                                                      0.000    10.000 r  ap_clk (IN)
+                         net (fo=2686, unset)         0.924    10.924    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/ap_clk
+    DSP48_X3Y18          DSP48E1                                      r  mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p/CLK
+                         clock pessimism              0.000    10.924    
+                         clock uncertainty           -0.035    10.889    
+    DSP48_X3Y18          DSP48E1 (Setup_dsp48e1_CLK_A[19])
+                                                     -0.544    10.345    mul_25s_24s_49_1_1_U8/fir_multiband_mul_25s_24s_49_1_1_Multiplier_2_U/p
+  -------------------------------------------------------------------
+                         required time                         10.345    
+                         arrival time                          -8.718    
+  -------------------------------------------------------------------
+                         slack                                  1.627    
+
+
+
+

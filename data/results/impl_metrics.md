@@ -3,7 +3,7 @@
 对手文件 `hls_synth_metrics.md` 里的数全是 `csynth_design` 的**估算值**，由脚本自动生成。
 这一份是**实测值** —— HLS 生成的 RTL 经 Vivado 综合 + 布局布线之后的数，手工维护。
 
-量法见 `build/hls/run_vivado_impl.tcl`。三种配置走的是同一套流程、同一个器件
+量法见 `build/hls/run_vivado_impl.tcl`。**本节三种配置**走的是同一套流程、同一个器件
 （`xc7z020clg400-1`，-1 速度等级）、同一条时钟约束（10 ns = 100 MHz）、
 同一组努力程度（综合 `PerformanceOptimized`，布局 `ExtraTimingOpt`，
 两次 `phys_opt_design -directive AggressiveExplore`，布线 `MoreGlobalIterations`）。
@@ -15,9 +15,20 @@
       cmd /c "E:\Xilinx\Vivado\2020.2\bin\vivado.bat -notrace -mode batch \
               -source build\hls\run_vivado_impl.tcl"
 
-RTL 得先存下来 —— HLS 每次综合都覆盖 `impl_proj`，所以量完一版要
-`cp -r impl_proj/solution1 build/hls/sol_<版本>` 留档。已留档的：
-`sol_v4_float`（浮点限流5）、`sol_v11_fixed`（定点限流5）、`sol_v10_fixed_nolimit`（定点不限流）。
+RTL 得先存下来 —— HLS 每次综合都覆盖它的工程目录，所以量完一版要
+`cp -r <HLS 的 solution 目录> build/hls/sol_<版本>` 留档。已留档的：
+`sol_v4_float`（浮点限流5）、`sol_v11_fixed`（定点限流5）、`sol_v10_fixed_nolimit`（定点不限流）、
+`sol_v12_sub_n65` / `sol_v13_sub_n193` / `sol_v15_sub_n193_mul64`（相减式那三版）。
+
+注意 **HLS 综合用的工程目录是 `build/hls/synth_proj/`，不是 `impl_proj/`** ——
+`impl_proj` 是 `export_design` 那个流程留下的，容易抄错目录，抄错了会拿到上一版
+一模一样的 RTL 还不自知。验证办法是看 `hist_V_4_ram.dat` 的行数（65 抽头 14 行、193 抽头 40 行）。
+
+换时钟频率用 `HLS_CLK_MHZ`：
+
+    MSYS_NO_PATHCONV=1 HLS_LABEL=<版本> HLS_SOL=build/hls/sol_<版本> HLS_CLK_MHZ=80 \
+      cmd /c "E:\Xilinx\Vivado\2020.2\bin\vivado.bat -notrace -mode batch \
+              -source build\hls\run_vivado_impl.tcl"
 
 ## 三个设计点的实测对照
 
@@ -34,6 +45,98 @@ RTL 得先存下来 —— HLS 每次综合都覆盖 `impl_proj`，所以量完�
 > 名字对一下：`v10_fixed_nolimit` 和 `hls_synth_metrics.md` 里的 `v10_fixed_nosat`
 > 是**同一版**（同一份源码、同一组开关、同一份 RTL）。指令文件名是
 > `v10_fixed_nosat.tcl`，实测那一轮换了个更好懂的名字叫 `nolimit`，报告目录因此有两个名字。
+
+## 相减式新结构的实测对照（2026-09-30）
+
+上面那张表是「4 段各自设计带通」那一代源码的。下面这一组是**相减式**新结构
+（3 个低通 + 两两相减、接口 int16/Q1.15、抽头数是编译开关）的实测。
+
+**量法变了一处**：这一组走的是 `-mode out_of_context`（原因见下面「踩的坑」第 1 条），
+所以**不能和上面三行逐位对照**。这一组内部互相可比。
+
+设备、时钟约束（默认 100 MHz）、努力程度都和上一节相同。
+
+| 版本 | 抽头 | 乘法器 | 拍/采样 | LUT | FF | DSP | BRAM | WNS | 失败端点 |
+|---|---|---|---|---|---|---|---|---|---|
+| `v12_sub_n65` | 65 | 不限 | 173 | 1754 (3.3%) | 2460 (2.3%) | 70 (31.8%) | 19 (13.6%) | **+1.547 ✅** | 0 |
+| `v13_sub_n193` | 193 | 不限 | 449 | **3962 (7.5%)** | 5514 (5.2%) | **202 (91.8%)** | 51.5 (36.8%) | **+1.624 ✅** | 0 |
+| `v14_sub_n193_mul96` | 193 | 限 96 | 452 | 9702 (18.2%) | 10889 (10.2%) | 132 (60.0%) | 19 (13.6%) | **−0.138 ❌** | 19 |
+| `v15_sub_n193_mul64` | 193 | 限 64 | 455 | 10443 (19.6%) | 11619 (10.9%) | 86 (39.1%) | 15 (10.7%) | **−0.620 ❌** | 443 |
+| `v15_sub_n193_mul64` @ **80 MHz** | 193 | 限 64 | 455 | 10311 (19.4%) | 11445 (10.8%) | 86 (39.1%) | 15 (10.7%) | **+0.386 ✅** | 0 |
+
+### 结论一：限流省了 DSP，但时序全崩；而且还更费 LUT
+
+DSP 从 202 降到 86、LUT 反而从 3962 涨到 10443。两条曲线都是往坏的方向走的：
+
+    DSP：  202  →  132  →   86        （限流越狠越省）
+    拍数： 449  →  452  →  455        （几乎不变，+1.3%）
+    LUT： 3962  → 9702  → 10443       （限流越狠越费，2.6 倍）
+    WNS：+1.624 → −0.138 → −0.620     （从过到不过）
+
+**原因和 `v11_fixed_nosat_mul5` 那次一模一样**：复用乘法器 = 把两个 DSP48 串成一条链，
+中间没有寄存器。最差路径长这样：
+
+    ap_enable_reg_pp1_iter1_reg_replica_4/C
+      -> mul_15s_16s_31_1_1_Multiplier_0_U   (DSP48E1)
+      -> 累加器                              (DSP48E1)
+      -> reg_13496_reg[27]/D
+    Data Path Delay 10.491 ns，Logic Levels 4 = DSP48E1×2 + LUT2 + LUT5
+
+而**不限流那一版的最差路径根本不在算术上**：它落在 `hist` 的**地址加法**上
+（15 级逻辑、13 个 CARRY4，终点是 DRC 乘法器的 A 口），7.755 ns。
+这和 `v10` / `v4` 当年的瓶颈是同一处 —— 地址逻辑是这几代共有的短板，以后想再提频就从它下手。
+
+### 结论二：降价换面积这条路走不通
+
+`v15` 在 100 MHz 下差 0.620 ns。把时钟降到 80 MHz，**真跑一遍布局布线**（不是重算报告）
+的结果是 +0.386 ns —— 过了，但薄。
+
+而且那一版的临界路径是 **`ap_CS_fsm_reg[47]` 到乘法器的 C 口，11.589 ns 里 7.018 ns（60%）
+是纯走线**，逻辑只有 4 级。这不是逻辑深，是布得散、信号横穿了整个芯片。
+这种余量靠不住：外围电路一加进去，布局一变就可能又不过。
+所以**降频不是免费的**，"少用 116 个 DSP" 换来的是薄到 0.386 ns 的余量。
+
+### 结论三：抽头数定 193，乘法器不限流，100 MHz
+
+`v13_sub_n193`（不限流、100 MHz）：202 个 DSP 占板上的 **91.8%**，看着吓人，
+但整个系统里除了这个 FIR **没有任何东西用 DSP48**（AXI DMA、I2S 控制器、AXI 互联都是 0 个），
+这 202 个是真全花在刀口上的。它是唯一一个**时序余量真实（+1.624）且频段分得开**的配置。
+
+为什么不能用 65 抽头 —— 这条是量出来的，不是估的：
+
+| 抽头 | 过渡带 (3.3·fs/N) | 最差边界残留 | 段 2 在**自己**中心处 (707 Hz) |
+|---|---|---|---|
+| 65 | 2437 Hz | **−6.0 dB** | **−14.2 dB** |
+| 129 | 1227 Hz | −14.5 dB | −4.1 dB |
+| 193 | 820 Hz | **−21.4 dB** | −1.6 dB |
+
+判据是"每条边界的两侧都 ≤ −20 dB"。65 抽头不是"串音大了点"，是**段 2 连自己该通过的
+707 Hz 都压掉了 14 dB** —— 那四段根本就没分开，压缩比调什么都一样。
+过渡带 2437 Hz 比要分的那几段本身（500 / 500 / 1000 Hz 宽）还宽，这是必然结果。
+
+### 踩的坑（都是环境/流程的，不是设计的）
+
+1. **顶层端口装不进封装。** 普通模式下 Vivado 把顶层端口当真管脚，布局第一步就得给它们
+   找位置。这一版顶层有 **185 个端口位**（`in_r` 32 + `out_r` 32 + `length_r` 32 +
+   两个 DRC 参数数组的存储器接口 80 + 握手位），而 clg400 **总共只有 125 个可用管脚位**：
+
+       ERROR: [Place 30-58] IO placement is infeasible.
+       Number of unplaced terminals (178) is greater than number of available sites (125).
+
+   改 `synth_design -mode out_of_context`（IP 核的标准做法，顶层端口不是物理对象）。
+   核将来是**被实例化进 overlay** 的，本来就没有"核自己是一颗芯片"这个用法。
+   `v10` / `v11` 那两行是普通模式下量的，要复现它们加 `HLS_OOC=0`。
+   （`v10`/`v11` 的端口少，恰好塞得进 125 个，所以当年没撞上。）
+
+2. **拿一套布线去重算别的时钟频率，只能当粗估。** 用 `report_alt_clock.tcl` 在 100 MHz
+   的布线上重算 80 MHz，得 WNS +1.880；真跑一遍 80 MHz 的布局布线，实测 **+0.386**。
+   差了 1.5 ns。周期一变 Vivado 会布出完全不同的结果（关键路径都换了一条）。
+   要出数就必须真跑 `run_vivado_impl.tcl`，重算只用来"决定值不值得真跑"。
+
+3. **不要同时开两个 Vivado。** 并发跑的时候 `synth_design` 报过
+   `invalid command name "rt-undefined"`，还有一次报
+   `couldn't read file "E:/Xilinx/Vivado/2020.2/scripts/rt/data/common.tcl": no such file or directory`
+   —— Vivado 读不到自己的脚本文件。重跑一次就好，跟设计无关。
 
 ## 实测和估算差多远
 
