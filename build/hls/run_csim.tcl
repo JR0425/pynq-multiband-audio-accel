@@ -44,10 +44,9 @@ if {[info exists ::env(HLS_TR)] && [string length $::env(HLS_TR)] > 0} {
 #
 # ⚠️ 这些开关**必须同时加给测试台**，不能只加给核。
 #    测试台自己也 include 了 fir_coeffs.h，靠它拿 N_TAPS / N_BANDS / FIR_GROUP_DELAY。
-#    只给核加的话两边编译出的抽头数就不一样了：核按 193 跑，测试台却以为 D = 32
-#    （65 抽头的默认值），而它的位移搜索范围是 2D+8 = 72，**够不到真正的延迟 96**，
-#    于是印出 "best lag = 14, mismatches = 927/928" —— 看着像结构坏了，
-#    其实只是测试台把延迟数错了。实测就是这么翻的车。
+#    若给核和测试台传入不同的 FIR_N_TAPS，两边就会采用不同抽头数与群延迟，
+#    直通位移搜索会错过预期延迟，误报为结构错误。该问题曾在默认抽头数为 65 时出现；
+#    当前默认值为 193，但覆盖编译参数时仍须给核和测试台传入完全相同的开关。
 set cflags ""
 if {[info exists ::env(HLS_CFLAGS)]} {
     set cflags $::env(HLS_CFLAGS)

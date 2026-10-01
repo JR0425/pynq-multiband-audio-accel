@@ -45,7 +45,7 @@ The diagram separates the project's custom HLS core from the open-source referen
 
 The current local run used Python 3.9.12, NumPy 2.0.2, SciPy 1.13.1, Matplotlib 3.9.4, and SoundFile 0.13.1. The latest best-of-five processing run took 89.5 ms for 10.58 s of audio, or 0.176 µs per sample and 118.3× host real time. The host CPU model was unavailable, so this is a local reference measurement, not a portable benchmark, and it must not be divided by the board-side figures — a 3 GHz desktop x86 and a 100 MHz FPGA differ by orders of magnitude by construction.
 
-The comparison that carries the speedup claim is measured on the board itself, on the same chip, with the same algorithm on both sides: the Zynq ARM in software against the PL core. That measurement gives 6.116 µs against 4.507 µs per sample, a 1.4× ratio. `data/results/accel_cpu_vs_fpga.md` records the conditions and the four caveats that must travel with the number — differing numeric precision, an optimised software library on the CPU side, Python call overhead inside the core-side figure, and the core exploiting filter symmetry to perform about half the multiplications the CPU baseline performs.
+The comparison that carries the speedup claim is measured on the board itself, on the same chip, with the same algorithm on both sides: the Zynq ARM in software against the PL core. That measurement gives 6.116 µs against 4.507 µs per sample, a 1.4× ratio. `data/results/accel_cpu_vs_fpga.md` records the conditions and caveats that must travel with the number: CPU float64 versus core Q1.15, scipy's optimized C implementation (but no hand-written NEON comparison), and the core's symmetry optimization, which halves its multiplication count relative to this CPU run. The PL time includes software register/cache handling; at this block size it was measured to be negligible relative to the 4.500 µs schedule.
 
 The current run reported a maximum coefficient-sum reconstruction error of `3.469e-18` before DRC. Its output artifacts are `data/audio/multiband_output.wav` and `data/figures/multiband_comparison.png`. The independent 1,000-sample test vector used by the HLS testbench is in `data/audio/test_input.txt`; the corresponding Python golden output is `data/results/python_golden.txt`.
 
@@ -75,7 +75,7 @@ The implementation history and measurement limitations are documented in `data/r
 
 The project overlay is `board/overlay/fir.bit`: the custom multiband HLS core together with the PYNQ audio codec, built from `board/overlay/build_fir.tcl`. `board/scripts/fir_core.py` drives the core over AXI-Lite, and `board/scripts/fir_audio_loop.py` runs microphone → core → headphone one block at a time.
 
-The on-board checks passed:
+The recorded on-board checks passed:
 
 | Check | Result |
 | --- | --- |
@@ -83,6 +83,8 @@ The on-board checks passed:
 | Block continuity: 157-point blocks against a single block | bit-identical |
 | Real captured audio through the core: 144,000 samples in 18 blocks | 0 mismatches |
 | Quantisation SNR against the Python golden reference | 75.4 dB (criterion ≥ 70 dB) |
+
+The captured input in the audio-loop log was nearly silent (effective value 1,342), so that run proves the block-level bypass path but does not demonstrate audible microphone compression. Compression was shown with a synthetic signal; a usable microphone A/B recording remains outstanding.
 
 The demonstration path is block-at-a-time, not a real-time stream: the script records a fixed length, runs the core over it, and plays the result back. Making it sample-by-sample would need a streaming interface on the core, which would invalidate the verified schedule and timing. The core's throughput is not the obstacle; the audio port's buffer mechanism is.
 
@@ -97,14 +99,14 @@ The same-board speedup measurement is in section 3. `data/results/reference_over
 | Python time-frequency waterfall | Generated locally on 2026-10-01 |
 | Python golden output for the current 1,000-sample test vector | Regenerated locally on 2026-10-01 |
 | Stored HLS output compared with the regenerated golden file | Passed on 2026-10-01: 75.4 dB SNR, best lag 0; the stored transparent output matched bit for bit at 96 samples |
-| Rebuilding the HLS C simulation in this workstation | Pending; the toolchain is present (Vitis HLS 2020.2 CLI runs), the rerun has not been performed |
+| Rebuilding the HLS C simulation in this workstation | Pending. The teammate's 2026-10-01 handover reports Vitis HLS 2020.2 working at `E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat`; that E: path is not mounted in this local execution environment, so I could not independently rerun it here. |
 | Custom HLS core out-of-context implementation | Results recorded in `data/results/impl_metrics.md` |
 | Custom HLS core integrated into the board overlay | Complete: `board/overlay/fir.bit`; timing and utilisation in `board/overlay/fir_timing.rpt` and `board/overlay/fir_util.rpt` |
 | Custom-core board audio through the real capture path | Complete: 144,000 samples in 18 blocks, 0 mismatches |
 | Same-chip ARM against PL core timing | Measured: 6.116 µs against 4.507 µs per sample, 1.4× |
 | RTL implementation and Python/HLS/RTL comparison | Pending; `src/rtl/` is empty |
 
-The current stored HLS output passes comparison against the newly generated 193-tap Python golden file, and the stored transparent output confirms the expected 96-sample delay. Rebuilding the C-simulation output with the final toolchain remains necessary for reproducibility; filenames alone do not establish which source flags produced a result.
+The current stored HLS output passes comparison against the newly generated 193-tap Python golden file, and the stored transparent output confirms the expected 96-sample delay. Rebuilding the C-simulation output with the final toolchain remains necessary for reproducibility; filenames alone do not establish which source flags produced a result. The handover reports that the matching Vitis HLS installation is available on the teammate's workstation; this sandbox cannot access that E: drive.
 
 ## 7. Reproduction
 
@@ -124,7 +126,7 @@ The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the READ
 ## 8. Remaining work before submission
 
 1. The target environment is settled: PYNQ 2.7 with Vivado/Vitis HLS 2020.2 is the project's declared toolchain, and it is what all board evidence in this repository was produced with.
-2. Rerun the 193-tap C simulation with the documented toolchain and compare it with the regenerated Python golden data.
+2. For an independent source-reproduction record, rebuild the 193-tap C simulation with the documented toolchain and compare it with the regenerated Python golden data. The stored HLS output comparison is already complete (W3 per the teammate handover).
 3. Produce the same-input Python/HLS/RTL comparison after an RTL implementation exists.
 4. Record the demonstration video from the board evidence, review the English poster, and run a clean-machine reproduction.
 

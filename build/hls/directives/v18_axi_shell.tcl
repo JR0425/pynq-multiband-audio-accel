@@ -9,7 +9,7 @@
 # 这一版把接口换掉，算法不动：
 #   · in / out          → AXI4-Master（m_axi），核自己去 DDR 读写，成块地搬
 #   · length / reset / bypass / drc_thr / drc_ratio → AXI4-Lite（s_axilite）
-#     这一组就对应 `report/interface_spec_hw.md` §二 那张寄存器表
+#     这一组就对应 `report/hardware_interface_spec.md` §二 那张寄存器表
 #
 # ⚠️ 只动接口不动算法，所以 csim 的输出必须**逐位不变**。
 #    跑完综合要立刻重跑 csim 对一遍（见文件末尾的复现命令）。
