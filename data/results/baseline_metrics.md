@@ -1,52 +1,112 @@
-# Python Software Baseline
+# 基线数据表
 
-## Current reference run
+> 2026-10-01 重做。这是 W2 的交付物之一。
+>
+> 上一版（9/25）参数是旧的：44100 Hz、边界 300/600/1000、4 段各自 `firwin`。
+> 现在硬件和软件都是**相减式 4 段 / 边界 500/1000/2000 / 193 抽头**，
+> 拿旧表写报告会对不上。旧表留在本文最后当历史记录。
 
-Run date: 2026-10-01
+## 一、三套数，别混着用
 
-Command: `python src/python/multiband_baseline.py --taps 193 --repeat 5`
+同一个算法，在三个地方跑过。**它们不是一回事**，报告里引用必须说清是哪一套：
 
-Environment: repository virtual environment, Python 3.9.12, NumPy 2.0.2, SciPy 1.13.1, Matplotlib 3.9.4, SoundFile 0.13.1. The CPU model was not available from the current Windows session, so retain the machine-specific timing as a local reference rather than a portable benchmark.
+| # | 在哪跑的 | 单采样 | 实时倍率 | 用来回答什么问题 |
+|---|---|---|---|---|
+| A | 桌面 x86（Windows 10 / Miniconda，3 GHz 左右） | 0.140 µs | 148.6× | "纯软件要多久" —— 只作参考 |
+| B | **板载 ARM**（Zynq-7020 的 PS，667 MHz） | 6.116 µs | 3.41× | 和核**同一颗芯片**，这才是加速比的分母 |
+| C | **PL 里的加速核**（100 MHz） | 4.507 µs | 4.62× | 加速比的分子 |
 
-| Item | Result |
-| --- | ---: |
-| Input | `data/audio/real_voice.wav`, stereo, 44.1 kHz, about 10.58 s |
-| Processing rate | 48 kHz after polyphase resampling |
-| Test length after resampling | 507,905 samples |
-| Filter design | 3 low-pass FIRs at 500, 1,000, and 2,000 Hz; 193 taps each |
-| Output bands | 4 subtractive bands, followed by DRC |
-| Group delay | 96 samples, 2.00 ms at 48 kHz |
-| Reconstruction check before DRC | Maximum coefficient-sum error `3.469e-18` |
-| Best of 5 processing times (run A) | 100.7 ms |
-| Host time per sample (run A) | 0.198 µs/sample |
-| Host real-time factor (run A) | 105.1× |
-| Best of 5 processing times (run B) | 89.5 ms |
-| Host time per sample (run B) | 0.176 µs/sample |
-| Host real-time factor (run B) | 118.3× |
-| HLS core schedule reference | 449 cycles/sample at 100 MHz = 4.49 µs/sample; 4.6× against the 48 kHz sample budget |
+**48 kHz 的实时预算是 20.83 µs/采样。** A、B、C 三个都在这条线以内。
 
-The Python and HLS values are not a measured end-to-end speedup comparison. The Python number comes from the local host; the HLS figure comes from a core-level schedule and out-of-context implementation. The custom HLS core has not been integrated and timed through the board audio path. In both runs the host processed each sample faster than the HLS schedule figure, so do not claim that the FPGA is faster from these measurements. The poster draft displays run A as one measured example.
+**加速比用 B ÷ C = 1.4 倍。A 和 C 不能相除** —— 一个是 3 GHz 通用 CPU，
+一个是 100 MHz 的 FPGA，差三十多倍是必然的，说明不了"用 FPGA 值不值"。
+详细论证和必须带上的四条免责声明见 `accel_cpu_vs_fpga.md`。
 
-The repository's existing 1,000-sample HLS output was compared with the freshly regenerated Python golden output. The numeric comparison passed: SNR 75.4 dB, correlation 0.999999986, MSE `6.810e-10`, maximum absolute error `3.469e-05`, and best lag 0. The stored transparent-mode output also matched the quantized test input bit for bit at a 96-sample delay (0 mismatches out of 1,000). This update reran the comparison, not Vitis HLS itself; the HLS executable is unavailable at the documented path on this workstation. Rebuild C simulation before treating the result as a reproducible clean-toolchain run.
+## 二、A：桌面 x86 逐段耗时
 
-Generated artifacts:
+素材：`data/audio/real_voice.wav`，10.58 秒 @ 44100 Hz，重采样到 48000 Hz（507905 个采样）。
+脚本：`src/python/multiband_baseline.py`，重复 3 次取最快。
 
-- `data/audio/multiband_output.wav`
-- `data/figures/multiband_comparison.png`
-- `data/figures/spectrum_waterfall.png`
-- `data/figures/hls_golden_comparison.png`
-- `data/results/python_golden.txt` (separate 1,000-sample HLS test vector)
+| 阶段 | 耗时 | 占处理时间 | 备注 |
+|---|---|---|---|
+| a. 读入 + 混音 + 去直流 + 重采样到 48k | 13.0 ms | — | **含磁盘 I/O**，不和下面几项相加 |
+| b. 3 个 193 抽头低通 | 39.7 ms | 56% | 和核里同一个循环 |
+| c. 4 段压缩 + 求和 | 31.5 ms | 44% | 由"全流程 − b"推得，是估计值 |
+| **处理合计（b + c）** | **71.2 ms** | 100% | 折算 **0.140 µs/采样，148.6× 实时** |
+| （对照）4 段各自滤波的旧形状 | 82.7 ms | — | 乘加 4/3 倍，比上面慢 16% |
 
-Reproduce the software run from the repository root with the command above. Timing varies with host load and hardware.
+关于最后一行：CPU 侧如果按"4 段各自一个滤波器"写，乘加次数是核的 4/3 倍。
+**这个形状不能拿来当基线**，会让加速比虚高。留在这里只为让这个差可见。
 
-## Historical baseline (2026-09-25)
+计时说明：桌面上的单次计时抖动大概 ±10%（同一脚本两次跑出 71.2 ms 和 80.8 ms，
+后者是换形状之前的数）。**要写进报告的绝对值，请在同一台机器上重跑一次取均值**，
+别直接抄这里。这里给的是量级和比例。
 
-The table below is retained as a historical record of the superseded design: 44.1 kHz input without hardware-rate resampling, 65 taps, and independently designed bands. It is not comparable to the current configuration and must not be used as current software performance data.
+## 三、B 和 C：板载 ARM vs PL 里的核
 
-| Test | Historical parameters | Recorded time | Notes |
-| --- | --- | ---: | --- |
-| Input read and DC removal | `mean(x)` | about 0.05 s | Historical run |
-| Single low-pass FIR | 65 taps, 600 Hz | about 0.12 s | Historical run |
-| Four-band processing | 65 taps × 4 | about 0.35 s | Superseded architecture |
-| DRC | threshold 0.1, ratio 0.7 | about 0.08 s | Historical run |
-| Full run including FFT plot | old pipeline | about 1.2 s | Not comparable to current run |
+素材：144000 个采样（3.0 秒 @ 48 kHz），11 根谱线铺在 100 Hz~4 kHz + 底噪。
+脚本：`board/scripts/compare_cpu_fpga.py`，两边各跑 3 次取最快。
+原始输出：`data/results/compare_cpu_fpga_run_20261001_fix.txt`。
+
+| | 实现 | 单采样 | 实时倍率 |
+|---|---|---|---|
+| B | ARM（float64 + `scipy.signal.lfilter`） | 6.116 µs | 3.41× |
+| C | PL 里的核（Q1.15 定点，AXI4-Master 直连 DDR） | 4.507 µs | 4.62× |
+| | **加速比** | **1.4 倍** | |
+
+**结果一致性**（精度不同，不能逐位比，只查是不是同一件事）：
+
+    输入有效值 0.10706 ｜ CPU 输出 0.10659（1.00 倍）
+    CPU 峰值   0.28627 ｜ 核峰值   0.28625
+
+**核的实测贴着理论吞吐**，说明 Python 那层开销可以忽略：
+
+    450 拍 @ 100 MHz = 4.500 µs/采样    实测 4.507 µs   差 0.2%
+
+## 四、写报告时怎么用这张表
+
+- 「软件基线」这一节：用 **A**，说明是桌面 x86，注明是参考量级。
+- 「硬件加速效果」这一节：用 **B vs C**，这是同一颗芯片上的账。
+- 加速比那一句必须带上四条免责声明（精度不同 / CPU 是优化过的库 / 核少做一半乘法 /
+  CPU 不是极限实现），原文在 `accel_cpu_vs_fpga.md`。
+- **不要写"FPGA 比 CPU 快 1.4 倍"**，正确写法是
+  "同一颗芯片上，硬件通路比 scipy 参考实现快 1.4 倍"。
+
+## 五、附：核为什么只有 1.4 倍
+
+结论来自 csynth 报告的循环表，v13/v18 两版数字一致：
+
+| 循环 | 迭代 | achieved II | 拍数 |
+|---|---|---|---|
+| 延迟线整体移位 | 194 | 2 | **398** |
+| 3 个低通 | 3 | 1 | 11 |
+| 4 段压缩 | 4 | 1 | 12 |
+| 每采样合计 | | | **450** |
+
+**88% 的拍数花在"把延迟线整体挪一格"上**，真正算乘法只占 11 拍。
+瓶颈在数据搬动，不在乘法器。改成环形缓冲区理论上能快 6~7 倍，
+**没做** —— 设计已定案，改它要连带重跑综合、时序和全套上板验证。
+
+---
+
+## 附：9/25 旧参数基线（历史记录，不要引用）
+
+测试日期：2026-09-25。测试环境：Windows 10 / Miniconda Python 3.9。
+音频素材：`real_voice.wav`（10.58 秒 @ 44100 Hz，16-bit 立体声）。
+
+| 测试项目 | 算法参数 | 处理耗时 | 输出长度 | 备注 |
+|---|---|---|---|---|
+| 原始读取与去直流 | mean(x) | 约 0.05 秒 | 10.58 秒 | 均值约 5.71e-20，去直流成功 |
+| 单频段 FIR 低通滤波 | 65 抽头, 600 Hz | 约 0.12 秒 | 10.58 秒 | 440 Hz 保留，880 Hz 被衰减 |
+| 4 频段多频段处理 | 65 抽头 x 4 | 约 0.35 秒 | 10.58 秒 | 4 段各自 `firwin`，边界 300/600/1000 |
+| 动态范围压缩（DRC） | 阈值 0.1, 压缩比 0.7 | 约 0.08 秒 | 10.58 秒 | |
+| 全流程（含 FFT 画图） | 以上全部 | 约 1.2 秒 | 10.58 秒 | 端到端总耗时 |
+
+**这张表哪里不能用了**：
+
+1. **采样率。** 表里按 44100 Hz 跑的，硬件固定 48000 Hz，系数不是同一组。
+2. **算法。** 4 段各自 `firwin`、边界 300/600/1000、65 抽头 —— 都不是现在这套。
+   实测旧结构各段之和比原信号高 +3.2 dB（相减式是 −309 dB），是能听出来的差别。
+3. **计时粒度。** 只到 0.01 秒，且没有说明重复次数和取最快还是平均。
+
+留在这里的意义是记录"旧方案有多快"，**不要拿它当当前设计的基线**。

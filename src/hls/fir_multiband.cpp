@@ -262,8 +262,18 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
 
     for (int n = 0; n < length; n++) {
         /* 整体右移一格，把新采样放到最前面。
-         * 完全展开：移位在硬件里只是寄存器之间重新接几根线，不花逻辑资源，
-         * 展开之后 192 次移动变成同一拍的 192 组线，从 192 拍降到 1 拍。 */
+         *
+         * ! 这里**不是**"寄存器之间接几根线"那么便宜 —— 实测它是整个核的瓶颈。
+         *   csynth 报告里这个循环 achieved II = 2、194 次迭代、**398 拍**，
+         *   而 3 个低通加起来只要 11 拍。也就是每采样 450 拍里，
+         *   **398 拍（88%）花在这个移位上**。
+         *   原因：hist 同时被 `ARRAY_PARTITION cyclic factor=5` 拆进 5 个 RAM，
+         *   跨 RAM 边界搬数据要串行，一层 `#pragma HLS UNROLL` 解决不了 ——
+         *   原来那句"从 192 拍降到 1 拍"的假设是错的。
+         *   （v13 / v18 两版报告里这三个数完全一样，见 data/results/impl_metrics.md。）
+         *
+         *   要改的话标准做法是**环形缓冲区 + 转动的读下标**，每采样零搬运。
+         *   没做 —— 设计已定案，改它要连带重跑综合、时序和全套上板验证。 */
 #if FIR_PRAGMA
 #pragma HLS UNROLL
 #endif

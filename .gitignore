@@ -49,6 +49,10 @@ build/hls/*
 # 写在前面会被那句放行盖掉。文件本身留在本地（report_io_timing.tcl 要用它补 I/O 约束）。
 *.dcp
 
+# 临时脚手架（我跑命令时用的 cmd_*.txt、从板子上拷下来的第三方源码副本等）——
+# 一律不进仓库：前者是过程垃圾，后者是别人的版权代码。
+build/tmp/
+
 # OS
 .DS_Store
 Thumbs.db

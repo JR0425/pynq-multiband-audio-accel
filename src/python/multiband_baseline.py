@@ -17,17 +17,24 @@
 
 用法（在仓库根目录）：
     python src/python/multiband_baseline.py               # 默认 193 抽头
-    python src/python/multiband_baseline.py --taps 193
+    python src/python/multiband_baseline.py --taps 65
 输出：
     data/audio/multiband_output.wav   处理后的音频（48 kHz）
     data/figures/multiband_comparison.png  频谱对照图
 
-屏幕上还会打出主机 CPU 处理耗时和实时倍率。它是本机软件基线，不是板上端到端性能。
+屏幕上还会打出 CPU 处理耗时和实时倍率 —— 那才是"软件基线"这个词的用处。
+记：那是**桌面 x86** 的数，不是板子上那个 ARM 核的数，报告里引用要说清是哪一个。
 """
 
 import argparse
 import os
+import sys
 import time
+
+# Windows 控制台默认 GBK，打不出 µ（第 4 步那两行会 UnicodeEncodeError）。
+# 只在 Windows 上会撞，但加这一句不影响 Linux —— 板子上跑同一个文件。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import matplotlib
 matplotlib.use("Agg")          # 无窗口环境也要能出图
@@ -95,7 +102,10 @@ def main():
     # 实测的拍/采样，键是抽头数。见 data/results/impl_metrics.md。
     # 换抽头数就得重新综合，也就得往这里补一行 —— 不给的话宁可不打这个对照，
     # 也不能拿 193 的数去说 65 抽头。
-    CYCLES_MEASURED = {65: 173, 193: 449}
+    # 193 那个数取的是**上板的那一版** `v18_axi_shell`(=450)，不是它的前一版
+    # `v13_sub_n193`(=449) —— 挂 AXI 壳时多了一拍。差 1 拍不影响结论，
+    # 但两个文件报的字面数不一致会让人以为看错了。
+    CYCLES_MEASURED = {65: 173, 193: 450}
     cycles = args.cycles if args.cycles is not None else CYCLES_MEASURED.get(n)
 
     # ---- 1. 读音频，重采样到硬件用的采样率 ----
@@ -129,40 +139,97 @@ def main():
           f"（{d / FS * 1000:.2f} ms）")
     print(f"   结构自检（各段系数之和 vs δ[D]）：最大偏差 {err:.3e}")
 
-    # 计时只包住"处理"，不包文件读写 —— 要比的是算法本身
-    def process(sig):
-        bands = [signal.lfilter(c, 1.0, sig) for c in band_coefs]
-        out = np.zeros_like(sig)
+    # ---- 逐段计时 ----
+    # 只包住"处理"，不包文件读写 —— 要比的是算法本身。
+    # ★ 形状必须和核一样：核每采样跑 **3 遍** 193 抽头低通
+    #   （`for (int b = 0; b < N_LP; b++)`，N_LP=3），第 4 段靠 hist[D] 白拿。
+    #   如果这边改成"4 段各自滤波"，乘加量成了 4/3 倍，加速比会虚高。
+    #   下面 `process_legacy` 那条路留着，只为让那个差看得见。
+    d = group_delay(n)
+    delayed = np.zeros_like(x)
+    delayed[d:] = x[:len(x) - d]
+
+    def stage_lowpass(sig):
+        return [signal.lfilter(c, 1.0, sig) for c in lps]
+
+    def stage_drc(y):
+        bands = (y[0], y[1] - y[0], y[2] - y[1], delayed - y[2])
+        out = np.zeros_like(x)
         for b in bands:
             out += drc(b, DRC_THRESHOLD, DRC_SLOPE)
         return bands, out
 
-    elapsed = []
-    for k in range(max(1, args.repeat)):
-        t0 = time.perf_counter()
-        bands, output = process(x)
-        elapsed.append(time.perf_counter() - t0)
-    best = min(elapsed)
+    def process_legacy(sig):
+        """旧形状：4 段各自一个滤波器。乘加 4/3 倍，别当基线用。"""
+        bs = [signal.lfilter(c, 1.0, sig) for c in band_coefs]
+        o = np.zeros_like(sig)
+        for b in bs:
+            o += drc(b, DRC_THRESHOLD, DRC_SLOPE)
+        return bs, o
+
+    rep = max(1, args.repeat)
+
+    def bench(fn):
+        el = []
+        r = None
+        for _ in range(rep):
+            t0 = time.perf_counter()
+            r = fn()
+            el.append(time.perf_counter() - t0)
+        return r, min(el)
+
+    _, t_lp = bench(lambda: stage_lowpass(x))
+    _, t_all = bench(lambda: stage_drc(stage_lowpass(x)))
+    _, t_legacy = bench(lambda: process_legacy(x))
+    bands, output = stage_drc(stage_lowpass(x))          # 真正要输出的那一份
+    # 压缩+求和那一段是"全流程减去滤波"推出来的，不是单独量的 ——
+    # 单独量会把两次调用之间的 cache 效应算进去。这是个估计值，当量级看。
+    t_drc_only = t_all - t_lp
 
     for i, b in enumerate(bands):
         print(f"   段 {i + 1}: 滤波后 max|y| = {np.max(np.abs(b)):.6f}")
     print(f"3. 压缩后求和：max|y| = {np.max(np.abs(output)):.6f}")
 
-    # ---- 3b. Host CPU timing ----
-    # This is a host-side measurement. The HLS figure is a core-level schedule,
-    # so these values do not establish an end-to-end FPGA speedup.
+    # 读入那一段单独量（含磁盘 I/O，和上面几个不是一回事，所以分开列）
+    t0 = time.perf_counter()
+    _d, fs_in2 = read_wav(IN_PATH)
+    _x = _d[:, 0] + _d[:, 1] if _d.ndim > 1 else _d.copy()
+    if fs_in2 != FS:
+        from math import gcd as _gcd
+        _g = _gcd(int(fs_in2), FS)
+        _x = signal.resample_poly(_x, FS // _g, int(fs_in2) // _g)
+    t_io = time.perf_counter() - t0
+
+    best = t_all
+
+    # ---- 3b. CPU 耗时 —— 这才是"软件基线"这个词的用处 ----
+    # 记：这是**桌面 x86 上的数**，不是板子上那个 ARM 核的数。两个数是两个量级，
+    # 报告里引用时必须说清是哪一个。加速比要等上板之后拿同一段音频、同一条时钟去比。
     audio_s = len(x) / FS
     cpu_us = best / len(x) * 1e6
     budget_us = 1e6 / FS
     print(f"4. CPU 处理 {audio_s:.2f} 秒音频耗时 {best * 1000:.1f} ms"
-          f"（重复 {max(1, args.repeat)} 次取最快）")
-    print(f"   单采样 {cpu_us:.3f} us，实时倍率 {audio_s / best:.1f}x")
+          f"（重复 {rep} 次取最快）")
+    print(f"   单采样 {cpu_us:.3f} µs，实时倍率 {audio_s / best:.1f}x")
+    print(f"   逐段（同一台机器、同一段音频，取最快那次）：")
+    print(f"     a. 读入 + 混音 + 去直流 + 重采样到 48k（含磁盘） "
+          f"{t_io * 1000:7.1f} ms")
+    print(f"     b. 3 个 193 抽头低通（和核同一个循环）           "
+          f"{t_lp * 1000:7.1f} ms   ← 全流程里的大头")
+    print(f"     c. 4 段压缩 + 求和（= 全流程 − b，估计值）        "
+          f"{t_drc_only * 1000:7.1f} ms")
+    print(f"     ---- 处理合计（b + c，不含 a 的磁盘）            "
+          f"{t_all * 1000:7.1f} ms")
+    print(f"     （对照）4 段各自滤波的旧形状，乘加 4/3 倍          "
+          f"{t_legacy * 1000:7.1f} ms  比上面慢 "
+          f"{100.0 * (t_legacy / t_all - 1):.0f}%")
     if cycles:
         fpga_us = cycles / (args.fpga_mhz * 1e6) * 1e6
         print(f"   对照板子：{cycles} 拍 @ {args.fpga_mhz:g} MHz"
-              f" = {fpga_us:.2f} us/采样，实时倍率 {budget_us / fpga_us:.1f}x")
-        print(f"   （48 kHz 实时预算 {budget_us:.1f} us/采样；两项来自不同平台和测量范围，"
-              "不能据此声称 FPGA 更快。自研核上板后的端到端时间仍待测。）")
+              f" = {fpga_us:.2f} µs/采样，实时倍率 {budget_us / fpga_us:.1f}x")
+        print(f"   （48 kHz 实时预算 {budget_us:.1f} µs/采样；两个都够实时，差的是别的 ——"
+              "桌面 3 GHz 扛 SIMD，比 100 MHz 的 DSP 链快得多 ——"
+              "这种规模的负载上这很正常。板子的账不在吞吐上，在确定性延迟、功耗和体积。）")
     else:
         print(f"   （{n} 抽头的拍/采样还没量过，跳过板子侧对照；"
               "要用 --cycles 显式给）")
