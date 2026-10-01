@@ -4,11 +4,9 @@
 # 它自己经 AXI4-Master 去 DDR 读、算完写回，完成时把状态位置起来。
 # 这个类就是那套寄存器操作的一层薄封装。
 #
-# 寄存器偏移的**唯一来源**是 HLS 生成的头文件
-#   build/hls/synth_proj/solution1/impl/misc/drivers/fir_multiband_v1_0/src/xfir_multiband_hw.h
-# 它和 report/hardware_interface_spec.md §二 那张「设计意图」表**不一样** ——
-# HLS 自动生成的控制口是 ap_ctrl 风格（AP_CTRL/AP_DONE 那套），
-# 不是当初设计的 CTRL/STATUS/ID 那套。以这里为准，spec 那份要改。
+# 寄存器偏移来自 HLS 生成的 ap_ctrl_hs 映射；生成头文件位于 HLS build 输出目录，
+# 但不随本仓库快照提交。当前驱动常量和 report/hardware_interface_spec.md §二
+# 使用同一组偏移。早期手排的 CTRL/STATUS/ID 表已经作废。
 #
 # 用法（板子上）：
 #   from pynq import Overlay

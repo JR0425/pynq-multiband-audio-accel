@@ -11,7 +11,7 @@ Status updated 2026-10-01 from the files currently present in this repository. A
 - [x] Current Python baseline and its plot/audio artifacts were regenerated on 2026-10-01.
 - [x] The stored 1,000-sample HLS output was compared with regenerated Python golden data; SNR and transparent-mode alignment passed, and the comparison plot was generated.
 - [ ] A clean-machine reproduction has not yet been performed.
-- [ ] Vitis HLS C simulation has not been rerun in this session. The toolchain is not the obstacle: Vitis HLS 2020.2 is installed at `E:\Xilinx\Vitis_HLS\2020.2\` and its CLI runs (`-version` returns v2020.2, exit 0), so `build/hls/run_csim.tcl` can be rerun. Rerunning it and re-recording the result is outstanding.
+- [ ] A fresh C-simulation rebuild from source has not been repeated in this execution environment. The stored HLS output/golden comparison is present and passed (the handover marks W3 complete); the teammate reports the Vitis HLS 2020.2 CLI worked at `E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat`, but that E: path is not mounted here, so an independent rebuild remains outstanding.
 - [ ] Review whether the tracked board bitstreams should use Git LFS before final submission. `board/overlay/fir.bit` is the custom HLS design; `ps_only.bit` is an earlier playback-only artifact.
 
 ## Hardware and comparison evidence
@@ -21,7 +21,7 @@ Status updated 2026-10-01 from the files currently present in this repository. A
 - [x] Custom HLS core integrated into the board overlay: `board/overlay/fir.bit`, built by `board/overlay/build_fir.tcl`; timing and utilisation in `board/overlay/fir_timing.rpt` and `fir_util.rpt`.
 - [x] Custom-core board measurement: 144,000 samples of captured audio through the core in 18 blocks, bit-exact against the reference; bypass and block-continuity checks also passed.
 - [x] Same-chip speedup measured: ARM 6.116 µs against the core's 4.507 µs per sample, 1.4×, with caveats recorded in `data/results/accel_cpu_vs_fpga.md`.
-- [ ] Live audio demonstration clip: `board/scripts/fir_audio_loop.py` runs and writes the WAV files, but the microphone capture has not yet been verified at a usable level, so the audible A/B comparison is outstanding.
+- [ ] Live audio demonstration clip: the saved 2026-10-01 capture was nearly silent (effective value 1,342), so the audible microphone A/B is still outstanding. The script demonstrated compression with a synthetic signal; rerun with a usable mic or line input and record the clip.
 - [ ] Python/HLS/RTL comparison on the same input and with documented alignment and precision.
 - [ ] RTL implementation and RTL simulation evidence.
 
@@ -32,7 +32,7 @@ Status updated 2026-10-01 from the files currently present in this repository. A
 - [x] Skill package contains prompts, templates, checkers, and pitfalls.
 - [x] Target toolchain fixed and recorded: PYNQ-Z2 image 2.7.0 with Vivado and Vitis HLS 2020.2. Every board measurement and synthesis record in this repository was produced with that pair; no other combination has been used.
 - [ ] Final design report. `report/design_report_draft.md` now matches the integrated design; it still needs a final read-through.
-- [x] English poster draft exists at `report/poster_en/pynq_multiband_audio_poster_draft.pptx`; team review is still required.
+- [x] Updated English poster exists at `report/poster_en/pynq_multiband_audio_poster_v2.pptx`; it includes the integrated-board status, current toolchain, and microphone-capture limitation. Team review is still required; `pynq_multiband_audio_poster_draft.pptx` is the superseded draft.
 - [ ] Record and edit the final demonstration video, then add its link to the README.
 - [x] Interface specification and toolchain version fixed: `report/hardware_interface_spec.md` for the register contract, PYNQ-Z2 image 2.7.0 with Vivado/Vitis HLS 2020.2 for the environment.
 

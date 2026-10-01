@@ -2,7 +2,7 @@
  *
  * ⚠️ 抽头数**不是寄存器**，是编译期常量 —— AXI 寄存器改不动它。
  *    换抽头数 = 换一个 -DFIR_N_TAPS，重新综合。
- *    接口上对外"报"抽头数的是只读的 ID 寄存器（见 report/interface_spec_hw.md §二）。
+ *    抽头数是编译期常量，不存在 ID 寄存器；板端驱动在 fir_core.py 中记录并核对该值。
  *
  * 为什么不把系数写成"运行时可写的数组"：
  *    系数一旦不是常量，HLS 就没法把它当 ROM 处理，很可能撑出一大片逻辑
@@ -18,7 +18,7 @@
 #define FIR_COEFFS_H
 
 #ifndef FIR_N_TAPS
-/* 默认 193 —— 这是已定下来的设计点（report/interface_spec_hw.md §1.5：
+/* 默认 193 —— 这是已定下来的设计点（report/hardware_interface_spec.md §1.5：
  * 65 抽头四段根本分不开，实测最差边界残留只有 −6 dB）。
  * 跑 65 抽头的对照版就显式加 -DFIR_N_TAPS=65，别指望默认值帮你切。 */
 #define FIR_N_TAPS 193

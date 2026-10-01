@@ -1,7 +1,7 @@
 # 硬件接口规格 —— 处理核的对外契约
 
 日期:2026-09-30 ｜ 寄存器表 2026-10-01 重写 ｜ 状态:**已随整机实测验证**
-数据来源:`src/python/band_plan_sweep.py`、`src/hls/`、`data/results/impl_metrics.md`
+数据来源:`src/python/band_plan_sweep.py`、`src/hls/`、`board/scripts/fir_core.py`、`board/overlay/fir.hwh`、`data/results/impl_metrics.md`
 
 ---
 
@@ -35,7 +35,7 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
 - `bypass`:非 0 = 跳过压缩,输出就是各段之和(对应 CTRL 的 BYPASS 位)。
   两个用处:① 上板演示"加压缩 / 不加压缩"的对比听感(验配现场就是这么做的);
   ② **直通检验** —— 各段之和恒等于延迟 D 拍的输入,所以 bypass 时输出必须
-  **逐位等于**输入延后 D 拍。实测 N=65:1000 个采样、位移精确等于 D=32、错配 0 个。
+  **逐位等于**输入延后 D 拍。N=193 上板实测 144000 个采样、位移精确等于 D=96、错配 0 个；C 仿真也验证了 1000 点直通输出。
   想靠"把阈值设到最大"来绕过压缩是**不行的**:阈值是 Q1.15,最大只能到 32767/32768,
   而相减式下 b_i 是两段之差、幅度能到 ±2,照样会落进压缩支路。
 
@@ -129,9 +129,9 @@ out = Σ DRC(b_i, thr_i, ratio_i)
 > **这张表 2026-10-01 重写过。** 原来那一版是**设计意图**（CTRL / STATUS / N_SAMPLES / ID
 > 那套手排的寄存器），和 HLS 实际生成的对不上 —— HLS 给 `s_axilite` 口的是一套
 > **`ap_ctrl_hs` 协议 + 参数自动分配偏移**的寄存器组，我改不动它的布局。
-> 下面这张是**实际生成的那一张**，出处是 HLS 自己产出的头文件
-> `xfir_multiband_hw.h`，也是 `board/scripts/fir_core.py` 里那组常量的唯一来源。
-> **以这张为准。**
+> 下面这张是**实际生成的那一张**，队友交接记录其出处为 HLS 生成头文件
+> `xfir_multiband_hw.h`；仓库中的 `board/scripts/fir_core.py` 与板级 overlay 元数据使用同一寄存器映射。
+> 生成头文件本身不在当前仓库快照中。**以生成的 HLS 映射和驱动常量为准。**
 
 | 偏移 | 名字 | R/W | 内容 |
 |---|---|---|---|
@@ -177,7 +177,8 @@ bundle 里的 m_axi 口合并成一个 AXI4-Master**。打包出来的 `componen
 别在别的脚本里再抄一份。最小用法:
 
 ```python
-from pynq import Overlay
+import numpy as np
+from pynq import Overlay, allocate
 from fir_core import FirMultiband
 
 ol = Overlay("fir.bit")                 # board/overlay/fir.bit

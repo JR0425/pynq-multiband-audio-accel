@@ -12,14 +12,14 @@
 - `scripts/compare_cpu_fpga.py`: same-board ARM baseline against the core.
 - `notebooks/w3_own_overlay_audio.ipynb`: loads `overlay/audio.bit`, the audio-only milestone build that has no accelerator core, and confirms that a project-built bitstream can drive the audio codec.
 - `notebooks/w2_audio_playback.ipynb`: base-overlay audio playback milestone notebook.
-- `notebooks/test_multiband.ipynb`: board-side multiband test notebook; confirm its overlay interface against the final design before use.
+- `notebooks/test_multiband.ipynb`: board-side smoke test for the integrated `fir.bit` overlay; it uses the current `fir_core.py` register driver and verifies bypass delay and compression on a synthetic signal.
 - `scripts/verify_audio_playback.py`: base-overlay audio playback and capture check.
 - `scripts/test_overlay_load.py`: overlay load and IP inventory check.
 - `scripts/verify_fir_hw_e2e.py`: DMA FIR test procedure for an overlay exposing the expected FIR DMA. Its default `fir_accel2.bit` and `filter.fir_dma` are not included in this repository.
 
 ## Evidence boundary
 
-The custom-core board results are `data/results/fir_audio_loop_run_20261001.txt` and `data/results/compare_cpu_fpga_run_20261001_fix.txt`; the write-up is `data/results/accel_cpu_vs_fpga.md`. The core ran on real captured audio (144,000 samples in 18 blocks) bit-exact against the reference, and the same-board ARM baseline measured 6.116 µs against the core's 4.507 µs per sample.
+The custom-core board results are `data/results/fir_audio_loop_run_20261001.txt` and `data/results/compare_cpu_fpga_run_20261001_fix.txt`; the write-up is `data/results/accel_cpu_vs_fpga.md`. The recorded 144,000-sample, 18-block capture passed the bypass identity check with zero mismatches, but its input level was nearly silent (effective value 1,342), so it does not prove an audible microphone A/B compression demo. A synthetic signal did demonstrate compression. The same-board ARM baseline measured 6.116 µs against the core's 4.507 µs per sample. The matching comparison is ARM float64/scipy against PL Q1.15; it does not compare with a hand-written NEON CPU implementation.
 
 `data/results/reference_overlay_metrics.md` records a different, earlier test: a separate open-source 27-tap FIR reference overlay. That result validates a board-side DMA path only and does not measure the custom core. Keep the two apart when quoting numbers.
 
