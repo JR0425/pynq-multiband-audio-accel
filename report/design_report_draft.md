@@ -1,116 +1,125 @@
-# 基于 PYNQ-Z2 的实时多频段音频处理加速平台设计报告（草稿）
+# PYNQ-Z2 Multiband Audio Processing Accelerator
 
-> **这份草案里的设计细节已经过时，别照着它做。**（2026-09-30 标注）
-> 文中写的「4 组 65 抽头、边界 300/600/1000、每段各自 firwin 一个带通、
-> 用 `test_fir.cpp` 跑 C 仿真」是**改造之前**的方案，现在都不是这样了：
->
-> | 草案里写的 | 现在的做法 |
-> |---|---|
-> | 每段各自设计带通 | **相减式**：3 个低通 + 相邻相减 |
-> | 边界 300 / 600 / 1000 Hz | 边界 **500 / 1000 / 2000 Hz**（倍频程） |
-> | 65 抽头 | **193 抽头**（实测 65 抽头四段分不开） |
-> | float | **int16 / Q1.15** |
-> | `sim/hls_csim/test_fir.cpp` + 4 份带通系数 | `src/hls/fir_tb.cpp` + 3 份低通系数 |
->
-> 背景、意义、总体方案那几节还能用。**要引用具体参数，以
-> `report/interface_spec_hw.md` 和 `src/python/band_design.py` 为准。**
-> 正文等提交前统一重写。
+## Design report draft
 
-## 一、 选题背景与意义
+**Status as of 2026-10-01:** the Python reference path and the custom HLS core are present. The custom core has out-of-context synthesis and implementation records. The custom core has not yet been integrated into the board audio path or measured end to end. This report separates measured results from planned work so that the reference-overlay demonstration is not mistaken for a demonstration of the custom core.
 
-### 1.1 听力辅助算法的现状与痛点
-全球听力损失人口数以亿计，助听算法的核心是多频段动态范围压缩（DRC）。该算法要求极低延迟与实时处理，且需要针对不同患者的听力曲线进行灵活重构。
-- 纯软件（如 Python、手机 App）无法满足严苛的实时性要求（延迟通常 > 20ms）。
-- 专用 ASIC 芯片流片成本极高、周期极长，不适合算法快速迭代。
-- FPGA 凭借其并行计算能力和硬件可重构特性，恰好填补了这一空白。
+## 1. Project goal
 
-### 1.2 我们的创新点与场景迁移价值
+The project explores a multiband dynamic-range-compression (DRC) audio pipeline on a PYNQ-Z2 board. DRC reduces the level of signals above a threshold. The algorithm divides audio into frequency bands, applies the same compression rule to each band, and sums the results.
 
-**前人工作**：
-1. **基于软件仿真的验证**：大量助听算法研究使用 MATLAB/Python 进行纯软件仿真（如经典的宽动态范围压缩 WDRC 模型）。这类方法能快速验证算法逻辑，但无法反映真实硬件的时序、延迟和资源开销，无法支撑实时系统的原型验证。
-2. **基于 ASIC 的专用芯片**：高端助听器多采用 ASIC 方案，其优势是极低功耗和极小面积，但流片成本动辄数百万元，且一旦流片完成就无法修改算法，迭代周期长达数月，极大地限制了新算法的快速验证。
-3. **基于 FPGA 的通用加速**：近年来出现了少量基于 FPGA 的音频处理原型（如开源项目 soheilbh/fir_accel_pynq），但它们通常仅实现了单一频段的 FIR 低通滤波，尚未实现多频段分解与动态范围压缩这一助听器场景的核心功能。
+The planned comparison uses a Python reference, an HLS implementation, and an RTL implementation. At this snapshot the repository contains the Python reference and HLS source. No custom RTL source or three-way comparison is present.
 
-**我们的创新点**：
-1. **软硬件三实现对撞**：同一套多频段动态压缩算法，我们同时提供了 Python 软件基线、HLS 高层次综合加速核、自研 RTL 三个版本。通过端到端延迟、资源占用和输出误差的多维度对比，直观展现 FPGA 加速在实时音频处理中的优势。
-2. **多频段动态范围压缩（DRC）落地**：区别于传统的单一低通滤波，我们实现了 4 频段分解，并引入了带阈值的动态范围压缩逻辑，真正贴合助听器“小声放大，大声压小”的实际场景需求。
-3. **可迁移的 PYNQ Skill 封装**：将“在 PYNQ 上插入自定义 HLS 音频加速核”的全流程（包括音频通路搭建、DMA 配置、FFT 验证）封装为通用技能包，该方案可直接迁移至会议系统、车载语音、直播降噪等场景。
+## 2. Current algorithm
 
-## 二、 系统架构设计
+The current design uses a subtractive crossover. It designs three linear-phase low-pass filters at 500 Hz, 1,000 Hz, and 2,000 Hz, each with 193 taps. The bands are formed as follows:
 
-### 2.1 硬件平台介绍
-本设计采用 PYNQ-Z2（Zynq-7020）作为核心平台，板载 ADAU1761 音频编解码芯片，提供 I2S 接口进行音频采集与播放。
+```text
+band 1 = LP500
+band 2 = LP1000 - LP500
+band 3 = LP2000 - LP1000
+band 4 = delayed input - LP2000
+```
 
-### 2.2 自建 Overlay 架构
-我们放弃了修改官方 base overlay 的路线，转而自建标准 Overlay。原因在于官方 base overlay 的音频通路使用了 PYNQ 自研 IP（audio_codec_ctrl 和 audio_direct），修改它需要阅读生产级 RTL 源码，资料少且不划算。自建 Overlay 则完全采用标准 IP（如 axi_i2s_adi），资料丰富，且 block design 由我们自己搭建，能更好地体现系统设计能力。
+The four bands sum to the input delayed by the FIR group delay before compression. At 193 taps, the group delay is 96 samples, or 2.00 ms at 48 kHz. The DRC uses a threshold of 0.1 and a slope of 0.7. The Python reference uses floating-point arithmetic; the HLS core uses a fixed-point input/output path. Quantization error must therefore be measured separately from algorithm alignment.
 
-### 2.3 音频数据流
-本设计的音频数据流如下：
-1. ADAU1761 音频编解码芯片通过 I2S 接口采集模拟音频信号并转换为数字信号。
-2. 数据通过 axi_i2s_adi IP 核转换为 AXI-Stream 流格式。
-3. AXI-Stream 数据流进入 FIR 加速核（HLS 或 RTL 实现）进行多频段滤波和动态范围压缩处理。
-4. 处理后的 AXI-Stream 数据流通过 axi_i2s_adi 转换为 I2S 格式，送回 ADAU1761 播放。
+The single parameter source for sample rate, edges, and DRC defaults is `src/python/band_design.py`. HLS coefficients are generated into `sim/hls_csim/` by `src/python/export_coefficients.py`.
 
-### 2.4 软硬件接口设计
-- **AXI-Lite**：PS 侧通过 AXI-Lite 接口向 FIR 加速核写入滤波器系数、频段参数等配置信息。
-- **AXI-DMA（可选）**：若采用半流式处理，使用 AXI-DMA 进行 DDR 与 PL 之间的批量音频数据搬运。
+```mermaid
+flowchart LR
+    wav[44.1 kHz test WAV] --> prep[Mix channels, remove DC, resample to 48 kHz]
+    prep --> py[Python reference<br/>193-tap FIR + four-band DRC]
+    prep --> q15[Int16 / Q1.15 test input]
+    q15 --> hls[HLS core<br/>three low-pass FIRs + subtractive bands + DRC]
+    py --> pyout[Processed WAV and plots]
+    hls --> simout[C-simulation output<br/>compared with Python golden]
+    hls -. integration and board timing pending .-> board[PYNQ audio path]
+    ref[Open-source 27-tap reference overlay] --> refboard[Separate board-path evidence]
+```
 
-## 三、 算法实现与优化
-### 3.1 Python 软件基线实现
-#### 3.1.1 算法设计说明
-1. **FIR 滤波器设计**：使用 `scipy.signal.firwin` 生成 65 抽头的线性相位 FIR 滤波器，保证通带平坦度与阻带衰减的平衡。
-2. **多频段分解**：使用低通、带通、高通组合的方式，将 0-8kHz 频段划分为 4 个子带，模拟人耳对不同频率的敏感度差异。
-3. **动态范围压缩（DRC）**：采用“硬拐点”压缩方式，设定幅度阈值为 0.1，压缩比为 0.7。即对大于阈值的信号，按 `sign(x) * (0.1 + (|x| - 0.1) * 0.7)` 进行压缩。
-4. **频谱分析**：使用 `numpy.fft.fft` 进行快速傅里叶变换，并在计算前对信号执行去直流操作 `x = x - np.mean(x)`，避免 0Hz 处出现假峰。
-基于 numpy、scipy 完成全部软件基线算法实现：
-- 读取与预处理：利用 soundfile 库读取 48kHz 立体声 16-bit 真人语音（10.58 秒），进行左右声道混合与去直流偏移。
-- 频段划分：设计 4 组 65 抽头 FIR 滤波器，利用 scipy.signal.firwin 分别构建低通(0-300Hz)、带通(300-600Hz)、带通(600-1000Hz)、高通(1000-8000Hz) 滤波器。
-- 动态范围压缩（DRC）：针对每个频段独立进行动态压缩，设定阈值 0.1，压缩比 0.7，模拟助听器“宽动态范围压缩”算法。
-- 可视化与数据分析：基于 matplotlib 与 numpy.fft 生成原始频谱、FIR 滤波对比、多频段处理对比三张关键数据图。
-- 软件基线性能：全流程端到端 CPU 单线程处理耗时约 1.2 秒（含画图），音频处理核心部分耗时约 0.6 秒。详细数据见 `data/results/baseline_metrics.md`。
+The diagram separates the project's custom HLS core from the open-source reference overlay. The dotted connection is planned work, not a completed integration.
 
-### 3.2 HLS 加速核实现
-硬件团队最终采用“相减式”多频段架构（只设计 3 个低通滤波器，相邻低通相减得到各频段），大幅节省了硬件乘法器资源。频段边界按倍频程定为 500Hz / 1000Hz / 2000Hz。最终确定 FIR 抽头数为 193。
+## 3. Python reference implementation
 
-在 Xilinx xc7z020clg400-1 平台上独立综合，100MHz 时钟下实测：LUT 占用 3962 (7.5%)，DSP 占用 202 (91.8%)，WNS 为 +1.624ns，满足实时处理要求（每采样消耗 449 拍，48kHz 下余量 4.6 倍）。直通检验输出与输入延迟对齐，信噪比达 75.4 dB。接口已按 Q1.15 整数格式对齐，待上板联调。
+`src/python/multiband_baseline.py` reads `data/audio/real_voice.wav`, mixes its stereo channels, removes the DC component, and resamples from the file's 44.1 kHz rate to the design rate of 48 kHz. It processes the signal with four subtractive bands and saves a WAV file and spectrum plot.
 
-*（注：原 65 抽头数据已废弃，此处为最新的 193 抽头实测数据）*
+The current local run used Python 3.9.12, NumPy 2.0.2, SciPy 1.13.1, Matplotlib 3.9.4, and SoundFile 0.13.1. The latest best-of-five processing run took 89.5 ms for 10.58 s of audio, or 0.176 µs per sample and 118.3× host real time. The host CPU model was unavailable, so this is a local reference measurement, not a portable benchmark.
 
-### 3.3 RTL 自研 FIR 版本
-计划使用 Verilog 手写 FIR 滤波器，作为与 HLS 版本对照的底层实现。架构设计：
-1. **数据通路**：采用移位寄存器（Shift Register）缓存 65 个历史采样点，使用 65 个乘法器和加法树进行并行乘累加。
-2. **控制通路**：使用有限状态机（FSM）处理 AXI-Stream 的握手信号（TVALID/TREADY），确保数据流的稳定。
-3. **时序约束**：加入时钟约束，确保在 100MHz 时钟下建立时间（Setup Time）收敛，无负裕量（WNS）。
-*（综合报告与波形数据待实现后填入）*
+The Python runtime number is faster per sample than the HLS schedule number below. The measurements use different platforms and scopes; they do not establish an FPGA speedup. The HLS core may still be useful for freeing processor time or providing predictable hardware execution, but this repository does not yet quantify those system-level benefits.
 
+The current run reported a maximum coefficient-sum reconstruction error of `3.469e-18` before DRC. Its output artifacts are `data/audio/multiband_output.wav` and `data/figures/multiband_comparison.png`. The independent 1,000-sample test vector used by the HLS testbench is in `data/audio/test_input.txt`; the corresponding Python golden output is `data/results/python_golden.txt`.
 
-## 四、 测试与性能分析
+## 4. HLS core results
 
-### 4.1 测试方法
-本项目的测试分为三个阶段：
-1. **Python 软件基线测试**：在 PC 上运行纯 Python 实现的多频段 FIR 与 DRC 算法，测量端到端处理耗时，并生成频谱图作为算法正确性的参考标准。
-2. **HLS C 仿真测试**：在 Vitis HLS 中运行 C++ 仿真激励（`test_fir.cpp`），读取 Python 导出的测试数据（`test_input.txt`），将其输出结果与 Python 基线进行逐点比对，验证硬件算法的逻辑正确性。
-3. **上板实时测试**：在 PYNQ-Z2 板上加载 Overlay，通过 Jupyter Notebook 调用硬件加速核，测试端到端延迟、吞吐量以及资源占用情况。
+`src/hls/fir_multiband.cpp` contains the subtractive FIR and DRC implementation. `src/hls/fir_tb.cpp` supplies the C-simulation testbench. The current implementation report records the 193-tap, fixed-point, multiplier-unlimited design point:
 
-### 4.2 软硬件性能对比数据
-（待自研加速核上板后填入）
+| Metric | Recorded value |
+| --- | ---: |
+| LUT | 3,962 (7.5%) |
+| Flip-flops | 5,514 (5.2%) |
+| DSP | 202 (91.8%) |
+| BRAM | 51.5 (36.8%) |
+| Worst negative slack at a 10 ns constraint | +1.624 ns |
+| HLS schedule | 449 cycles/sample |
 
-### 4.3 输出正确性比对
-（待自研加速核上板后填入）
+At 100 MHz, 449 cycles correspond to 4.49 µs per sample, compared with the 20.83 µs sample period at 48 kHz. The resource and timing figures come from an out-of-context core implementation. They exclude the surrounding AXI, audio, and overlay logic. The scheduled cycles are an HLS schedule result, not a board measurement. The integrated design must be measured again after the technical lead completes the overlay.
 
-## 五、 大模型协作与技能包
-### 5.1 协作日志与提示词工程
-（已在 report/llm_collab_log/ 下记录 GitHub 环境搭建、Python基线编写、DRC算法、音频长度Bug修复等过程）
+The implementation history and measurement limitations are documented in `data/results/impl_metrics.md`. Do not compare the out-of-context rows with rows measured using a different flow without accounting for the methodology change.
 
-### 5.2 踩坑清单与通用 PYNQ Skill
-（已在 skill/ 目录下持续积累）
+## 5. Board evidence
 
-## 六、 总结与展望
+The repository records a successful PYNQ-Z2 test of an open-source 27-tap reference overlay in `data/results/reference_overlay_metrics.md`. That test validates the reference overlay's DMA and board control flow. It does not execute the project's custom HLS core and must not be presented as the project's end-to-end accelerator result.
 
-### 6.1 项目总结
-本项目基于 PYNQ-Z2 平台，成功搭建了一套面向听力辅助场景的实时多频段音频处理加速平台。在软件层面，我们完成了多频段 FIR 滤波与动态范围压缩（DRC）算法的 Python 基线实现，并通过 FFT 频谱分析验证了算法的正确性。在系统架构层面，我们设计了自建 Overlay 的音频通路与 AXI-Lite 寄存器映射，完成了 Python 与硬件加速核的接口定义。
+The repository also contains `board/overlay/ps_only.bit`, board notebooks, and playback/verification scripts. The bitstream is labelled `ps_only`; the repository does not establish that it contains the custom multiband HLS core. A custom-core live audio demonstration and its end-to-end latency remain open tasks.
 
-### 6.2 未来展望
-1. **算法扩展**：后续可在现有 4 频段基础上进一步细化频段划分，或引入基于机器学习的自适应降噪算法（如 NLMS），以适应更复杂的听觉场景。
-2. **硬件优化**：探索更高阶的 HLS 优化策略（如数据流架构 Dataflow），在资源与吞吐量之间寻求更优平衡。
-3. **跨平台迁移**：本项目的架构与技能包具有良好的可移植性，未来可尝试部署到其他搭载 Zynq 系列芯片的板卡上，验证跨平台的通用性。
+## 6. Validation status
+
+| Check | Status at this snapshot |
+| --- | --- |
+| Python subtractive-band reconstruction identity | Regenerated locally; maximum error `3.469e-18` |
+| Python audio output and spectrum | Regenerated locally on 2026-10-01 |
+| Python time-frequency waterfall | Generated locally on 2026-10-01 |
+| Python golden output for the current 1,000-sample test vector | Regenerated locally on 2026-10-01 |
+| Stored HLS output compared with the regenerated golden file | Passed on 2026-10-01: 75.4 dB SNR, best lag 0; the stored transparent output matched bit for bit at 96 samples |
+| Rebuilding the HLS C simulation in this workstation | Pending; Vitis HLS is unavailable at the documented installation path |
+| Custom HLS core out-of-context implementation | Results recorded in `data/results/impl_metrics.md` |
+| Custom HLS core integrated into the audio overlay | Pending |
+| Custom-core board audio and end-to-end latency | Pending |
+| RTL implementation and Python/HLS/RTL comparison | Pending |
+
+The current stored HLS output passes comparison against the newly generated 193-tap Python golden file, and the stored transparent output confirms the expected 96-sample delay. Rebuilding the C-simulation output with the final toolchain remains necessary for reproducibility; filenames alone do not establish which source flags produced a result.
+
+## 7. Reproduction
+
+From the repository root, create a Python environment and run:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-python.txt
+python src/python/multiband_baseline.py --taps 193 --repeat 5
+python src/python/export_coefficients.py --taps 193
+python src/python/export_golden.py --taps 193
+```
+
+The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the README. It requires the matching Vitis HLS installation. Before publishing the comparison, record the tool version, exact build flags, test input, output filenames, sample alignment, SNR, and transparent-mode bit-exact check.
+
+## 8. Remaining work before submission
+
+1. Confirm the target PYNQ image and Vivado/Vitis version with the technical lead. The repository contains reference evidence for PYNQ 2.7 and Vivado/Vitis HLS 2020.2, while the team plan specifies PYNQ 3.1 and Vivado 2024.1.
+2. Rerun the 193-tap C simulation and compare it with the regenerated Python golden data.
+3. Integrate the custom core into the board overlay, then capture live audio and end-to-end latency/throughput measurements.
+4. Produce the same-input Python/HLS/RTL comparison after an RTL implementation exists.
+5. Replace the provisional video script claims with recorded evidence, review the English poster, and run a clean-machine reproduction.
+
+## 9. Project artifacts
+
+- Python reference: `src/python/multiband_baseline.py`
+- Spectrum waterfall utility: `src/python/plot_spectrum_waterfall.py`
+- Shared filter design: `src/python/band_design.py`
+- HLS core and testbench: `src/hls/fir_multiband.cpp`, `src/hls/fir_tb.cpp`
+- Current Python metrics: `data/results/baseline_metrics.md`
+- HLS implementation metrics: `data/results/impl_metrics.md`
+- Reference-overlay metrics: `data/results/reference_overlay_metrics.md`
+- Collaboration record: `report/llm_collab_log/`
+- Skill package: `skill/`

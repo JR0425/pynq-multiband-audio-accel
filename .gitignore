@@ -27,6 +27,7 @@ solution*/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+/.venv/
 
 # Build artifacts (但保留 board/overlay 下的最终产物)
 build/*.bit
@@ -34,6 +35,9 @@ build/*.hwh
 # build/vivado 下是 Vivado 工程本体，整个不进仓库 —— 上面那些 *.cache/ *.runs/
 # 之类只是挡住了里面的大头，剩下的 .Xil / NA / webtalk 报告还是会漏出来。
 build/vivado/
+build/poster_work/
+build/.codex-finalizer/
+/.chart-data-*/
 # build/hls 下只留构建脚本、优化指令和综合报告，HLS 工程本体（csim_proj 等）不进仓库
 build/hls/*
 !build/hls/*.tcl

@@ -10,7 +10,7 @@
 > ```
 >
 > 也就是"每调一次处理一块、靠 `reset` 维持块间延迟线连续"，而且抽头数是**编译期常量**
-> 不是参数。真实写法看 `src/hls/fir_tb.cpp`，接口契约看 `report/interface_spec_hw.md` §一。
+> 不是参数。真实写法看 `src/hls/fir_tb.cpp`，接口契约看 `report/hardware_interface_spec.md` §一。
 
 ```cpp
 #include <iostream>
