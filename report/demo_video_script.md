@@ -1,41 +1,140 @@
-# Project Progress Video Script
+# 演示视频脚本
 
-**Status:** capture-ready progress-video draft. It is not the final competition demonstration because the custom HLS core has not yet been integrated into the board audio path.
+**目标时长**：2 分 30 秒左右
+**场地**：PYNQ-Z2 板子（网线接笔记本、耳机麦插板子上的 3.5mm 口）、笔记本（开 Jupyter 看文件列表）
 
-**Target length:** about 2 minutes.
+> 2026-10-01 重写。上一版有两处**和现在的事实不符**，照它拍会在视频里说出假话：
+>
+> 1. 上一版说"440Hz 保留、880Hz 被滤除" —— 那是 9/25 那个 65 抽头单段演示，
+>    现在根本不是这个设计（现在是 4 段，边界 500/1000/2000）。
+> 2. 上一版说"对着麦克风说话，耳机里几乎零延迟地传出处理后的声音" ——
+>    **这不是真的**。现在这条通路是**一块一块处理**的：录 3 秒 → 过核 → 放 3 秒，
+>    中间隔了好几秒。说成实时，视频一放就穿帮。
+>
+> 下面这版只写**实际能演示出来的东西**。
 
-**Evidence to capture:** Python baseline run and generated plot; the HLS implementation report; the separately labelled reference-overlay board test. Do not show the reference overlay as the custom multiband core.
+---
 
-## 0:00–0:20 | Project and goal
+## 拍之前先跑一遍
 
-**Shot:** PYNQ-Z2 board and project title.
+在 Jupyter 里新建一个笔记本，粘这段，跑完再开录（保证录的时候一切正常）：
 
-**Narration:** “This project explores multiband dynamic-range compression on a PYNQ-Z2. We are building a Python reference and an HLS FIR core so that the algorithm and the hardware implementation can be checked against the same input.”
+```python
+%cd /home/xilinx/jupyter_notebooks
+!echo xilinx | sudo -S env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 fir_audio_loop.py
+```
 
-## 0:20–0:55 | Algorithm and Python reference
+跑完之后 `/home/xilinx/jupyter_notebooks/` 下会多出四个 wav（Jupyter 文件列表里能直接点播放）：
 
-**Shot:** Show the band equations and run `python src/python/multiband_baseline.py --taps 193 --repeat 5`. Display the resulting `multiband_comparison.png`.
+| 文件 | 内容 |
+|---|---|
+| `loop_1_录进来.wav` | 麦克风录的原始声，没过核 |
+| `loop_2_过核_直通.wav` | 过了核，但压缩关着（用来证明"核没算错"，声音和上一条该几乎一样） |
+| `loop_3_过核_压缩.wav` | 过了核并且开了压缩 |
+| `loop_4_合成_压缩.wav` | 合成信号（300 Hz + 3000 Hz）的压缩结果，差别最明显 |
 
-**Narration:** “The current design uses three low-pass filters at 500, 1,000, and 2,000 hertz. Subtracting adjacent low-pass outputs forms four bands. The Python reference resamples this 44.1-kilohertz recording to 48 kilohertz and applies the same threshold and compression slope as the HLS design.”
+**录之前务必对着麦克风说几句正常的音量的话**（念一段新闻就行）。上次录的时候麦克风没插，
+录进来是静音，压缩前后都是静音，听不出差别，那一条检验只能跳过。
 
-## 0:55–1:25 | HLS core implementation evidence
+---
 
-**Shot:** Show the 193-tap row in `data/results/impl_metrics.md`; keep the OOC label visible.
+## 分镜 1 ｜ 开场（0:00–0:20）
 
-**Narration:** “The custom HLS core has an out-of-context implementation result at a 100-megahertz constraint. The recorded design uses 3,962 LUTs, 5,514 flip-flops, 202 DSP blocks, and 51.5 BRAMs, with positive 1.624-nanosecond slack. This result covers the core by itself. It does not measure an integrated audio overlay.”
+**画面**：板子全景，能看清耳机插在板子上、网线接到笔记本。
 
-## 1:25–1:45 | Board-flow evidence
+**旁白**：
+"这是我们用 PYNQ-Z2 做的多频段音频压缩加速器。要解决的问题是：助听器那类算法
+需要在 48 kHz 下逐采样处理，纯靠 CPU 跑，实时余量很小，一旦同时还要干别的就顶不住。
+我们把这条算法链做成了 FPGA 加速核，放进 PYNQ 的音频通路里。"
 
-**Shot:** If showing the board, use the existing reference-overlay notebook and label the screen ‘open-source reference overlay, 27 taps’.
+---
 
-**Narration:** “We have also tested a separate open-source reference overlay on the PYNQ-Z2. That confirms a board-side control and data-transfer path, but it is not the custom multiband HLS core.”
+## 分镜 2 ｜ 算法在做什么（0:20–0:50）
 
-## 1:45–2:00 | Current milestone
+**画面**：`data/figures/multiband_comparison.png`（频谱对照图），
+或者设计报告里那张段划分示意图。
 
-**Shot:** Show the submission checklist with the custom-core integration and end-to-end board measurement still open.
+**旁白**：
+"算法把声音按频率切成四段，分界点是 500 Hz、1000 Hz、2000 Hz。
+每段单独做动态范围压缩 —— 也就是小声的地方放大、大声的地方压下来，
+最后再合回去。四段之和严格等于原信号延迟 96 个采样，
+重建误差是浮点精度级别，所以切分本身不会改变音色。"
 
-**Narration:** “The remaining hardware milestone is to integrate the custom core into the board audio path, demonstrate processed audio, and measure end-to-end latency. We will publish the final comparison after those measurements use the same input and alignment.”
+**这段不用展示代码**，观众不需要看 C 代码。
 
-## Final-video replacement required
+---
 
-After the custom core is integrated, replace the reference-overlay shot with a live custom-core demonstration. Add the measured board latency, throughput, and output comparison. Update the title and status narration so the video describes completed work rather than the current progress snapshot.
+## 分镜 3 ｜ 录音 → 过核 → 播放（0:50–1:50，主体）
+
+**画面**：Jupyter 文件列表。依次点开四个 wav 播放。字幕打出每个文件的名字和它是什么。
+
+**旁白（按播放顺序）**：
+1. "这是麦克风直接录进来的原始声音。"
+2. "这一条过了核，但压缩是关着的 —— 听起来和第 1 条几乎一样。
+   这证明核没有把信号算坏：关掉压缩时，输出和输入逐位一致，我们测过 144000 个采样，错配 0 个。"
+3. "这一条压缩打开了。小声的部分被抬起来了，整体听起来更'满'一些，但大声的地方没有削顶。"
+4. "最后这一条是合成的 300 Hz 加 3000 Hz 双音信号，压缩前后的对比放在一起听，差别最清楚。"
+
+**要点**：这一段的说明词必须带上"这是**一块一块处理**的，不是边录边放的实时流"。
+不说这句，观众会默认是实时的，问一句就穿了。可以说：
+
+> "现在这条通路是分块做的：录一段，送进核算一遍，再放出来。
+> 做成边录边放的实时流是下一步 —— 核本身的吞吐是够的，卡在音频口的缓冲机制上。"
+
+---
+
+## 分镜 4 ｜ 数据（1:50–2:20）
+
+**画面**：`data/results/accel_cpu_vs_fpga.md` 里那张表，或者直接把下面三行做成图。
+
+| | 单采样耗时 | 相对 48 kHz 实时预算（20.83 µs） |
+|---|---|---|
+| 板上的 ARM 核（float64 + scipy） | 6.116 µs | 3.41 倍 |
+| PL 里的加速核（Q1.15 定点） | 4.507 µs | 4.62 倍 |
+
+**旁白**：
+"这是在同一颗芯片上量的：Zynq 里的 ARM 处理器跑纯软件，对比 PL 里的加速核跑同一条算法。
+ARM 每个采样 6.1 微秒，核是 4.5 微秒，核快 1.4 倍，实时余量从 3.4 倍提到 4.6 倍。
+三秒的声音，核实际计算的时间是 0.65 秒。"
+
+**这段必须带上的几条**（剪辑的时候打成小字放屏幕上，或者旁白里说）：
+
+- 两边精度不同：CPU 是 float64 双精度，核是 Q1.15 定点 16 位。核做的是更粗的活。
+- CPU 那边用的是 scipy 的 C 实现，属于优化过的软件，不是随便写的。
+- 核借了滤波器对称性，每采样只算 291 次乘法，CPU 基线老老实实算 579 次。
+  核少做一半的乘法。
+- 反过来说也要讲：CPU 那边不是极限，手写 NEON 还能更快。
+  所以只能说"比这个库快 1.4 倍"，不能说"FPGA 只比 CPU 快 1.4 倍"。
+
+**别拿桌面电脑的数字来比**。桌面上就是 0.140 µs/采样，和板子上的核相除是 32 倍 ——
+那个数没有意义，一个 3 GHz 的 x86 扛 SIMD，一个 100 MHz 的 FPGA，差两个数量级是必然的。
+
+**如果时间还够，可以再加一句**（这条其实比数字本身更有信息量）：
+
+"这个核现在每采样要 450 个时钟周期，其中 398 个花在把延迟线整体挪一格的搬运上，
+真正算乘法只占 11 个周期。也就是说瓶颈不在乘法器，在数据搬动 ——
+改成环形缓冲区理论上有 6 到 7 倍的提升空间，这是我们下一步要做的。"
+
+---
+
+## 分镜 5 ｜ 收尾（2:20–2:30）
+
+**画面**：板上资源占用：LUT 12.07%、FF 8.85%、BRAM 38.9%、DSP 91.82%，
+时序裕量 +0.256 ns、失败端点 0。
+
+**旁白**：
+"整机跑在 100 MHz，时序收敛，没有失败端点。DSP 用掉 91.8%，是这条算法的主要开销；
+逻辑资源还剩很多，后续加每段独立增益还有空间。
+方案可以迁移到会议系统、车载语音这些同样要求低延迟的场景。谢谢。"
+
+---
+
+## 录制注意
+
+- 全程**用麦克风的外放或者耳机外放录音**，别只录屏幕 —— 视频里要能听到声音。
+  如果只能录屏幕，就把四个 wav 的声音单独录一轨，剪辑时合并。
+- 录音那一条，让说话的人离麦克风**近一点、正常音量**。上次信号太弱，
+  压缩前后听不出差别。
+- 走线、桌面、聊天窗口这些别入镜。Jupyter 地址栏会显示 `192.168.2.99`，
+  这个无所谓，是本地地址。
+- 时长超一点没关系，目标 2 分 30 秒上下。

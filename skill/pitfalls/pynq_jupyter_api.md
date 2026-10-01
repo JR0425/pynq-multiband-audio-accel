@@ -41,6 +41,25 @@ req.add_header("X-XSRFToken", xsrf)
 `/home/xilinx/jupyter_notebooks/verify_audio_playback.py`，不是 `/home/xilinx/`。
 要放别处，先 put 再回串口 `mv`。
 
+### 反过来也成立：**板子上脚本的输出**要落在根目录里
+
+这一条 2026-10-01 又撞了一次，而且方向是反的。
+
+`board/scripts/fir_audio_loop.py` 原来把四个 wav 存到 `/home/xilinx/`。
+文件确实生成了（串口 `ls` 看得见），但**在 Jupyter 文件列表里一个都看不到** ——
+它只暴露自己的根，看不到上一级。结果是"跑完了、文件在、下不下来"。
+
+改：脚本里的输出目录写成 `/home/xilinx/jupyter_notebooks`。
+
+判据：跑完 `python skill/checkers/pynq_jupyter_files.py ls` 里能看到那几个文件，
+而不是在串口里 `ls` 能看到就算数。
+
+已经落在那儿的文件，回串口 `cp` 一次就行：
+
+```
+cp -n /home/xilinx/loop_*.wav /home/xilinx/jupyter_notebooks/
+```
+
 ## 不带界面跑一个 notebook
 
 改完 notebook 不用手点，直接在板子上跑一遍验证：
