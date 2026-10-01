@@ -17,7 +17,7 @@
 
 用法（在仓库根目录）：
     python src/python/multiband_baseline.py               # 默认 193 抽头
-    python src/python/multiband_baseline.py --taps 65
+    python src/python/multiband_baseline.py --taps 193
 输出：
     data/audio/multiband_output.wav   处理后的音频（48 kHz）
     data/figures/multiband_comparison.png  频谱对照图
