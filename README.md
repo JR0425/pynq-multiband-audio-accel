@@ -1,35 +1,40 @@
-# PYNQ-Z2 Multiband Audio Accelerator
+# PYNQ-Z2 多频段音频加速器
 
-A PYNQ-Z2 project for a multiband dynamic-range-compression (DRC) audio pipeline. The repository contains a Python reference implementation, an HLS FIR core and its C-simulation flow, the board overlay that integrates the core with the PYNQ audio codec, and same-chip ARM-vs-PL measurements.
+基于 PYNQ-Z2 的多频段动态范围压缩（DRC）音频处理项目。仓库里包含 Python 参考实现、
+HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起的整机 overlay，
+以及同一颗芯片上 ARM 与 PL 的对比实测。
 
-## Project status
+**工具链**：PYNQ-Z2 镜像 2.7.0 + Vivado / Vitis HLS 2020.2，目标器件 `xc7z020clg400-1`。
+仓库里所有上板实测和综合记录都是这一套跑出来的。
 
-- The Python reference baseline uses 48 kHz, four subtractive bands, and 193-tap linear-phase low-pass filters. Its current local run is recorded in `data/results/baseline_metrics.md`.
-- The custom HLS core has out-of-context synthesis and implementation results in `data/results/impl_metrics.md`.
-- The custom core is integrated into a board overlay together with the PYNQ audio codec. `board/overlay/fir.bit` is that overlay, built from `board/overlay/build_fir.tcl`; `board/scripts/fir_core.py` drives the core over AXI-Lite. On the board the core processed 144,000 samples of captured audio (18 blocks) bit-exact against the reference, with a bypass check matching at the 96-sample group delay and 0 mismatches.
-- Same-chip measurement, Zynq PS ARM against the PL core running the identical algorithm: 6.116 µs against 4.507 µs per sample, a 1.4× speedup. `data/results/accel_cpu_vs_fpga.md` records the conditions and the caveats that must travel with that number.
-- A separate open-source reference overlay was tested earlier. Its results are in `data/results/reference_overlay_metrics.md` and are unrelated to the custom core.
-- RTL and the Python/HLS/RTL three-way comparison are still pending; `src/rtl/` is empty.
+## 项目现状
 
-## Repository layout
+- Python 参考基线用 48 kHz、4 段相减式分频、193 抽头线性相位低通。最近一次本地运行记在 `data/results/baseline_metrics.md`。
+- 自研 HLS 核的单独综合与实现结果在 `data/results/impl_metrics.md`。
+- 核已经和 PYNQ 音频 codec 一起集成进整机 overlay。`board/overlay/fir.bit` 就是它，由 `board/overlay/build_fir.tcl` 构建；`board/scripts/fir_core.py` 走 AXI-Lite 驱动这个核。在板子上，核处理了 144,000 个真实录音采样（18 块），与参考结果逐位一致；直通检验在 96 拍群延迟处对齐，错配 0 个。
+- 同芯片实测 —— Zynq PS 侧的 ARM 与跑同一算法的 PL 核：每采样 6.116 µs 对 4.507 µs，加速比 1.4 倍。`data/results/accel_cpu_vs_fpga.md` 记着这个数的前提，以及引用时必须一起带上的免责说明。
+- 早期还测过一个开源参考 overlay。结果在 `data/results/reference_overlay_metrics.md`，和自研核无关，别混着引用。
+- RTL 和 Python/HLS/RTL 三路对比还没做；`src/rtl/` 是空的。
 
-| Directory | Contents |
+## 目录结构
+
+| 目录 | 内容 |
 | --- | --- |
-| `src/python/` | Python baseline, coefficient and test-data exporters, comparison and analysis utilities |
-| `src/hls/` | HLS core and C testbench |
-| `src/rtl/` | Reserved for RTL implementation; no custom RTL source is present yet |
-| `sim/hls_csim/` | FIR coefficient files used by C simulation |
-| `build/hls/` | HLS and Vivado scripts, directives, and reports |
-| `board/` | PYNQ notebooks, the integrated overlay (`overlay/fir.bit`), the core driver, and board scripts |
-| `data/audio/` | Test audio and generated audio |
-| `data/figures/` | Generated analysis figures |
-| `data/results/` | Software, simulation, and implementation records |
-| `skill/` | Prompts, templates, checkers, and troubleshooting notes |
-| `report/` | Design report, interface notes, submission checklist, and collaboration logs |
+| `src/python/` | Python 基线、系数与测试数据导出、比对与分析工具 |
+| `src/hls/` | HLS 核与 C 测试台 |
+| `src/rtl/` | 预留给 RTL 实现；目前没有自研 RTL 源码 |
+| `sim/hls_csim/` | C 仿真用的 FIR 系数文件 |
+| `build/hls/` | HLS 与 Vivado 的脚本、指令文件和报告 |
+| `board/` | PYNQ 笔记本、整机 overlay（`overlay/fir.bit`）、核驱动、板级脚本 |
+| `data/audio/` | 测试音频与生成的音频 |
+| `data/figures/` | 生成的分析图 |
+| `data/results/` | 软件、仿真与实现的记录 |
+| `skill/` | 提示词、模板、检查脚本、踩坑笔记 |
+| `report/` | 设计报告、接口说明、提交清单、协作日志 |
 
-## Python baseline
+## Python 基线
 
-Use Python 3.9 or newer. From the repository root in PowerShell:
+需要 Python 3.9 或更高。在仓库根目录用 PowerShell：
 
 ```powershell
 py -3 -m venv .venv
@@ -39,18 +44,24 @@ python -m pip install -r requirements-python.txt
 python src/python/multiband_baseline.py --taps 193 --repeat 5
 ```
 
-The input is `data/audio/real_voice.wav`. The script resamples it to 48 kHz, runs the four-band DRC reference, and writes `data/audio/multiband_output.wav` and `data/figures/multiband_comparison.png`. To create a time-frequency waterfall from that output, run `python src/python/plot_spectrum_waterfall.py`; it writes `data/figures/spectrum_waterfall.png`. The printed CPU timing is a local host measurement. It is not a board-side speedup result.
+输入是 `data/audio/real_voice.wav`。脚本把它重采样到 48 kHz，跑 4 段 DRC 参考实现，
+写出 `data/audio/multiband_output.wav` 和 `data/figures/multiband_comparison.png`。
+想从这个输出生成时频瀑布图，再跑 `python src/python/plot_spectrum_waterfall.py`，
+它会写出 `data/figures/spectrum_waterfall.png`。
+打印出来的 CPU 计时是本地主机上的数，**不是板级加速比**。
 
-To regenerate coefficients and the floating-point reference for the current HLS test input:
+重新生成当前 HLS 测试输入对应的系数和浮点黄金参考：
 
 ```powershell
 python src/python/export_coefficients.py --taps 193
 python src/python/export_golden.py --taps 193
 ```
 
-## HLS C simulation
+## HLS C 仿真
 
-The project C-simulation script targets the Vivado/Vitis HLS installation documented in `build/hls/run_csim.tcl`. On a Windows machine with that toolchain installed, run the documented batch command from the repository root, then compare `data/results/hw_output.txt` with `data/results/python_golden.txt`:
+项目的 C 仿真脚本用的就是 `build/hls/run_csim.tcl` 里写的那个 Vivado/Vitis HLS 安装路径。
+在装好这套工具链的 Windows 机器上，从仓库根目录跑文档里那条批处理命令，
+再把 `data/results/hw_output.txt` 和 `data/results/python_golden.txt` 做比对：
 
 ```powershell
 $env:MSYS_NO_PATHCONV = '1'
@@ -58,16 +69,27 @@ cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_csim.tcl"
 python src/python/compare_golden_vs_hw.py
 ```
 
-The comparison command prints SNR, maximum absolute error, sample alignment, and the transparent-mode bit-exact result. When valid HLS output files are present, it also saves `data/figures/hls_golden_comparison.png`.
+比对脚本会打印信噪比、最大绝对误差、采样对齐和直通模式的逐位结果。
+存在有效 HLS 输出文件时，它还会存下 `data/figures/hls_golden_comparison.png`。
 
-Confirm the installed tool version and paths before running. The C-simulation Tcl regenerates its output files, so retain any results that need to be compared before starting another run.
+跑之前先确认装的是哪个版本、路径对不对。C 仿真会覆盖自己的输出文件，
+需要留着比的旧结果先另存再跑。
 
-## Board work and measurements
+## 板级工作与实测
 
-`board/overlay/fir.bit` is the project overlay: the custom multiband HLS core plus the PYNQ audio codec. `board/scripts/fir_core.py` is the register-level driver; `board/scripts/fir_audio_loop.py` records from the microphone, runs the core, and plays the result back. `board/scripts/fir_selftest.py` covers the bypass and block-continuity checks, and `board/scripts/compare_cpu_fpga.py` measures the ARM baseline against the core on the same board.
+`board/overlay/fir.bit` 是本项目的 overlay：自研多频段 HLS 核加 PYNQ 音频 codec。
+`board/scripts/fir_core.py` 是寄存器级驱动；`board/scripts/fir_audio_loop.py`
+从麦克风录音、过核、再放出来；`board/scripts/fir_selftest.py` 做直通和分块连续性检验；
+`board/scripts/compare_cpu_fpga.py` 在同一块板子上量 ARM 基线与核的对比。
 
-The `ps_only` bitstream is an earlier board-side playback artifact and does not contain the core. `data/results/reference_overlay_metrics.md` records a separate open-source reference overlay; read it together with `data/results/impl_metrics.md` and `data/results/accel_cpu_vs_fpga.md` for the scope and limitations of each measurement.
+`overlay/ps_only.bit` 是更早的板级放音产物，PL 里是空的。
+`overlay/audio.bit` 是更早的「我们自己建的工程能出声」里程碑产物，只有音频 codec。
+这两个都不含加速核，别拿来当本项目的结果。
 
-## License
+`data/results/reference_overlay_metrics.md` 记的是另一个开源参考 overlay，和自研核无关。
+连同 `data/results/impl_metrics.md` 和 `data/results/accel_cpu_vs_fpga.md` 一起看，
+才能弄清每个数的适用范围和局限。
 
-MIT. See `LICENSE`.
+## 许可
+
+MIT，见 `LICENSE`。

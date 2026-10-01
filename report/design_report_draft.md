@@ -97,7 +97,7 @@ The same-board speedup measurement is in section 3. `data/results/reference_over
 | Python time-frequency waterfall | Generated locally on 2026-10-01 |
 | Python golden output for the current 1,000-sample test vector | Regenerated locally on 2026-10-01 |
 | Stored HLS output compared with the regenerated golden file | Passed on 2026-10-01: 75.4 dB SNR, best lag 0; the stored transparent output matched bit for bit at 96 samples |
-| Rebuilding the HLS C simulation in this workstation | Pending; Vitis HLS is unavailable at the documented installation path |
+| Rebuilding the HLS C simulation in this workstation | Pending; the toolchain is present (Vitis HLS 2020.2 CLI runs), the rerun has not been performed |
 | Custom HLS core out-of-context implementation | Results recorded in `data/results/impl_metrics.md` |
 | Custom HLS core integrated into the board overlay | Complete: `board/overlay/fir.bit`; timing and utilisation in `board/overlay/fir_timing.rpt` and `board/overlay/fir_util.rpt` |
 | Custom-core board audio through the real capture path | Complete: 144,000 samples in 18 blocks, 0 mismatches |
@@ -123,7 +123,7 @@ The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the READ
 
 ## 8. Remaining work before submission
 
-1. Confirm the target PYNQ image and Vivado/Vitis version. All board evidence in this repository is for PYNQ 2.7 and Vivado/Vitis HLS 2020.2; a separate plan document refers to PYNQ 3.1 and Vivado 2024.1. The board work was done on 2.7 and the discrepancy needs to be settled before submission.
+1. The target environment is settled: PYNQ 2.7 with Vivado/Vitis HLS 2020.2 is the project's declared toolchain, and it is what all board evidence in this repository was produced with.
 2. Rerun the 193-tap C simulation with the documented toolchain and compare it with the regenerated Python golden data.
 3. Produce the same-input Python/HLS/RTL comparison after an RTL implementation exists.
 4. Record the demonstration video from the board evidence, review the English poster, and run a clean-machine reproduction.

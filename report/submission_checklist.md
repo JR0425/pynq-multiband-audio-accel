@@ -11,7 +11,7 @@ Status updated 2026-10-01 from the files currently present in this repository. A
 - [x] Current Python baseline and its plot/audio artifacts were regenerated on 2026-10-01.
 - [x] The stored 1,000-sample HLS output was compared with regenerated Python golden data; SNR and transparent-mode alignment passed, and the comparison plot was generated.
 - [ ] A clean-machine reproduction has not yet been performed.
-- [ ] Vitis HLS C simulation has not been rebuilt in this environment; the documented Vitis HLS executable is not installed at that path.
+- [ ] Vitis HLS C simulation has not been rerun in this session. The toolchain is not the obstacle: Vitis HLS 2020.2 is installed at `E:\Xilinx\Vitis_HLS\2020.2\` and its CLI runs (`-version` returns v2020.2, exit 0), so `build/hls/run_csim.tcl` can be rerun. Rerunning it and re-recording the result is outstanding.
 - [ ] Review whether the tracked board bitstreams should use Git LFS before final submission. `board/overlay/fir.bit` is the custom HLS design; `ps_only.bit` is an earlier playback-only artifact.
 
 ## Hardware and comparison evidence
@@ -30,11 +30,11 @@ Status updated 2026-10-01 from the files currently present in this repository. A
 - [x] Collaboration logs are organized under `report/llm_collab_log/`.
 - [x] Added a dated review note to `2026-09-25_github_setup.md` covering the English-name rule and directory-structure cross-check without rewriting the historical prompt.
 - [x] Skill package contains prompts, templates, checkers, and pitfalls.
-- [ ] Review skill-package compatibility notes with the project team because the repo contains both PYNQ 2.7 / Vivado 2020.2 reference artifacts and a plan specifying PYNQ 3.1 / Vivado 2024.1.
+- [x] Target toolchain fixed and recorded: PYNQ-Z2 image 2.7.0 with Vivado and Vitis HLS 2020.2. Every board measurement and synthesis record in this repository was produced with that pair; no other combination has been used.
 - [ ] Final design report. `report/design_report_draft.md` now matches the integrated design; it still needs a final read-through.
 - [x] English poster draft exists at `report/poster_en/pynq_multiband_audio_poster_draft.pptx`; team review is still required.
 - [ ] Record and edit the final demonstration video, then add its link to the README.
-- [ ] Confirm the final interface specification and toolchain version with the project team.
+- [x] Interface specification and toolchain version fixed: `report/hardware_interface_spec.md` for the register contract, PYNQ-Z2 image 2.7.0 with Vivado/Vitis HLS 2020.2 for the environment.
 
 ## Final gate
 
