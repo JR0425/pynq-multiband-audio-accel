@@ -47,7 +47,7 @@ AI 没有凭记忆作答，而是逐层实测排查：
 4. **冷启动复验**：重新上电后板子 `uptime` 仅 2 分钟、`ifconfig eth0` 自动带上 `192.168.2.99`、
    `pgrep dhclient` 为空、主机 ping 0% 丢失
    → **「以后插上就能用」成为实证，而不是推测。**
-5. 网络抽风按队友日志里记过的办法处理：`git config --global http.version HTTP/1.1`，必要时重试。
+5. 网络抽风按项目日志里记过的办法处理：`git config --global http.version HTTP/1.1`，必要时重试。
 
 【沉淀】
 → `skill/pitfalls/pynq_direct_ethernet_windows.md`（5 个坑 + 验收清单 + 改配置铁律）

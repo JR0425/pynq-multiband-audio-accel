@@ -6,7 +6,7 @@
 #
 # 寄存器偏移的**唯一来源**是 HLS 生成的头文件
 #   build/hls/synth_proj/solution1/impl/misc/drivers/fir_multiband_v1_0/src/xfir_multiband_hw.h
-# 它和 report/interface_spec_hw.md §二 那张「设计意图」表**不一样** ——
+# 它和 report/hardware_interface_spec.md §二 那张「设计意图」表**不一样** ——
 # HLS 自动生成的控制口是 ap_ctrl 风格（AP_CTRL/AP_DONE 那套），
 # 不是当初设计的 CTRL/STATUS/ID 那套。以这里为准，spec 那份要改。
 #
