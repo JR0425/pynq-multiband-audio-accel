@@ -12,7 +12,7 @@ left_channel = data[:, 0] + data[:, 1]
 left_channel = left_channel - np.mean(left_channel)
 
 # 设计 600Hz 低通滤波器
-taps = signal.firwin(65, 600, fs=fs)
+taps = signal.firwin(193, 600, fs=fs)
 filtered_left = signal.lfilter(taps, 1.0, left_channel)
 
 # 打印能量对比，验证滤波是否生效
