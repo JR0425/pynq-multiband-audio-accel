@@ -109,8 +109,8 @@ Python 侧"四段之和 = 原信号延迟 96 拍"这条恒等式，当前实测�
 **3.469e-18**（浮点精度级别；旧的四段各自设计那套是 +3.2 dB）。
 
 **这两条数据的边界**：这是**拿现存的 HLS 输出**和重新生成的黄金数据做复比，
-**不是在本机重跑了 Vitis HLS**（本机那个路径下没有装）。要当"可从源码复现"用，
-得先在匹配的工具链里重跑一次 C 仿真。
+**不是在本机重跑了 Vitis HLS**。本机装着 Vitis HLS 2020.2（`-version` 实测退出码 0），
+所以重跑只是没做，不是做不了 —— 要当"可从源码复现"用，跑一次 C 仿真即可。
 
 产出：`data/figures/hls_golden_comparison.png`、`data/figures/spectrum_waterfall.png`、
 `data/results/python_golden.txt`。

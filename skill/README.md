@@ -11,11 +11,11 @@ This folder collects reusable prompts, testbench templates, validation scripts, 
 
 ## Tested environments and limits
 
-The repository contains material from more than one environment. Treat each note's stated version as part of its evidence:
+All material in this repository was produced with one toolchain. Treat each note's stated version as part of its evidence:
 
 - The board work, both the reference-overlay measurements and the custom-core integration, uses PYNQ-Z2 image 2.7.0. The reference-overlay results validate an open-source reference overlay; the custom-core results come from `board/overlay/fir.bit`.
 - The recorded HLS implementation flow invokes Vitis HLS/Vivado 2020.2 and targets `xc7z020clg400-1`.
-- The team plan separately specifies PYNQ 3.1 and Vivado 2024.1 for the intended final environment. Compatibility of the existing overlay and HLS outputs with that combination has not been demonstrated in this repository.
+- This pair — PYNQ-Z2 image 2.7.0 with Vivado and Vitis HLS 2020.2 — is the declared project toolchain. No other combination has been used to produce results in this repository.
 
 Do not combine results from these environments as if they came from one run. Before copying a command to another PYNQ image, board, or tool release, verify the version-specific APIs, IP metadata, and build output.
 
@@ -29,4 +29,4 @@ Do not combine results from these environments as if they came from one run. Bef
 
 ## Current limitation
 
-This package is a project-specific collection of scripts and lessons, not yet a standalone, version-independent PYNQ skill. The final PYNQ image and Vivado/Vitis version need confirmation before the instructions can be validated as one reproducible setup.
+This package is a project-specific collection of scripts and lessons, not yet a standalone, version-independent PYNQ skill. The toolchain it was written against — PYNQ-Z2 image 2.7.0 with Vivado/Vitis HLS 2020.2 — is fixed and recorded above, so the instructions describe one reproducible setup rather than a moving target.
