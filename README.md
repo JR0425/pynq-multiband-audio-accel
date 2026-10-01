@@ -1,13 +1,15 @@
 # PYNQ-Z2 Multiband Audio Accelerator
 
-A PYNQ-Z2 project for a multiband dynamic-range-compression (DRC) audio pipeline. The repository contains a Python reference implementation, an HLS FIR core and its C-simulation flow, board-side playback and verification utilities, and measurements from both a reference overlay and the custom HLS core.
+A PYNQ-Z2 project for a multiband dynamic-range-compression (DRC) audio pipeline. The repository contains a Python reference implementation, an HLS FIR core and its C-simulation flow, the board overlay that integrates the core with the PYNQ audio codec, and same-chip ARM-vs-PL measurements.
 
 ## Project status
 
 - The Python reference baseline uses 48 kHz, four subtractive bands, and 193-tap linear-phase low-pass filters. Its current local run is recorded in `data/results/baseline_metrics.md`.
-- The custom HLS core has out-of-context synthesis and implementation results in `data/results/impl_metrics.md`. These results describe the core, not the integrated audio system.
-- A separate open-source reference overlay was tested on the board. Its results are in `data/results/reference_overlay_metrics.md` and do not represent the custom core.
-- The custom HLS core has not yet been integrated into a project overlay and measured end to end on the board. RTL and the Python/HLS/RTL three-way comparison are also pending.
+- The custom HLS core has out-of-context synthesis and implementation results in `data/results/impl_metrics.md`.
+- The custom core is integrated into a board overlay together with the PYNQ audio codec. `board/overlay/fir.bit` is that overlay, built from `board/overlay/build_fir.tcl`; `board/scripts/fir_core.py` drives the core over AXI-Lite. On the board the core processed 144,000 samples of captured audio (18 blocks) bit-exact against the reference, with a bypass check matching at the 96-sample group delay and 0 mismatches.
+- Same-chip measurement, Zynq PS ARM against the PL core running the identical algorithm: 6.116 µs against 4.507 µs per sample, a 1.4× speedup. `data/results/accel_cpu_vs_fpga.md` records the conditions and the caveats that must travel with that number.
+- A separate open-source reference overlay was tested earlier. Its results are in `data/results/reference_overlay_metrics.md` and are unrelated to the custom core.
+- RTL and the Python/HLS/RTL three-way comparison are still pending; `src/rtl/` is empty.
 
 ## Repository layout
 
@@ -18,7 +20,7 @@ A PYNQ-Z2 project for a multiband dynamic-range-compression (DRC) audio pipeline
 | `src/rtl/` | Reserved for RTL implementation; no custom RTL source is present yet |
 | `sim/hls_csim/` | FIR coefficient files used by C simulation |
 | `build/hls/` | HLS and Vivado scripts, directives, and reports |
-| `board/` | PYNQ notebooks, board scripts, and the reference overlay files |
+| `board/` | PYNQ notebooks, the integrated overlay (`overlay/fir.bit`), the core driver, and board scripts |
 | `data/audio/` | Test audio and generated audio |
 | `data/figures/` | Generated analysis figures |
 | `data/results/` | Software, simulation, and implementation records |
@@ -62,7 +64,9 @@ Confirm the installed tool version and paths before running. The C-simulation Tc
 
 ## Board work and measurements
 
-The notebooks and scripts in `board/` include audio playback and overlay checks. The `ps_only` bitstream is a board-side playback/reference artifact; it does not contain the custom multiband HLS core. Read `data/results/reference_overlay_metrics.md` and `data/results/impl_metrics.md` for the scope and limitations of each measurement.
+`board/overlay/fir.bit` is the project overlay: the custom multiband HLS core plus the PYNQ audio codec. `board/scripts/fir_core.py` is the register-level driver; `board/scripts/fir_audio_loop.py` records from the microphone, runs the core, and plays the result back. `board/scripts/fir_selftest.py` covers the bypass and block-continuity checks, and `board/scripts/compare_cpu_fpga.py` measures the ARM baseline against the core on the same board.
+
+The `ps_only` bitstream is an earlier board-side playback artifact and does not contain the core. `data/results/reference_overlay_metrics.md` records a separate open-source reference overlay; read it together with `data/results/impl_metrics.md` and `data/results/accel_cpu_vs_fpga.md` for the scope and limitations of each measurement.
 
 ## License
 

@@ -2,7 +2,7 @@
 
 ## Design report draft
 
-**Status as of 2026-10-01:** the Python reference path and the custom HLS core are present. The custom core has out-of-context synthesis and implementation records. The custom core has not yet been integrated into the board audio path or measured end to end. This report separates measured results from planned work so that the reference-overlay demonstration is not mistaken for a demonstration of the custom core.
+**Status as of 2026-10-01:** the Python reference path and the custom HLS core are present. The core is integrated into a board overlay together with the PYNQ audio codec (`board/overlay/fir.bit`), has processed real captured audio on the board, and has been measured on the same chip against the Zynq ARM running the identical algorithm. Out-of-context and integrated-in-overlay figures are reported separately and labelled; the reference-overlay measurements are a different experiment and are kept apart from the custom core.
 
 ## 1. Project goal
 
@@ -33,44 +33,60 @@ flowchart LR
     q15 --> hls[HLS core<br/>three low-pass FIRs + subtractive bands + DRC]
     py --> pyout[Processed WAV and plots]
     hls --> simout[C-simulation output<br/>compared with Python golden]
-    hls -. integration and board timing pending .-> board[PYNQ audio path]
-    ref[Open-source 27-tap reference overlay] --> refboard[Separate board-path evidence]
+    hls --> board[PYNQ audio overlay<br/>fir.bit: core + audio codec]
+    ref[Open-source 27-tap reference overlay] --> refboard[Separate, earlier board-path evidence]
 ```
 
-The diagram separates the project's custom HLS core from the open-source reference overlay. The dotted connection is planned work, not a completed integration.
+The diagram separates the project's custom HLS core from the open-source reference overlay. The custom core is integrated and has run on the board; the reference overlay is an unrelated earlier experiment.
 
 ## 3. Python reference implementation
 
 `src/python/multiband_baseline.py` reads `data/audio/real_voice.wav`, mixes its stereo channels, removes the DC component, and resamples from the file's 44.1 kHz rate to the design rate of 48 kHz. It processes the signal with four subtractive bands and saves a WAV file and spectrum plot.
 
-The current local run used Python 3.9.12, NumPy 2.0.2, SciPy 1.13.1, Matplotlib 3.9.4, and SoundFile 0.13.1. The latest best-of-five processing run took 89.5 ms for 10.58 s of audio, or 0.176 µs per sample and 118.3× host real time. The host CPU model was unavailable, so this is a local reference measurement, not a portable benchmark.
+The current local run used Python 3.9.12, NumPy 2.0.2, SciPy 1.13.1, Matplotlib 3.9.4, and SoundFile 0.13.1. The latest best-of-five processing run took 89.5 ms for 10.58 s of audio, or 0.176 µs per sample and 118.3× host real time. The host CPU model was unavailable, so this is a local reference measurement, not a portable benchmark, and it must not be divided by the board-side figures — a 3 GHz desktop x86 and a 100 MHz FPGA differ by orders of magnitude by construction.
 
-The Python runtime number is faster per sample than the HLS schedule number below. The measurements use different platforms and scopes; they do not establish an FPGA speedup. The HLS core may still be useful for freeing processor time or providing predictable hardware execution, but this repository does not yet quantify those system-level benefits.
+The comparison that carries the speedup claim is measured on the board itself, on the same chip, with the same algorithm on both sides: the Zynq ARM in software against the PL core. That measurement gives 6.116 µs against 4.507 µs per sample, a 1.4× ratio. `data/results/accel_cpu_vs_fpga.md` records the conditions and the four caveats that must travel with the number — differing numeric precision, an optimised software library on the CPU side, Python call overhead inside the core-side figure, and the core exploiting filter symmetry to perform about half the multiplications the CPU baseline performs.
 
 The current run reported a maximum coefficient-sum reconstruction error of `3.469e-18` before DRC. Its output artifacts are `data/audio/multiband_output.wav` and `data/figures/multiband_comparison.png`. The independent 1,000-sample test vector used by the HLS testbench is in `data/audio/test_input.txt`; the corresponding Python golden output is `data/results/python_golden.txt`.
 
 ## 4. HLS core results
 
-`src/hls/fir_multiband.cpp` contains the subtractive FIR and DRC implementation. `src/hls/fir_tb.cpp` supplies the C-simulation testbench. The current implementation report records the 193-tap, fixed-point, multiplier-unlimited design point:
+`src/hls/fir_multiband.cpp` contains the subtractive FIR and DRC implementation. `src/hls/fir_tb.cpp` supplies the C-simulation testbench. Two implementations of the same 193-tap, fixed-point source are recorded, and their numbers must not be mixed:
 
-| Metric | Recorded value |
-| --- | ---: |
-| LUT | 3,962 (7.5%) |
-| Flip-flops | 5,514 (5.2%) |
-| DSP | 202 (91.8%) |
-| BRAM | 51.5 (36.8%) |
-| Worst negative slack at a 10 ns constraint | +1.624 ns |
-| HLS schedule | 449 cycles/sample |
+| Metric | Core alone (out of context) | Core inside the board overlay |
+| --- | ---: | ---: |
+| LUT | 3,962 (7.5%) | 6,422 (12.07%) |
+| Flip-flops | 5,514 (5.2%) | 9,416 (8.85%) |
+| DSP | 202 (91.8%) | 202 (91.82%) |
+| BRAM | 51.5 (36.8%) | 54.5 (38.9%) |
+| Worst negative slack at a 10 ns constraint | +1.624 ns | +0.256 ns |
+| Failing endpoints | 0 | 0 |
+| HLS schedule | 449 cycles/sample | 450 cycles/sample |
 
-At 100 MHz, 449 cycles correspond to 4.49 µs per sample, compared with the 20.83 µs sample period at 48 kHz. The resource and timing figures come from an out-of-context core implementation. They exclude the surrounding AXI, audio, and overlay logic. The scheduled cycles are an HLS schedule result, not a board measurement. The integrated design must be measured again after the technical lead completes the overlay.
+The out-of-context column describes the core by itself and excludes the surrounding AXI, audio, and overlay logic. The integrated column describes the full design as built into `board/overlay/fir.bit`. Use the integrated column when describing the system, and state which column a figure came from.
+
+At 100 MHz, 450 cycles correspond to 4.500 µs per sample against the 20.83 µs sample period at 48 kHz — a 4.6× real-time margin. The board measurement of the same core is 4.507 µs per sample, within 0.2% of the scheduled figure.
+
+The core's remaining cost is dominated by data movement, not arithmetic. Its synthesis loop table attributes 398 of the 450 cycles to shifting the 193-entry delay line; the three low-pass filters together take 11 cycles. A circular buffer with a rotating read index would remove that movement, and the estimate in `data/results/impl_metrics.md` puts it at several times faster. It is recorded as future work and is deliberately not implemented: changing the structure would invalidate the verified timing and require the whole on-board check suite to be repeated.
 
 The implementation history and measurement limitations are documented in `data/results/impl_metrics.md`. Do not compare the out-of-context rows with rows measured using a different flow without accounting for the methodology change.
 
 ## 5. Board evidence
 
-The repository records a successful PYNQ-Z2 test of an open-source 27-tap reference overlay in `data/results/reference_overlay_metrics.md`. That test validates the reference overlay's DMA and board control flow. It does not execute the project's custom HLS core and must not be presented as the project's end-to-end accelerator result.
+The project overlay is `board/overlay/fir.bit`: the custom multiband HLS core together with the PYNQ audio codec, built from `board/overlay/build_fir.tcl`. `board/scripts/fir_core.py` drives the core over AXI-Lite, and `board/scripts/fir_audio_loop.py` runs microphone → core → headphone one block at a time.
 
-The repository also contains `board/overlay/ps_only.bit`, board notebooks, and playback/verification scripts. The bitstream is labelled `ps_only`; the repository does not establish that it contains the custom multiband HLS core. A custom-core live audio demonstration and its end-to-end latency remain open tasks.
+The on-board checks passed:
+
+| Check | Result |
+| --- | --- |
+| Bypass: output equals the input delayed by the group delay | 0 mismatches over 1,000 samples; delay exactly 96 samples |
+| Block continuity: 157-point blocks against a single block | bit-identical |
+| Real captured audio through the core: 144,000 samples in 18 blocks | 0 mismatches |
+| Quantisation SNR against the Python golden reference | 75.4 dB (criterion ≥ 70 dB) |
+
+The demonstration path is block-at-a-time, not a real-time stream: the script records a fixed length, runs the core over it, and plays the result back. Making it sample-by-sample would need a streaming interface on the core, which would invalidate the verified schedule and timing. The core's throughput is not the obstacle; the audio port's buffer mechanism is.
+
+The same-board speedup measurement is in section 3. `data/results/reference_overlay_metrics.md` records a different, earlier experiment: an open-source 27-tap reference overlay. It validates a board-side DMA path but does not execute the custom core and must not be presented as this project's accelerator result.
 
 ## 6. Validation status
 
@@ -83,9 +99,10 @@ The repository also contains `board/overlay/ps_only.bit`, board notebooks, and p
 | Stored HLS output compared with the regenerated golden file | Passed on 2026-10-01: 75.4 dB SNR, best lag 0; the stored transparent output matched bit for bit at 96 samples |
 | Rebuilding the HLS C simulation in this workstation | Pending; Vitis HLS is unavailable at the documented installation path |
 | Custom HLS core out-of-context implementation | Results recorded in `data/results/impl_metrics.md` |
-| Custom HLS core integrated into the audio overlay | Pending |
-| Custom-core board audio and end-to-end latency | Pending |
-| RTL implementation and Python/HLS/RTL comparison | Pending |
+| Custom HLS core integrated into the board overlay | Complete: `board/overlay/fir.bit`; timing and utilisation in `board/overlay/fir_timing.rpt` and `board/overlay/fir_util.rpt` |
+| Custom-core board audio through the real capture path | Complete: 144,000 samples in 18 blocks, 0 mismatches |
+| Same-chip ARM against PL core timing | Measured: 6.116 µs against 4.507 µs per sample, 1.4× |
+| RTL implementation and Python/HLS/RTL comparison | Pending; `src/rtl/` is empty |
 
 The current stored HLS output passes comparison against the newly generated 193-tap Python golden file, and the stored transparent output confirms the expected 96-sample delay. Rebuilding the C-simulation output with the final toolchain remains necessary for reproducibility; filenames alone do not establish which source flags produced a result.
 
@@ -106,11 +123,10 @@ The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the READ
 
 ## 8. Remaining work before submission
 
-1. Confirm the target PYNQ image and Vivado/Vitis version with the technical lead. The repository contains reference evidence for PYNQ 2.7 and Vivado/Vitis HLS 2020.2, while the team plan specifies PYNQ 3.1 and Vivado 2024.1.
-2. Rerun the 193-tap C simulation and compare it with the regenerated Python golden data.
-3. Integrate the custom core into the board overlay, then capture live audio and end-to-end latency/throughput measurements.
-4. Produce the same-input Python/HLS/RTL comparison after an RTL implementation exists.
-5. Replace the provisional video script claims with recorded evidence, review the English poster, and run a clean-machine reproduction.
+1. Confirm the target PYNQ image and Vivado/Vitis version. All board evidence in this repository is for PYNQ 2.7 and Vivado/Vitis HLS 2020.2; a separate plan document refers to PYNQ 3.1 and Vivado 2024.1. The board work was done on 2.7 and the discrepancy needs to be settled before submission.
+2. Rerun the 193-tap C simulation with the documented toolchain and compare it with the regenerated Python golden data.
+3. Produce the same-input Python/HLS/RTL comparison after an RTL implementation exists.
+4. Record the demonstration video from the board evidence, review the English poster, and run a clean-machine reproduction.
 
 ## 9. Project artifacts
 

@@ -1,13 +1,13 @@
 # A and B Delivery Review and Local Reproduction
 
 【任务】
-对照队友 A、B 的职责清单，盘点项目已完成的工作，推进本地仓库中可以独立完成的 Python 基线、可视化、日志和文档交付，并记录依赖队长或板卡的剩余任务。
+对照项目分工清单，盘点已完成的工作，推进本地仓库中可以独立完成的 Python 基线、可视化、日志和文档交付，并记录依赖负责人或板卡的剩余任务。
 
 【提示词】
 「那你现在帮我完成A和B该做的所有事情，并且告诉我哪些没完成」
 
 【模型回答】
-检查本地仓库后，修复 Windows GBK 控制台下 Python 基线脚本在输出 `µ` 时异常退出的问题；重新生成当前软件基线 WAV、频谱图、黄金参考和频谱瀑布图；把已有 HLS 输出与新黄金参考复比，补充对比图；更新 README、性能表、报告草稿、提交清单、技能包说明和视频脚本；制作一页英文海报草稿。队长负责的自研核集成、目标工具链确认和板上端到端测试仍需团队完成。
+检查本地仓库后，修复 Windows GBK 控制台下 Python 基线脚本在输出 `µ` 时异常退出的问题；重新生成当前软件基线 WAV、频谱图、黄金参考和频谱瀑布图；把已有 HLS 输出与新黄金参考复比，补充对比图；更新 README、性能表、报告草稿、提交清单、技能包说明和视频脚本；制作一页英文海报草稿。自研核集成、目标工具链确认和板上端到端测试当时仍待完成。（后两项已于 2026-10-01 当晚完成，证据见 `data/results/accel_cpu_vs_fpga.md` 与 `board/overlay/fir.bit`。）
 
 【哪里错了】
 仓库检查发现：基线脚本在默认 Windows 控制台输出 `µs` 时抛出 `UnicodeEncodeError`，导致新音频和图表不能正常写出；README 快速开始没有完整安装和运行命令；报告正文残留旧的 65 抽头、独立带通和 RTL 计划；视频脚本把尚未完成的自研核实时演示写成已实现；性能文件没有将桌面 Python、HLS 核级结果和参考 overlay 板测明确分开。
@@ -23,7 +23,7 @@
 → `src/python/plot_spectrum_waterfall.py`：从生成的 WAV 绘制时间-频率瀑布图。
 → `src/python/compare_golden_vs_hw.py`：在数值比对之外生成 Python/HLS 输出与误差图。
 → `requirements-python.txt`：软件基线最小依赖清单。
-→ `report/submission_checklist.md`：按证据状态区分已完成、待队长确认和待上板事项。
+→ `report/submission_checklist.md`：按证据状态区分已完成、待负责人确认和待上板事项。
 
 【待办】
 → 在匹配版本的 Vitis HLS 环境重新构建并运行 C 仿真，确认结果可从当前源码复现。

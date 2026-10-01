@@ -123,7 +123,7 @@
 → `src/python/band_design.py`（新）—— 采样率、边界、设计法的**唯一定义处**，
   所有脚本和系数生成都从这里取，不再各写一份
 → `src/python/band_plan_sweep.py`（新）—— 结构 × 边界 × 抽头数的横向对比脚本
-→ `report/interface_spec_hw.md`（新）—— 核的接口契约（函数签名、数值格式、
+→ `report/hardware_interface_spec.md`（后并入此文件）—— 核的接口契约（函数签名、数值格式、
   寄存器表、与早期接口草案的逐条差异）
 → `skill/pitfalls/audio_data_consistency.md`、`hls_fixed_point_types.md` 各加一条补记
 
