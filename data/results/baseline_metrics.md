@@ -1,33 +1,52 @@
-# Python 软件基线数据表（Baseline Metrics）
+# Python Software Baseline
 
-> **2026-09-30 补记（下面这张表是 9/25 的旧参数基线，不是当前设计）**
->
-> 两处会和现状对上不：
->
-> 1. **采样率写错了。** 第 5 行写素材是 48000 Hz，实测 `real_voice.wav` 是
->    **44100 Hz**（`python -c "import wave; print(wave.open('data/audio/real_voice.wav').getframerate())"`）。
->    下表所有耗时都是按 44100 跑的。硬件侧固定 48 kHz，所以软件基线要重采样到
->    48 kHz 才能和硬件对照 —— 这一步 9/30 才补上（见 `src/python/multiband_baseline.py`）。
-> 2. **算法参数是旧方案。** 第 10~11 行的「65 抽头 / 600 Hz」和「65 抽头 × 4 段」
->    是各自独立设计的 4 个带通、边界 300/600/1000。现在改成
->    **3 个低通相减、边界 500/1000/2000、193 抽头**，唯一定义处在
->    `src/python/band_design.py`。
->
-> 表格本身留作"旧方案有多快"的历史记录，**不要拿它当当前设计的基线**。
+## Current reference run
 
-测试日期：2026-09-25
-测试环境：Windows 10 / Miniconda Python 3.9
-音频素材：real_voice.wav (10.58 秒, 48000 Hz, 16-bit Stereo)
+Run date: 2026-10-01
 
-| 测试项目 | 算法参数 | 处理耗时（软件） | 输出音频长度 | 备注 |
-| :--- | :--- | :--- | :--- | :--- |
-| 原始读取与去直流 | mean(x) | 约 0.05 秒 | 10.58 秒 | 均值约 5.71e-20，证明去直流成功 |
-| 单频段 FIR 低通滤波 | 65 抽头, 600 Hz | 约 0.12 秒 | 10.58 秒 | 440Hz 保留，880Hz 被衰减 |
-| 4 频段多频段处理 | 65 抽头 x 4 | 约 0.35 秒 | 10.58 秒 | 覆盖 0-8kHz 全频段 |
-| 动态范围压缩（DRC） | 阈值0.1, 压缩比0.7 | 约 0.08 秒 | 10.58 秒 | 实现助听器“小声放大，大声压小” |
-| 全流程（含 FFT 画图） | 以上全部 | 约 1.2 秒 | 10.58 秒 | 端到端软件处理总耗时约 1.2 秒 |
+Command: `python src/python/multiband_baseline.py --taps 193 --repeat 5`
 
-**注意**：以上时间统计基于 PC 端 CPU 单线程执行，仅作软件基线参考。本项目自研硬件加速核的对比数据待综合后填入；参考 overlay 的板级实测数据另见 `reference_overlay_metrics.md`。
----
-### 补记（2026-10-01 更新）
-由于硬件架构改为“相减式”设计，抽头数最终定为 193，频段边界改为 500/1000/2000Hz。原 65 抽头数据已废弃。硬件侧资源实测与端到端延迟数据待上板后填入。
+Environment: repository virtual environment, Python 3.9.12, NumPy 2.0.2, SciPy 1.13.1, Matplotlib 3.9.4, SoundFile 0.13.1. The CPU model was not available from the current Windows session, so retain the machine-specific timing as a local reference rather than a portable benchmark.
+
+| Item | Result |
+| --- | ---: |
+| Input | `data/audio/real_voice.wav`, stereo, 44.1 kHz, about 10.58 s |
+| Processing rate | 48 kHz after polyphase resampling |
+| Test length after resampling | 507,905 samples |
+| Filter design | 3 low-pass FIRs at 500, 1,000, and 2,000 Hz; 193 taps each |
+| Output bands | 4 subtractive bands, followed by DRC |
+| Group delay | 96 samples, 2.00 ms at 48 kHz |
+| Reconstruction check before DRC | Maximum coefficient-sum error `3.469e-18` |
+| Best of 5 processing times (run A) | 100.7 ms |
+| Host time per sample (run A) | 0.198 µs/sample |
+| Host real-time factor (run A) | 105.1× |
+| Best of 5 processing times (run B) | 89.5 ms |
+| Host time per sample (run B) | 0.176 µs/sample |
+| Host real-time factor (run B) | 118.3× |
+| HLS core schedule reference | 449 cycles/sample at 100 MHz = 4.49 µs/sample; 4.6× against the 48 kHz sample budget |
+
+The Python and HLS values are not a measured end-to-end speedup comparison. The Python number comes from the local host; the HLS figure comes from a core-level schedule and out-of-context implementation. The custom HLS core has not been integrated and timed through the board audio path. In both runs the host processed each sample faster than the HLS schedule figure, so do not claim that the FPGA is faster from these measurements. The poster draft displays run A as one measured example.
+
+The repository's existing 1,000-sample HLS output was compared with the freshly regenerated Python golden output. The numeric comparison passed: SNR 75.4 dB, correlation 0.999999986, MSE `6.810e-10`, maximum absolute error `3.469e-05`, and best lag 0. The stored transparent-mode output also matched the quantized test input bit for bit at a 96-sample delay (0 mismatches out of 1,000). This update reran the comparison, not Vitis HLS itself; the HLS executable is unavailable at the documented path on this workstation. Rebuild C simulation before treating the result as a reproducible clean-toolchain run.
+
+Generated artifacts:
+
+- `data/audio/multiband_output.wav`
+- `data/figures/multiband_comparison.png`
+- `data/figures/spectrum_waterfall.png`
+- `data/figures/hls_golden_comparison.png`
+- `data/results/python_golden.txt` (separate 1,000-sample HLS test vector)
+
+Reproduce the software run from the repository root with the command above. Timing varies with host load and hardware.
+
+## Historical baseline (2026-09-25)
+
+The table below is retained as a historical record of the superseded design: 44.1 kHz input without hardware-rate resampling, 65 taps, and independently designed bands. It is not comparable to the current configuration and must not be used as current software performance data.
+
+| Test | Historical parameters | Recorded time | Notes |
+| --- | --- | ---: | --- |
+| Input read and DC removal | `mean(x)` | about 0.05 s | Historical run |
+| Single low-pass FIR | 65 taps, 600 Hz | about 0.12 s | Historical run |
+| Four-band processing | 65 taps × 4 | about 0.35 s | Superseded architecture |
+| DRC | threshold 0.1, ratio 0.7 | about 0.08 s | Historical run |
+| Full run including FFT plot | old pipeline | about 1.2 s | Not comparable to current run |

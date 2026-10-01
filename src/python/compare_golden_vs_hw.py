@@ -8,7 +8,7 @@
 而逐位比对是"对不对"，对不上就是结构错了 —— 两件事必须分开，
 否则会拿"量化误差大"去解释一个其实是接错了的问题。
 
-写入 log 的验收判据是 **SNR ≥ 70 dB**（见 PROGRESS.md）。这个数不是拍的：
+当前脚本的验收判据是 **SNR ≥ 70 dB**。这个数不是拍的：
 采样 16 位本身的理论上限约 96 dB，本项目只要求"助听器听起来干净"，
 70 dB 已远高于这个要求。
 
@@ -20,12 +20,16 @@
 import os
 import sys
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 
 GOLDEN = "data/results/python_golden.txt"
 HW = "data/results/hw_output.txt"
 TRANSPARENT = "data/results/hw_transparent_i16.txt"
 INPUT = "data/audio/test_input.txt"
+PLOT = "data/figures/hls_golden_comparison.png"
 
 SNR_MIN_DB = 70.0
 MAX_ABS_ERROR = 1e-3
@@ -88,6 +92,29 @@ def compare_main():
     print(f"  最佳位移          {lag:+d}  (该位移下相关系数 {lag_corr:.9f})")
     print(f"  参考 max|y|       {np.max(np.abs(ref)):.6f}")
     print(f"  硬件 max|y|       {np.max(np.abs(hw)):.6f}")
+
+    # Keep a visual record of the same numeric comparison. This is a C-sim/HLS
+    # output comparison, not a board measurement.
+    os.makedirs(os.path.dirname(PLOT), exist_ok=True)
+    sample = np.arange(len(ref))
+    fig, (ax_out, ax_err) = plt.subplots(
+        2, 1, figsize=(10, 6), sharex=True,
+        gridspec_kw={"height_ratios": [2, 1]},
+    )
+    ax_out.plot(sample, ref, label="Python golden", linewidth=1.4)
+    ax_out.plot(sample, hw, label="HLS output", linewidth=1.0, alpha=0.8)
+    ax_out.set_ylabel("Amplitude")
+    ax_out.set_title(f"HLS C simulation vs Python golden ({snr:.1f} dB SNR)")
+    ax_out.grid(True, alpha=0.25)
+    ax_out.legend()
+    ax_err.plot(sample, err, color="#b24a32", linewidth=1.0)
+    ax_err.set_xlabel("Sample")
+    ax_err.set_ylabel("HLS − ref")
+    ax_err.grid(True, alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(PLOT, dpi=160)
+    plt.close(fig)
+    print(f"  比对图            {PLOT}")
 
     ok = True
     if lag != 0:

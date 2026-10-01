@@ -1,20 +1,41 @@
-# 演示视频脚本 (Demo Video Script)
+# Project Progress Video Script
 
-**目标时长**：2-3 分钟
-**演示设备**：PYNQ-Z2、USB 声卡/耳机、麦克风、笔记本电脑（显示频谱）
+**Status:** capture-ready progress-video draft. It is not the final competition demonstration because the custom HLS core has not yet been integrated into the board audio path.
 
-## 分镜 1：开场与背景（0:00 - 0:30）
-**画面**：展示 PYNQ-Z2 板卡、连接好的耳机和麦克风。
-**旁白**：“大家好，这里是基于 PYNQ-Z2 的实时多频段音频处理加速平台。针对听力辅助算法迭代慢、纯软件实时性不够的痛点，我们利用 FPGA 实现了低延迟的多频段动态范围压缩。”
+**Target length:** about 2 minutes.
 
-## 分镜 2：算法展示与三实现对撞（0:30 - 1:00）
-**画面**：笔记本屏幕展示 Python 生成的频谱对比图、硬件综合后的资源占用报告（LUT/DSP/WNS）。
-**旁白**：“这是我们通过相减式架构实现的多频段 FIR 滤波与 DRC 压缩。在 Python 端完成软件基线后，我们将算法部署到了 FPGA，硬件综合结果 LUT 占用仅 7.5%，WNS 为正，实时余量达 4.6 倍。”
+**Evidence to capture:** Python baseline run and generated plot; the HLS implementation report; the separately labelled reference-overlay board test. Do not show the reference overlay as the custom multiband core.
 
-## 分镜 3：硬件上板实时演示（1:00 - 2:00）
-**画面**：对着麦克风说话，耳机里立刻传出处理后的声音；笔记本屏幕上频谱实时变化。
-**旁白**：“现在我们把算法部署到 PYNQ-Z2 的 FPGA 上。大家可以看到，对着麦克风说话，耳机里几乎零延迟地传出了经过多频段处理后的声音，同时屏幕上的频谱实时变化。这就是硬件加速带来的实时性优势。”
+## 0:00–0:20 | Project and goal
 
-## 分镜 4：性能对比与总结（2:00 - 2:30）
-**画面**：展示软硬件性能对比数据表（延迟从纯软件的 XX 毫秒降到了 XX 毫秒）。
-**旁白**：“对比纯软件实现，硬件加速的端到端延迟大幅降低，满足了助听器场景对低延迟的严苛要求。未来该方案可直接迁移到会议系统、车载语音等场景。谢谢大家！”
+**Shot:** PYNQ-Z2 board and project title.
+
+**Narration:** “This project explores multiband dynamic-range compression on a PYNQ-Z2. We are building a Python reference and an HLS FIR core so that the algorithm and the hardware implementation can be checked against the same input.”
+
+## 0:20–0:55 | Algorithm and Python reference
+
+**Shot:** Show the band equations and run `python src/python/multiband_baseline.py --taps 193 --repeat 5`. Display the resulting `multiband_comparison.png`.
+
+**Narration:** “The current design uses three low-pass filters at 500, 1,000, and 2,000 hertz. Subtracting adjacent low-pass outputs forms four bands. The Python reference resamples this 44.1-kilohertz recording to 48 kilohertz and applies the same threshold and compression slope as the HLS design.”
+
+## 0:55–1:25 | HLS core implementation evidence
+
+**Shot:** Show the 193-tap row in `data/results/impl_metrics.md`; keep the OOC label visible.
+
+**Narration:** “The custom HLS core has an out-of-context implementation result at a 100-megahertz constraint. The recorded design uses 3,962 LUTs, 5,514 flip-flops, 202 DSP blocks, and 51.5 BRAMs, with positive 1.624-nanosecond slack. This result covers the core by itself. It does not measure an integrated audio overlay.”
+
+## 1:25–1:45 | Board-flow evidence
+
+**Shot:** If showing the board, use the existing reference-overlay notebook and label the screen ‘open-source reference overlay, 27 taps’.
+
+**Narration:** “We have also tested a separate open-source reference overlay on the PYNQ-Z2. That confirms a board-side control and data-transfer path, but it is not the custom multiband HLS core.”
+
+## 1:45–2:00 | Current milestone
+
+**Shot:** Show the submission checklist with the custom-core integration and end-to-end board measurement still open.
+
+**Narration:** “The remaining hardware milestone is to integrate the custom core into the board audio path, demonstrate processed audio, and measure end-to-end latency. We will publish the final comparison after those measurements use the same input and alignment.”
+
+## Final-video replacement required
+
+After the custom core is integrated, replace the reference-overlay shot with a live custom-core demonstration. Add the measured board latency, throughput, and output comparison. Update the title and status narration so the video describes completed work rather than the current progress snapshot.

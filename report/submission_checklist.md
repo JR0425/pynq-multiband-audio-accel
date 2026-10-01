@@ -1,32 +1,42 @@
-# 最终提交前检查清单 (Submission Checklist)
+# Submission Checklist
 
-> 提交截止：2026-11-04 18:00，留足 3 小时余量。
-> 提交物逐项对照指南 3.3.5 打勾。
+Status updated 2026-10-01 from the files currently present in this repository. A checked box means repository evidence exists; it does not replace team lead approval or a live board demonstration.
 
-## 📁 仓库与代码
-- [ ] 所有目录名与文件名为纯英文（无中文）
-- [ ] README.md 完整（含项目结构、快速开始、开源协议）
-- [ ] LICENSE 已加（MIT 协议）
-- [ ] .gitignore 生效，无临时/缓存文件混入
-- [ ] 大文件（.bit 等）通过 Git LFS 管理，仓库体积正常
-- [ ] 干净环境复现验证（换台机器照 README 的「快速开始」跑一遍成功）
-      ⚠️ 2026-09-30 核实：本项原来写的 `BUILD_GUIDE.md` **仓库里没有**，只在协作日志里
-      提过"计划编写"。要么补一份，要么把这一项改成照 README 跑（README 已有快速开始章节）。
-- [x] 软件基线数据（data/results/baseline_metrics.md）齐全
-      ⚠️ 该表是 9/25 的旧参数基线（按 44100 Hz、65 抽头、4 段带通）；
-      当前设计是 48 kHz、193 抽头、3 低通相减。表内已加补记，交付前需重新量一遍。
-- [x] 硬件接口规格：**当前有效的是 `report/interface_spec_hw.md`**
-      （`report/hardware_interface_spec.md` 是队友 9/25 的原始需求，其中
-      `CTRL/NUM_TAPS/FREQ_BAND_1~4` 已被推翻，留作对照）
+## Repository and Python work
 
-## 📄 文档与报告
-- [ ] 设计报告定稿（选题背景、架构、算法、测试、协作、总结）
-- [ ] 演示视频剪辑完成，链接放 README
-- [ ] 一页英文 PPT 海报（决赛用，提前准备）
-- [x] 大模型协作日志按主题归档（report/llm_collab_log/）
-- [x] 技能包（skill/）四类内容齐全
+- [x] Top-level project directories and tracked source filenames use English names.
+- [x] README describes the current repository status and Python reproduction steps.
+- [x] MIT license is present.
+- [x] `.gitignore` excludes common generated files.
+- [x] Current Python baseline and its plot/audio artifacts were regenerated on 2026-10-01.
+- [x] The stored 1,000-sample HLS output was compared with regenerated Python golden data; SNR and transparent-mode alignment passed, and the comparison plot was generated.
+- [ ] A clean-machine reproduction has not yet been performed.
+- [ ] Vitis HLS C simulation has not been rebuilt in this environment; the documented Vitis HLS executable is not installed at that path.
+- [ ] Review whether the tracked board bitstream should use Git LFS before final submission. The current `ps_only.bit` is a reference/playback artifact, not the custom HLS design.
 
-## 🔧 绝对不能砍的三样
-- [ ] 实时出声（板上跑通，耳机能听到处理后的声音）
-- [ ] 软硬件对比数据（Python/HLS/RTL 三实现对撞）
-- [ ] 完整可复现的工程源码
+## Hardware and comparison evidence
+
+- [x] Custom HLS core out-of-context synthesis and implementation results are recorded in `data/results/impl_metrics.md`.
+- [x] Reference overlay board measurements are separately documented in `data/results/reference_overlay_metrics.md`.
+- [ ] Custom HLS core integration into the board overlay and end-to-end board measurement.
+- [ ] Live audio demonstration of the custom core.
+- [ ] Python/HLS/RTL comparison on the same input and with documented alignment and precision.
+- [ ] RTL implementation and RTL simulation evidence.
+
+## Documentation and presentation
+
+- [x] Collaboration logs are organized under `report/llm_collab_log/`.
+- [x] Added a dated review note to `2026-09-25_github_setup.md` covering the English-name rule and directory-structure cross-check without rewriting the historical prompt.
+- [x] Skill package contains prompts, templates, checkers, and pitfalls.
+- [ ] Review skill-package compatibility notes with the technical lead because the repo contains both PYNQ 2.7 / Vivado 2020.2 reference artifacts and a plan specifying PYNQ 3.1 / Vivado 2024.1.
+- [ ] Final design report. The current file is still a draft and must be reviewed against the team's final hardware architecture.
+- [x] English poster draft exists at `report/poster_en/pynq_multiband_audio_poster_draft.pptx`; team and technical lead review are still required.
+- [ ] Record and edit the final demonstration video, then add its link to the README.
+- [ ] Confirm the final interface specification and toolchain version with the technical lead.
+
+## Final gate
+
+- [ ] All final source and build files needed for reproduction are present.
+- [ ] Final end-to-end audio path is demonstrated on the target board.
+- [ ] All performance claims in the report and poster cite the correct measurement scope.
+- [ ] Submission package is checked against the official competition guide.

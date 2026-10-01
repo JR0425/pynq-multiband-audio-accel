@@ -22,8 +22,7 @@
     data/audio/multiband_output.wav   处理后的音频（48 kHz）
     data/figures/multiband_comparison.png  频谱对照图
 
-屏幕上还会打出 CPU 处理耗时和实时倍率 —— 那才是"软件基线"这个词的用处。
-记：那是**桌面 x86** 的数，不是板子上那个 ARM 核的数，报告里引用要说清是哪一个。
+屏幕上还会打出主机 CPU 处理耗时和实时倍率。它是本机软件基线，不是板上端到端性能。
 """
 
 import argparse
@@ -149,22 +148,21 @@ def main():
         print(f"   段 {i + 1}: 滤波后 max|y| = {np.max(np.abs(b)):.6f}")
     print(f"3. 压缩后求和：max|y| = {np.max(np.abs(output)):.6f}")
 
-    # ---- 3b. CPU 耗时 —— 这才是"软件基线"这个词的用处 ----
-    # 记：这是**桌面 x86 上的数**，不是板子上那个 ARM 核的数。两个数是两个量级，
-    # 报告里引用时必须说清是哪一个。加速比要等上板之后拿同一段音频、同一条时钟去比。
+    # ---- 3b. Host CPU timing ----
+    # This is a host-side measurement. The HLS figure is a core-level schedule,
+    # so these values do not establish an end-to-end FPGA speedup.
     audio_s = len(x) / FS
     cpu_us = best / len(x) * 1e6
     budget_us = 1e6 / FS
     print(f"4. CPU 处理 {audio_s:.2f} 秒音频耗时 {best * 1000:.1f} ms"
           f"（重复 {max(1, args.repeat)} 次取最快）")
-    print(f"   单采样 {cpu_us:.3f} µs，实时倍率 {audio_s / best:.1f}x")
+    print(f"   单采样 {cpu_us:.3f} us，实时倍率 {audio_s / best:.1f}x")
     if cycles:
         fpga_us = cycles / (args.fpga_mhz * 1e6) * 1e6
         print(f"   对照板子：{cycles} 拍 @ {args.fpga_mhz:g} MHz"
-              f" = {fpga_us:.2f} µs/采样，实时倍率 {budget_us / fpga_us:.1f}x")
-        print(f"   （48 kHz 实时预算 {budget_us:.1f} µs/采样；两个都够实时，差的是别的 ——"
-              "桌面 3 GHz 扛 SIMD，比 100 MHz 的 DSP 链快得多 ——"
-              "这种规模的负载上这很正常。板子的账不在吞吐上，在确定性延迟、功耗和体积。）")
+              f" = {fpga_us:.2f} us/采样，实时倍率 {budget_us / fpga_us:.1f}x")
+        print(f"   （48 kHz 实时预算 {budget_us:.1f} us/采样；两项来自不同平台和测量范围，"
+              "不能据此声称 FPGA 更快。自研核上板后的端到端时间仍待测。）")
     else:
         print(f"   （{n} 抽头的拍/采样还没量过，跳过板子侧对照；"
               "要用 --cycles 显式给）")

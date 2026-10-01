@@ -1,6 +1,6 @@
 # 硬件接口规格 —— 硬件侧对 `hardware_interface_spec.md` 的答复
 
-日期:2026-09-30 ｜ 状态:**草案(本地,未推)**
+日期:2026-09-30 ｜ 状态:**接口工作草案，待技术负责人最终确认**
 数据来源:`src/python/band_plan_sweep.py`、`src/hls/`、`data/results/impl_metrics.md`
 
 ---
