@@ -49,8 +49,36 @@ WAV_DRY = DIR + "/loop_2_过核_直通.wav"
 WAV_WET = DIR + "/loop_3_过核_压缩.wav"
 
 # 录音电平低于这个值就当「没插麦克风 / 没声音」。
-# 满量程 2^23 ≈ 8.4e6，这个阈值约等于满量程的千分之一。
-SILENT_RMS = 8000.0
+# 这个电平和下面打印的是同一个单位：int16 域（i32_to_i16_chan 里 >>8 过了），
+# 满量程 32767，不是 24 位的 8.4e6。
+# 实测（2026-10-02，耳机麦）：没检测到时本底只有 7～45；
+# 正常说话 400～1200，峰值 2000～5400。取 200，两边各留一倍以上余量。
+SILENT_RMS = 200.0
+
+# 进核之前的输入增益匹配。
+# 压缩器的门限是 0.1，也就是 int16 的 3276。耳机麦直接录进来很小
+# （实测有效值 1084，满量程的 3.3%），够不到门限，压缩等于没做 ——
+# 实测 1084 → 1081，1.00 倍。所以按有效值把录音抬到 TARGET_RMS，
+# 再用峰值卡住不超过满量程的 90%，免得削顶。
+TARGET_RMS = 0.15 * 32767.0
+
+# 压缩器参数，Q1.15 整数，写进 AXI 寄存器 —— 改它不用重新综合。
+# 出厂默认是阈值 0.1、压缩比 0.7。但 drc() 比的是**单个频段**的幅度，
+# 不是整段信号：四段一分，每段只剩总能量的一小块，绝大多数样本够不到 0.1，
+# drc 直接原样返回。实测人声只降 1.1 dB、合成信号 1.8 dB —— 都听不出来。
+# 下面这组是按实测电平重定的。
+THR_Q15   = 983          # 0.030 满量程
+RATIO_Q15 = 16384        # 0.5
+N_BANDS   = 4
+
+
+def cr(v):
+    """峰均比（峰值 / 有效值）。压缩器要压的就是它 —— 只看有效值会被
+    「整体变轻」带偏，峰均比变小才说明动态范围真的被压窄了。"""
+    v = v.astype(np.float64)
+    r = rms(v)
+    return float(np.abs(v).max()) / r if r else 0.0
+
 
 ok_all = True
 
@@ -159,6 +187,9 @@ print("   → 用 %s 这一遍" % src_name)
 
 if lvl < SILENT_RMS:
     note("** 录音几乎是静音 ** —— 麦克风/线路输入没插东西，或者插了但是没声。")
+    note("   插着耳机麦还报这个：把耳机**拔掉停两秒再插回去**，然后重跑。")
+    note("   板子 HP+MIC 口里有颗自动耳机开关（U41），只在插头插入那一下")
+    note("   做检测；板子上电时插头已经插在里面，它就检测不到麦克风。")
     note("   下面的算术检验照样全跑（静音也是合法的输入），")
     note("   但「压缩听出区别」这一条会被跳过 —— 静音压不出变化。")
     note("   第 5 节用合成信号补上这一条保证能看的效果。")
@@ -167,6 +198,19 @@ else:
 
 save_wav24(WAV_RAW, x)
 print("   原始录音已存：%s" % WAV_RAW)
+
+# 进核之前做增益匹配，把录音抬进压缩器的工作区间。
+# 直通和压缩用的是同一个 x，两边乘同一个增益，所以对比仍然成立。
+if lvl >= SILENT_RMS:
+    raw_rms = rms(x)
+    raw_pk = float(np.abs(x).max())
+    gain = min(TARGET_RMS / max(raw_rms, 1.0), 0.90 * 32767.0 / max(raw_pk, 1.0))
+    x = np.clip(np.round(x.astype(np.float64) * gain), -32768, 32767).astype(np.int16)
+    print("   增益匹配：录音有效值 %.0f、峰值 %d → 乘 %.2f 倍"
+          % (raw_rms, int(raw_pk), gain))
+    print("      （压缩器门限 0.1 = %d，人声不抬上去根本够不到）" % int(0.1 * 32767))
+else:
+    print("   录音是静音，跳过增益匹配（放大了也只是噪声）")
 
 # ---------------- 4. 过核 ----------------
 print("\n4) 过核（这就是 ③d 的关键一步：声音进核了）")
@@ -180,8 +224,11 @@ mism = int(np.count_nonzero(dry != ref))
 check("核的输出逐位等于「录音延后 %d 拍」" % D, mism == 0,
       "错配 %d / %d 个，切了 %d 块" % (mism, len(x), len(dry_blocks)))
 
-print("   4b 压缩（默认阈值 0.1、压缩比 0.7）")
-wet, wet_dt, wet_blocks = core.process(x, reset=True, bypass=False, chunk=CHUNK)
+print("   4b 压缩（阈值 %.3f、压缩比 %.2f，运行期参数）"
+      % (THR_Q15 / 32768.0, RATIO_Q15 / 32768.0))
+wet, wet_dt, wet_blocks = core.process(x, reset=True, bypass=False, chunk=CHUNK,
+                                       thr=(THR_Q15,) * N_BANDS,
+                                       ratio=(RATIO_Q15,) * N_BANDS)
 
 diff = int(np.count_nonzero(wet != dry))
 save_wav24(WAV_DRY, dry)
@@ -192,8 +239,26 @@ if lvl >= SILENT_RMS:
           "不同的采样 %d / %d（%.1f%%）" % (diff, len(x), 100.0 * diff / len(x)))
     r_in, r_dry, r_wet = rms(x[D:]), rms(dry[D:]), rms(wet[D:])
     print("   有效值：录音 %.0f ｜ 直通 %.0f ｜ 压缩后 %.0f" % (r_in, r_dry, r_wet))
+    print("   峰均比：直通 %.2f ｜ 压缩后 %.2f   （压缩器该压的是这个数）"
+          % (cr(dry[D:]), cr(wet[D:])))
     check("压缩后整体变轻", r_wet < r_dry,
-          "%.0f → %.0f（%.2f 倍）" % (r_dry, r_wet, r_dry / r_wet if r_wet else 0))
+          "%.0f → %.0f（%.2f 倍，合 %.1f dB）"
+          % (r_dry, r_wet, r_dry / r_wet if r_wet else 0,
+             20.0 * np.log10(r_wet / r_dry) if r_dry and r_wet else 0.0))
+
+    # 4c 参数扫描。阈值和压缩比是 AXI 寄存器，扫一遍不用重新综合 ——
+    # 这也是这核的设计卖点（换一组参数就是换一种验配，不必重综合）。
+    print("\n   4c 阈值/压缩比扫描（看哪一组才真的听得出来）")
+    print("      %-20s %10s %10s %10s" % ("(阈值, 压缩比)", "有效值", "相对直通", "峰均比"))
+    for thr, ratio in ((3277, 22938), (1638, 22938), (983, 22938),
+                       (983, 16384), (656, 13107), (328, 9830)):
+        y, _, _ = core.process(x, reset=True, bypass=False, chunk=CHUNK,
+                               thr=(thr,) * N_BANDS, ratio=(ratio,) * N_BANDS)
+        r = rms(y[D:])
+        print("      (%5.3f, %.2f)%s %10.0f %9.1f dB %10.2f"
+              % (thr / 32768.0, ratio / 32768.0,
+                 " ←" if (thr, ratio) == (THR_Q15, RATIO_Q15) else "  ",
+                 r, 20.0 * np.log10(r / r_dry) if r_dry else 0.0, cr(y[D:])))
 else:
     print("   跳过「压缩有区别」这一条（录音是静音，见上面那行提示）")
 
@@ -208,7 +273,9 @@ synth = (0.55 * np.sin(2 * np.pi * 300.0 * t)
 x_s = np.clip(np.round(synth * 32767.0), -32768, 32767).astype(np.int16)
 
 s_dry, _, _ = core.process(x_s, reset=True, bypass=True, chunk=CHUNK)
-s_wet, s_dt, s_blocks = core.process(x_s, reset=True, bypass=False, chunk=CHUNK)
+s_wet, s_dt, s_blocks = core.process(x_s, reset=True, bypass=False, chunk=CHUNK,
+                                     thr=(THR_Q15,) * N_BANDS,
+                                     ratio=(RATIO_Q15,) * N_BANDS)
 s_diff = int(np.count_nonzero(s_wet != s_dry))
 r_sd, r_sw = rms(s_dry[D:]), rms(s_wet[D:])
 print("   输入有效值 %.0f ｜ 直通 %.0f ｜ 压缩后 %.0f" % (rms(x_s), r_sd, r_sw))
@@ -238,8 +305,22 @@ if lvl >= SILENT_RMS:
     t0 = time.time()
     audio.play()
     print("   压缩后放完，墙钟 %.2f 秒" % (time.time() - t0))
-    print("   ⚠️ 这一条只有耳朵能判：第二遍是不是比第一遍「平」一些？")
-    print("      （应该听到：小声的地方被抬起来、大声的地方被压下去，整体不那么忽大忽小）")
+
+    # 第三遍：把压缩后那一段补回等响度再放一遍。
+    # 不加这一步，A/B 听出来的只是「第二遍变小了」——那是音量差，不是压缩。
+    mk = r_dry / r_wet if r_wet else 1.0
+    wf = wet.astype(np.float64) * mk
+    wet_m = np.clip(np.round(wf), -32768, 32767).astype(np.int16)
+    over = int(np.count_nonzero(np.abs(wf) > 32767))
+    time.sleep(1.0)
+    audio.buffer = i16_to_i32_stereo(wet_m)
+    t0 = time.time()
+    audio.play()
+    print("   等响度补回放完，墙钟 %.2f 秒（补 %.2f 倍 = +%.1f dB，削顶 %d 个点）"
+          % (time.time() - t0, mk, 20.0 * np.log10(mk), over))
+    print("   三遍：① 原声 ｜ ② 压缩后（整体变轻）｜ ③ 压缩后补回等响度")
+    print("   要比的是 ① 和 ③ —— 一样响的前提下，③ 的大小声落差是不是更小。")
+    print("   ② 只是音量小了，它不算证据。")
 else:
     print("   录音是静音，A/B 就没得听了 —— 插上麦克风再跑一次就有。")
 
