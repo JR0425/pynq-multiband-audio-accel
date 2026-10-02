@@ -20,6 +20,11 @@
 import os
 import sys
 
+# Windows 控制台默认 GBK，下面这些中文判据会打成乱码。同一个守卫
+# 别的脚本都有，这个漏了。不影响 Linux —— 板子上跑的是同一个文件。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -95,21 +100,32 @@ def compare_main():
 
     # Keep a visual record of the same numeric comparison. This is a C-sim/HLS
     # output comparison, not a board measurement.
+    # 把参考画粗、画在下面，硬件输出画细、画在上面。
+    # 两条本来就该重合（75 dB SNR），以前参考只有 1.4 pt、上面那条又叠了 0.8
+    # 的透明度，糊在一起看不出画了两条 —— 图里像是只有 HLS output。
+    # 参考加粗之后会从两边各露出一点，形成一条"描边"，一眼看出是两条线。
     os.makedirs(os.path.dirname(PLOT), exist_ok=True)
     sample = np.arange(len(ref))
     fig, (ax_out, ax_err) = plt.subplots(
         2, 1, figsize=(10, 6), sharex=True,
         gridspec_kw={"height_ratios": [2, 1]},
     )
-    ax_out.plot(sample, ref, label="Python golden", linewidth=1.4)
-    ax_out.plot(sample, hw, label="HLS output", linewidth=1.0, alpha=0.8)
+    ax_out.plot(sample, ref, label="Python golden", linewidth=3.0,
+                color="tab:blue", alpha=1.0)
+    ax_out.plot(sample, hw, label="HLS output", linewidth=1.0,
+                color="tab:orange", alpha=1.0)
     ax_out.set_ylabel("Amplitude")
     ax_out.set_title(f"HLS C simulation vs Python golden ({snr:.1f} dB SNR)")
     ax_out.grid(True, alpha=0.25)
     ax_out.legend()
-    ax_err.plot(sample, err, color="#b24a32", linewidth=1.0)
+
+    # 误差换成 **16 位 LSB** 为单位，不用裸的浮点差。
+    # 原来纵轴是 1e-5 的浮点差，读图的人得自己心算才知道 3e-5 算大还是算小。
+    # 1 LSB = 1/32768，换成 LSB 之后纵轴直接读成"最多差一个最低位"。
+    err_lsb = err * 32768.0
+    ax_err.plot(sample, err_lsb, color="#b24a32", linewidth=1.0)
     ax_err.set_xlabel("Sample")
-    ax_err.set_ylabel("HLS − ref")
+    ax_err.set_ylabel("HLS − ref\n(16-bit LSB)")
     ax_err.grid(True, alpha=0.25)
     fig.tight_layout()
     fig.savefig(PLOT, dpi=160)

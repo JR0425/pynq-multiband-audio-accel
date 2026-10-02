@@ -239,27 +239,67 @@ def main():
     print(f"   已保存 {OUT_WAV}")
 
     # ---- 5. 频谱对照图 ----
-    m = min(FS, len(x))                  # 只取前 1 秒画图
-    freqs = np.fft.fftfreq(m, 1 / FS)
-    fft_orig = np.abs(np.fft.fft(x[:m])) / m * 2
-    fft_multi = np.abs(np.fft.fft(output[:m])) / m * 2
+    # 只取前 1 秒、0~2000 Hz 画图（人声能量都在这段）。
+    #
+    # 纵轴用 **dB**（满量程正弦 = 0 dB），不是线性归一化幅度。
+    # 线性那套（|X| / N * 2）是给**单频正弦**定的刻度：满量程正弦画出来正好是 1.0。
+    # 真实人声的能量摊在几百个频率格上，单格最大只有 0.0244，也就是满量程的 3%。
+    # 配一个写死的 ylim(0, 1.5)，两条曲线就都贴在 0 上，**图等于空的** ——
+    # 这张图从生成那天起一直是这样，2026-10-02 才发现。
+    # 换 dB 之后 0.0244 就是 −32 dB，看得见。
+    # 用 **Welch 法（分段平均）** 估谱，不用单次 FFT 的周期图。
+    # 单段周期图每个频率格的方差极大 —— 语音上逐格能上下跳 20 dB，
+    # 那点起伏比压缩器造成的变化还大，图上看不出到底谁压了谁（实测见过）。
+    # 分段平均之后留下的是真正的频谱形状。
+    m = min(FS, len(x))                  # 只取前 1 秒
+    nperseg = 4096                       # 频率分辨率 11.7 Hz，约 22 段平均
+    f, psd_o = signal.welch(x[:m], fs=FS, nperseg=nperseg,
+                            noverlap=nperseg // 2, scaling="spectrum")
+    _, psd_p = signal.welch(output[:m], fs=FS, nperseg=nperseg,
+                            noverlap=nperseg // 2, scaling="spectrum")
 
-    plt.figure(figsize=(10, 4))
-    plt.plot(freqs[:m // 2], fft_orig[:m // 2], label="Original", color="blue", alpha=0.5)
-    plt.plot(freqs[:m // 2], fft_multi[:m // 2], label="Multiband Processed",
-             color="orange", linewidth=2)
-    plt.title(f"Multiband Baseline ({len(bands)} bands, {n} taps, "
-              f"subtractive, {FS} Hz)")
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Normalized Magnitude")
-    plt.xlim(0, 2000)
-    plt.ylim(0, 1.5)
-    plt.legend()
-    plt.grid(True)
+    # 0 dB 参考 = 一个满量程正弦的均方（幅度 1.0 → 均方 0.5）。
+    # scaling="spectrum" 下这个参考同样成立，所以纵轴读出来就是 dBFS。
+    REF = 0.5
+    o_db = 10.0 * np.log10(np.maximum(psd_o / REF, 1e-12))
+    p_db = 10.0 * np.log10(np.maximum(psd_p / REF, 1e-12))
+    # 20 Hz 以下不画：第一个频率格（11.7 Hz）在压缩器不工作的直流附近，
+    # 两条曲线在那里都接近零，dB 相减会把它放大成一个假的尖峰。
+    keep = (f >= 20.0) & (f <= 2000.0)
+    peak_db = float(max(o_db[keep].max(), p_db[keep].max()))
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
+
+    ax1.plot(f, o_db, label="Original", color="tab:blue", linewidth=1.0)
+    ax1.plot(f, p_db, label="Multiband Processed", color="tab:orange",
+             linewidth=1.4)
+    ax1.set_title(f"Multiband Baseline ({len(bands)} bands, {n} taps, "
+                  f"subtractive, {FS} Hz)")
+    ax1.set_ylabel("Magnitude (dB)\nfull-scale sine = 0 dB")
+    ax1.set_ylim(peak_db - 45.0, peak_db + 6.0)
+    ax1.legend(loc="upper right")
+    ax1.grid(True)
+
+    # 下图：压缩前后差多少。DRC 只在超过阈值的地方动手，所以这条曲线
+    # 就是"这个压缩器在这段音频上到底改了什么"。
+    # y 轴给一个下限（±0.2 dB），免得"其实什么都没变"的时候自动缩放
+    # 去放大数值噪声，看着像变了很多。
+    diff = p_db - o_db
+    dmax = float(np.max(np.abs(diff[keep])))
+    span = max(dmax * 1.2, 0.2)
+    ax2.plot(f, diff, color="tab:red", linewidth=1.0)
+    ax2.axhline(0.0, color="black", linewidth=0.8)
+    ax2.set_xlabel("Frequency (Hz)")
+    ax2.set_ylabel("Processed − Original (dB)")
+    ax2.set_ylim(-span, span)
+    ax2.grid(True)
+    ax2.set_xlim(20, 2000)
 
     os.makedirs(os.path.dirname(OUT_FIG), exist_ok=True)
-    plt.savefig(OUT_FIG)
-    print(f"   已保存 {OUT_FIG}")
+    fig.savefig(OUT_FIG, dpi=130)
+    plt.close(fig)
+    print(f"   已保存 {OUT_FIG}"
+          f"（峰值 {peak_db:.1f} dB，压缩前后最大差 {dmax:.2f} dB）")
 
 
 if __name__ == "__main__":
