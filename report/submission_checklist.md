@@ -11,7 +11,7 @@ Status updated 2026-10-01 from the files currently present in this repository. A
 - [x] Current Python baseline and its plot/audio artifacts were regenerated on 2026-10-01.
 - [x] The stored 1,000-sample HLS output was compared with regenerated Python golden data; SNR and transparent-mode alignment passed, and the comparison plot was generated.
 - [ ] A clean-machine reproduction has not yet been performed.
-- [ ] A fresh C-simulation rebuild from source has not been repeated in this execution environment. The stored HLS output/golden comparison is present and passed (the handover marks W3 complete); the teammate reports the Vitis HLS 2020.2 CLI worked at `E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat`, but that E: path is not mounted here, so an independent rebuild remains outstanding.
+- [x] C simulation rebuilt from source on 2026-09-30 with Vitis HLS 2020.2 via `build/hls/run_csim.tcl`. The coefficient-width sweep outputs are in `data/results/fixed_dw16_cw12/16/18/20.txt`; the stored `hw_output.txt` and `hw_transparent_i16.txt` are the outputs the 2026-10-01 golden comparison was run against.
 - [ ] Review whether the tracked board bitstreams should use Git LFS before final submission. `board/overlay/fir.bit` is the custom HLS design; `ps_only.bit` is an earlier playback-only artifact.
 
 ## Hardware and comparison evidence
