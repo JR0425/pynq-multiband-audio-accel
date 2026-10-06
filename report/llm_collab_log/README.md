@@ -12,4 +12,10 @@ A/B 工作包：
 
 板载音频输入的接通过程（麦克风输入路径 + 压缩器增益分级）见 `2026-10-02_onboard_mic_and_compressor_gain.md`。
 
+交付图表的核对过程（三张图的实际缺陷 + 一处 1 个最低位的量纲假警报）见 `2026-10-02_figures_and_one_lsb.md`。
+
+技能包改用官方 Agent Skill 写法的判断依据、以及"能不能用官方工具链"的落地条件见 `2026-10-02_skill_package_official_format.md`。
+
+板载音频输入的固定、压缩器输入-输出电平曲线的测量、以及"压窄了多少 dB"的口径见 `2026-10-06_fixed_input_and_drc_level_curve.md`。
+
 抽头数参数调整见 `2026-09-30_python_baseline_193_taps.md`。更早的开发过程仍按各自任务文件记录。

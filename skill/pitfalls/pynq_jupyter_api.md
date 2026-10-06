@@ -1,3 +1,19 @@
+---
+name: pynq-jupyter-files
+description: >
+  Move files to and from a PYNQ-Z2 and run notebooks headless over the Jupyter
+  HTTP API. Use when the board has no SSH or shared folder but files must be
+  transferred, when a PUT or POST returns 403 because of a missing XSRF token, when an
+  uploaded file lands in an unexpected directory, when files generated on the board are
+  invisible in the Jupyter file list, or when a notebook has to be executed without
+  opening a browser.
+license: MIT
+compatibility: PYNQ-Z2 image 2.7.0, Jupyter 5.x
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-27"
+---
+
 # 用 Jupyter 的 HTTP 接口传文件 / 跑 notebook
 
 板子没有 SSH、没有共享目录，但 PYNQ 自带一个 Jupyter 服务（9090 端口），
@@ -10,6 +26,25 @@ python skill/checkers/pynq_jupyter_files.py ls
 python skill/checkers/pynq_jupyter_files.py put <本地文件> <板上路径>
 python skill/checkers/pynq_jupyter_files.py get <板上路径> <本地文件>
 ```
+
+## 什么时候用
+
+- 板子没有 SSH、没有共享目录，但要传文件或取结果
+- 非 GET 请求返回 403，而且不提示缺什么
+- 要在板子上不带界面跑一遍 notebook
+- 脚本在板子上生成的 wav 在 Jupyter 文件列表里看不到
+
+## 什么时候别用
+
+- 网络不通 —— 先走串口
+- 只是想看一个文本文件 —— 串口 cat 更快
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-27 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 坑 1：不带 `_xsrf` 的所有非 GET 请求都被拒
 

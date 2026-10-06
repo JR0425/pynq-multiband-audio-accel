@@ -1,8 +1,42 @@
+---
+name: hls-fixed-point-types
+description: >
+  Whether fixed-point beats floating-point in HLS depends on whether the design
+  reuses arithmetic or spreads it out, and csynth estimates get the direction wrong, so
+  only post-place-and-route numbers count. Use when deciding on ap_fixed, when a
+  fixed-point version is slower or larger than expected, when choosing sample and
+  coefficient bit widths, or when a synthesis estimate disagrees with implementation.
+license: MIT
+compatibility: Vitis HLS 2020.2 + Vivado 2020.2, xc7z020clg400-1
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-29"
+---
+
 # HLS 定点化（`ap_fixed`）：省不省，取决于「复用」还是「铺开」
 
 工具：Vitis HLS 2020.2 + Vivado 2020.2，目标 `xc7z020clg400-1`（PYNQ-Z2），
 10 ns 时钟（100 MHz）。本页数字分两类：**估算**（来自 `csynth_design`）和
 **实测**（跑完布局布线），每处都标了是哪一类 —— 两者差得很远，见第七节。
+
+## 什么时候用
+
+- 要在定点还是浮点之间做取舍
+- 定点版的时序比浮点还差，或者 DSP 比浮点还多
+- 要选采样位宽和系数位宽
+- 综合估算和布局布线实测对不上
+
+## 什么时候别用
+
+- 还没跑过布局布线 —— 这一页的结论只对实测成立，估算会判错方向
+- 要调的是面积而不是数据类型 —— 先看 hls_synthesis_and_directives.md
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-29 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 一、先看结论
 

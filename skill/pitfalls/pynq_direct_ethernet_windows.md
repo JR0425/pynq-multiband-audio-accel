@@ -1,7 +1,42 @@
+---
+name: pynq-direct-ethernet
+description: >
+  Bring up a direct Ethernet link between a PYNQ-Z2 and a Windows laptop with no
+  router in between: static addresses on both sides, the dhclient trap that silently
+  wipes the static address, and an acceptance checklist that only counts after a cold
+  boot. Use when the laptop NIC shows 169.254.x.x, when ping to the board fails, when
+  the Jupyter page at 192.168.2.99:9090 will not open, or when the board loses its IPv4
+  address after a reboot.
+license: MIT
+compatibility: PYNQ-Z2 image 2.7.0 + Windows 11
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-25"
+---
+
 # PYNQ-Z2 直连 Windows 笔记本
 
 网线直连，中间没有路由器。目标：浏览器打开板子的 Jupyter。
 实测：PYNQ-Z2 + PYNQ 2.7.0 + Windows 11，2026-09-25。
+
+## 什么时候用
+
+- 网线直连、中间没有路由器，要打开板子的 Jupyter
+- 笔记本网卡拿到的是 169.254.x.x
+- ping 不通板子，或者 9090 页面打不开
+- 板子重启之后 IPv4 地址没了
+
+## 什么时候别用
+
+- 板子接在路由器上、能自己拿到 IP —— 不用手工设静态地址
+- 只关心板子起来没有、不关心网络 —— 直接走串口更省事
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-25 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 最终配置
 

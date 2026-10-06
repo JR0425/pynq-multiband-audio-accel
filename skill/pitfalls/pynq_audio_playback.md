@@ -1,7 +1,43 @@
+---
+name: pynq-audio-playback
+description: >
+  Get sound out of and audio into a PYNQ-Z2 through the factory base overlay,
+  and past the five things that block it: root-only device nodes, a wrong volume
+  ceiling, the 24-bit stereo 48 kHz wav restriction, DC offset on capture, and the
+  headset switch that latches once on insertion. Use when the board is silent, when the
+  microphone records only noise floor, when set_volume raises ValueError, when
+  Audio.load rejects a wav file, or when planning how to demonstrate audio I/O.
+license: MIT
+compatibility: PYNQ-Z2 image 2.7.0 + factory base overlay
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-27"
+---
+
 # PYNQ-Z2 板子出声 / 录音
 
 出厂 base overlay 的音频通路怎么跑通，以及四个会卡住人的地方。
 实测：PYNQ-Z2 + PYNQ 2.7.0 + 出厂 base overlay，2026-09-27。
+
+## 什么时候用
+
+- 板子不出声，或者录音全是本底噪声
+- set_volume 报 ValueError: Volume has to be in [0,63]!
+- Audio.load() 拒绝一个 wav 文件
+- 要确认音频搬运到底是 CPU 干的还是 FPGA 干的
+- 演示前要定用哪种接法（耳麦还是 Line-in）
+
+## 什么时候别用
+
+- 要把自定义核接进音频通路 —— 这一页讲的是出厂 base overlay 的通路
+- 只需要验算法、不用真出声 —— Python 基线和 C 仿真就够
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-27 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 跑通它
 

@@ -1,6 +1,40 @@
+---
+name: hls-synthesis-directives
+description: >
+  Which Vitis HLS optimisation directives actually move the numbers: limiting
+  multiplier allocation is the real area knob, set_directive_unroll fails silently on
+  nested loops, Tcl directives conflict with source pragmas, and coefficient symmetry
+  folding is a measured dead end. Use when choosing directives for a pipelined FIR, when
+  a directive appears to have had no effect, or when deciding between full unrolling and
+  resource sharing.
+license: MIT
+compatibility: Vitis HLS 2020.2, xc7z020clg400-1, 10 ns clock
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-29"
+---
+
 # Vitis HLS 综合与优化指令：哪把闸真的管用
 
 实测：Vitis HLS 2020.2，目标 `xc7z020clg400-1`（PYNQ-Z2），10 ns 时钟（100 MHz），2026-09-28 ~ 09-29。
+
+## 什么时候用
+
+- 要给一个流水线 FIR 选优化指令
+- 加了指令但报告里的数没变，不确定生效没有
+- 在「全展开」和「限流复用」之间拿不定主意
+
+## 什么时候别用
+
+- 纠结的是定点还是浮点 —— 那是数据类型问题
+- 只是要跑一次综合看数 —— 命令见 build/hls/run_synth.tcl 文件头
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-29 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 一、先看结论
 
