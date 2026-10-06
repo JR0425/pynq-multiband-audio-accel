@@ -1,6 +1,40 @@
+---
+name: hls-csim-setup
+description: >
+  Run Vitis HLS C simulation in batch mode: open_project wants a project name
+  rather than a path, csim runs in a temporary directory so relative paths break, and a
+  host g++ syntax check costs seconds where a full HLS pass costs minutes. Use when
+  open_project fails with contains illegal character, when the testbench cannot find its
+  input file, or before iterating on HLS C++ source.
+license: MIT
+compatibility: Vitis HLS 2020.2, Windows batch mode
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-28"
+---
+
 # Vitis HLS 跑 C 仿真（batch 模式）的三个卡点
 
 实测：Vitis HLS 2020.2，Windows 批处理模式，2026-09-28。
+
+## 什么时候用
+
+- 要在 Windows 批处理模式下跑 HLS C 仿真
+- open_project 报 contains illegal character ':'
+- 测试台找不到输入文件
+- 要反复改 HLS 源码、想缩短每一轮的等待
+
+## 什么时候别用
+
+- 要的是综合或布局布线的数 —— 那是 csynth / impl，不是 csim
+- 在 Linux 上跑 —— 路径和 shell 的坑不一样
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-28 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 一、`open_project` 要的是工程名，不是路径
 

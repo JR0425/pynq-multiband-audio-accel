@@ -1,3 +1,15 @@
+---
+name: hls-testbench-template
+description: >
+  A minimal HLS C++ testbench skeleton — read a file, run the kernel, write a
+  file — together with the warning that its simplified signature is not this project's
+  real streaming int16 interface. Use when starting a new HLS testbench from scratch.
+license: MIT
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-25"
+---
+
 # HLS C++ Testbench 模板
 
 > **这只是最小骨架，不是本项目的真实接口。** 下面这个签名（`float*` 进、整段一次处理）
@@ -31,3 +43,19 @@ int main() {
     // 读取 Python 导出的文本数据
     // 对比 Python 基线的输出结果
 }
+
+## 什么时候用
+
+- 要新起一个 HLS 测试台，先要个骨架
+
+## 什么时候别用
+
+- 要改本项目现有的测试台 —— 真实接口在 src/hls/fir_tb.cpp
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-25 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
+

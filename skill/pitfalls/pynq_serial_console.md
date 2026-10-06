@@ -1,3 +1,18 @@
+---
+name: pynq-serial-console
+description: >
+  Read and drive the PYNQ-Z2 serial console from Windows PowerShell without
+  PuTTY, including the three encoding defaults that turn Chinese output into question
+  marks. Use when the board's IP is unknown, when Jupyter will not open, when boot
+  messages are needed, when serial output shows ?????? instead of Chinese, or when a
+  script has to be started on the board itself.
+license: MIT
+compatibility: PYNQ-Z2 image 2.7.0 + Windows 11
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-26"
+---
+
 # PYNQ-Z2 串口控制台
 
 不装 PuTTY，用 Windows 自带的 PowerShell 读板子的串口。
@@ -5,7 +20,21 @@
 
 ## 什么时候用
 
-板子不知道 IP / Jupyter 打不开 / 想看开机报错。串口是不依赖网络的唯一通路。
+- 不知道板子 IP，Jupyter 打不开，或者想看开机报错
+- 要在板子上直接执行命令 —— 网络不通时的唯一通路
+- 串口输出里中文变成 ??????
+
+## 什么时候别用
+
+- 网络是通的，只是想传文件或跑 notebook —— 走 Jupyter 接口更快
+- 想同时开两个串口任务 —— 同一时刻只能有一个进程占着 COM 口
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-26 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 端口号
 

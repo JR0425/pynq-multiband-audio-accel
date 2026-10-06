@@ -1,7 +1,41 @@
+---
+name: pynq-overlay-loading
+description: >
+  Fix No Devices Found when loading a PYNQ overlay, build a minimal PS-only
+  overlay correctly, and compare FPGA output against a software reference by
+  cross-correlation rather than sample by sample. Use when Overlay(...) raises No
+  Devices Found, when a .hwh file turns out to be a zip archive, when validate_bd_design
+  fails on unconnected clock pins, or when a hardware-vs-software correlation comes out
+  far too low.
+license: MIT
+compatibility: PYNQ-Z2 image 2.7.0; Vivado 2020.2 for the bitstream side
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-26"
+---
+
 # PYNQ-Z2 加载 Overlay 的前置条件
 
 `Overlay("xxx.bit")` 报 `No Devices Found`，加 `sudo` 也一样。
 实测：PYNQ-Z2 + PYNQ 2.7.0，2026-09-26。
+
+## 什么时候用
+
+- Overlay("xxx.bit") 报 No Devices Found，加 sudo 也一样
+- 自己出 bit 时 validate_bd_design 失败
+- 拿硬件输出和软件参考对比，相关系数低得不像话
+
+## 什么时候别用
+
+- 用的是出厂 base overlay —— 开机时已经灌好，直接 BaseOverlay("base.bit")
+- 只是想验算法、不碰硬件 —— HLS C 仿真就够
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-26 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 两个原因
 

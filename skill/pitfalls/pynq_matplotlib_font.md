@@ -1,7 +1,40 @@
+---
+name: pynq-matplotlib-font
+description: >
+  Plot on the PYNQ board without ending up with tofu boxes: the image ships only
+  one CJK font and matplotlib 3.1 cannot fall back per character, so Chinese and digits
+  cannot both render. Use when a figure shows squares, when matplotlib warns Glyph
+  missing from current font, or before putting any board-generated figure into a
+  report.
+license: MIT
+compatibility: PYNQ-Z2 image 2.7.0, matplotlib 3.1.2
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-27"
+---
+
 # 板子上画图：中文字体只能二选一
 
 在 PYNQ 板子上用 matplotlib 画图时，中文和数字不能同时正常显示。
 实测：PYNQ-Z2 + PYNQ 2.7.0，matplotlib 3.1.2，2026-09-27。
+
+## 什么时候用
+
+- 板子上画出来的图里中文变成方框
+- 看到 RuntimeWarning: Glyph ... missing from current font
+- 要把板子出的图放进报告
+
+## 什么时候别用
+
+- 在 PC 上画图 —— 本机字体齐全，不受这条限制
+- notebook 正文和 print 输出 —— 那些不走 matplotlib，中文正常
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-27 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 现象
 

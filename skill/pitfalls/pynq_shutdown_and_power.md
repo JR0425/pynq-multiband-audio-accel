@@ -1,7 +1,39 @@
+---
+name: pynq-shutdown-and-power
+description: >
+  Decide whether a PYNQ-Z2 can be unplugged or must be shut down in software
+  first, and how to tell that the halt has actually finished. Use when the user asks
+  how to power the board off, whether it is safe to just pull the cable, or worries
+  about corrupting the SD card, and before packing the board away for the night.
+license: MIT
+compatibility: PYNQ-Z2 image 2.7.0
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-25"
+---
+
 # PYNQ-Z2 断电与关机
 
 什么时候可以直接拔，什么时候必须先软件关机。
 实测：PYNQ-Z2 + PYNQ 2.7.0 镜像，2026-09-25。
+
+## 什么时候用
+
+- 要收起来过夜、搬动板子之前
+- 刚改过配置，或刚跑过会写盘的命令（pip / apt / 写文件 / 改网络）
+- 不确定「现在拔掉会不会弄坏 SD 卡」
+
+## 什么时候别用
+
+- 只是想重启 Jupyter 或重跑一个脚本 —— 不用断电
+- 板子正在录音、正在写文件 —— 先让它停干净，再走本文流程
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-25 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 分三档
 

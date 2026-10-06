@@ -1,17 +1,69 @@
+---
+name: audio-processing-bugs
+description: >
+  Three recurring Python audio-processing bugs: DC offset spiking the 0 Hz bin,
+  slicing a variable for a plot and truncating the saved file, and normalising an FFT
+  the wrong way. Use when a spectrum shows a huge spike at 0 Hz, when the output wav
+  length does not match the input, or when a figure that should show two curves appears
+  to show one.
+license: MIT
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-25"
+---
+
 # Python 音频处理常见 Bug 避坑指南
 
+## 什么时候用
+
+- 频谱在 0 Hz 处出现一根巨峰，把正常频段压没了
+- 输出音频的时长和输入对不上
+- 图里画了两条线，看起来只有一条
+
+## 什么时候别用
+
+- 问题出在硬件通路上 —— 那看 pynq_audio_playback.md
+- 频谱已经用 Welch 平均过还是这样 —— 多半不是这一页的原因
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-25 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
+
 ## 症状
-1. 频谱图在 0Hz 处出现巨大尖峰，完全掩盖了正常的频段。
-2. 生成的音频文件时长与原始文件不符（例如 10 秒变 2 秒）。
-3. 图表中两条线完全重叠，看起来只有一条。
 
-## 原因
-1. **直流偏移（DC Offset）**：音频数据存在极微小的正负不平衡，FFT 计算时在 0Hz 产生巨大能量。
-2. **变量作用域污染**：为了画图截取了 `x = x[:n]` 或 `output = output[:n]`，导致写入文件时只写入了截断后的数据。
-3. **数据源单一**：只用了左声道（440Hz），导致右声道的 880Hz 信号缺失，滤波效果无法展示。
+1. 频谱图在 0 Hz 处出现一根巨峰，把正常频段全压没了
+2. 生成的音频时长和原始文件对不上（比如 10 秒变 2 秒）
+3. 图里两条线完全重叠，看起来只有一条
 
-## 解决方案
-1. **去直流**：在 FFT 和保存前执行 `x = x - np.mean(x)`。
-2. **隔离逻辑**：画图时不要用切片覆盖原始变量，若需要截取，使用新变量如 `x_view = x[:n]`。
-3. **FFT 归一化**：计算幅度时用 `np.abs(np.fft.fft(data)) / n * 2`，防止 Y 轴出现不合理的高值。
-4. **坐标轴缩放**：使用 `plt.xlim(0, 2000)` 和 `plt.ylim(0, 1.5)` 聚焦关键频段与正常幅度。
+## 原因和解决
+
+**1. 直流偏移。** 音频数据有极微小的正负不平衡，FFT 会在 0 Hz 上把它堆成一根巨峰。
+
+算频谱和存文件之前先减均值：
+
+```python
+x = x - np.mean(x)
+```
+
+**2. 画图时切片覆盖了原始变量。** `x = x[:n]` 看着只是取一段来画，
+实际上把 `x` 本身截断了，后面写文件写的就是截断后的数据。
+
+要截就换一个新变量：
+
+```python
+x_view = x[:n]        # 对
+x = x[:n]             # 错 —— 后面的写文件也跟着被截
+```
+
+**3. 只喂了一个声道。** 素材左声道 440 Hz、右声道 880 Hz 时，只取左声道
+会让 880 Hz 那一路整个消失，滤波效果看不出差别。
+
+**4. FFT 幅度没归一化、坐标轴没限范围。** 幅度用 `/ n * 2`，否则 Y 轴会出现
+不合理的高值。画频谱时先 `plt.xlim` / `plt.ylim` 聚焦要看的那一段 ——
+但范围按实际信号定，别照抄。
+
+本项目的基线脚本 `src/python/multiband_baseline.py` 这几条都已经处理过。
+这篇留着是因为新写一个分析脚本时还会再犯。

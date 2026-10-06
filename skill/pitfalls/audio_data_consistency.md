@@ -1,6 +1,38 @@
+---
+name: audio-data-consistency
+description: >
+  Keep filter coefficients and audio data on the same sample rate, and make sure
+  a hardware-versus-software comparison actually compares the two things it claims to.
+  Use when board output and the Python baseline each look fine on their own but do not
+  match, when adding an audio source whose sample rate differs from the design, or when
+  writing a comparison script and the question is what its two ends should be.
+license: MIT
+metadata:
+  version: "1.0.1"
+  updated: "2026-09-28"
+---
+
 # 系数和数据必须同一个采样率（否则软硬件对撞是假的）
 
 实测：2026-09-28。
+
+## 什么时候用
+
+- 板子输出和 Python 基线「各自看着都对」，一比就是不像
+- 要新接一个音频源，采样率和设计不一样
+- 要写一个「硬件 vs 参考」的比对脚本，得先定两端的对象
+
+## 什么时候别用
+
+- 只是浮点误差级别的对不上 —— 那种看 SNR 就够
+- 两边已经确定用的是同一套系数、同一个采样率
+
+## 修订记录
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| 1.0.0 | 2026-09-28 | 初版 |
+| 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
 
 ## 症状
 
