@@ -24,8 +24,10 @@
 #      不是"FPGA 白得的便宜"。
 #   2. **CPU 那边用的是 scipy 的 C 实现**,不是 Python 循环。
 #      也就是说这是"优化过的软件",不是"随便写写的软件"。
-#   3. **核的耗时里含 Python 写寄存器 + cache 维护**。实测这部分很小
-#      （见下,测量值和理论吞吐几乎相同）,但要写清楚。
+#   3. **核的耗时里含 Python 写寄存器 + cache 维护 + 等 DONE 的轮询**。
+#      这一条在 v18（450 拍/采样）时几乎看不见 —— 硬件本身 4.5 µs，
+#      Python 那点固定开销被摊掉了。**核改成 28 拍/采样之后它就不再可忽略**，
+#      会直接决定实测值。所以下面会把它算出来、单独打一行，不再一句"很小"带过。
 #
 # 用法（板子上,要 root）：
 #   echo xilinx | sudo -S env XILINX_XRT=/usr \
@@ -49,7 +51,16 @@ N_TAPS = 193
 SECONDS = 3.0
 REPEAT = 3
 FPGA_MHZ = 100.0
-CYCLES_MEASURED = 450          # v18_axi_shell 的拍/采样,见 data/results/impl_metrics.md
+# 拍/采样,见 data/results/impl_metrics.md。
+# v18_axi_shell 是 450；v19_shift_chain（改了延迟线写法）之后是 28。
+# 默认按现在的 bit（v19）算，要复现旧数就 CYCLES_MEASURED=450。
+CYCLES_MEASURED = int(os.environ.get("CYCLES_MEASURED", "28"))
+# 每块多少采样。核的 m_axi 缓冲深度是 8192，8000 是留了余量。
+# **这个值以前硬编码 8000，是错的** —— 上面那个 4.5 µs 里 Python 开销只占 0.2%，
+# 是因为核本身慢（450 拍），Python 那点开销被摊掉了。核快 16 倍之后
+# 每块固定开销会顶上来，块长就成了要量、要调的参数。
+# 所以这里改成可传参，配合 fir_chunk_sweep.py 一起看。
+CHUNK = int(os.environ.get("CHUNK", "8000"))
 
 N = int(FS * SECONDS)
 budget_us = 1e6 / FS           # 48 kHz 的实时预算,µs/采样
@@ -154,21 +165,38 @@ ol = Overlay(BITFILE)
 k = FirMultiband(ol.fir_multiband_0.mmio)
 print("   核地址 %s" % hex(ol.ip_dict["fir_multiband_0"]["phys_addr"]))
 
-k.process(x16[:8000], reset=True)     # 预热
+k.process(x16[:min(CHUNK, N)], reset=True)     # 预热
 fpga_best = None
 for _ in range(REPEAT):
-    y16, dt, blocks = k.process(x16, reset=True, chunk=8000)
+    y16, dt, blocks = k.process(x16, reset=True, chunk=CHUNK)
     fpga_best = dt if fpga_best is None else min(fpga_best, dt)
 fpga_us = fpga_best / N * 1e6
+nblk = len(blocks)
 
-print("   跑 %d 次取最快：%.4f 秒（切了 %d 块）" % (REPEAT, fpga_best, len(blocks)))
+print("   跑 %d 次取最快：%.4f 秒（每块 %d 个采样，切了 %d 块）"
+      % (REPEAT, fpga_best, CHUNK, nblk))
 print("   单采样 %.3f µs   实时倍率 %.2fx" % (fpga_us, budget_us / fpga_us))
 
+# ---- 把"硬件"和"Python 来回"拆开 ----
+# 实测 = 硬件吞吐 + 每块固定开销/块长。这两项现在**差不多大**了，
+# 不能像 v18 那版一样合成一个数就完事。
 theo_us = CYCLES_MEASURED / (FPGA_MHZ * 1e6) * 1e6
-print("   理论吞吐：%d 拍 @ %g MHz = %.3f µs/采样（实测 %.3f，差 %.1f%%）"
-      % (CYCLES_MEASURED, FPGA_MHZ, theo_us, fpga_us,
-         100.0 * (fpga_us - theo_us) / theo_us))
-print("   → 实测贴着理论值，说明 Python 写寄存器和 cache 维护的开销在这个规模下可以忽略。")
+ovh_us = fpga_us - theo_us
+print("   硬件理论上限：%d 拍 @ %g MHz = %.3f µs/采样" % (CYCLES_MEASURED, FPGA_MHZ, theo_us))
+print("   实测 − 理论  = %.3f µs/采样，折成每块 **%.1f µs** 的固定开销"
+      % (ovh_us, ovh_us * CHUNK))
+print("      （固定开销 = 写 10 个寄存器 + 2 次 cache flush + 1 次 invalidate + 轮询 DONE）")
+if theo_us > fpga_us:
+    print("   ⚠️ 实测比理论还快 —— 要么量到的是噪声，要么拍数不是 %d。"
+          "先确认板上这版 bit 是不是 v19，再 CYCLES_MEASURED=<实际值> 重跑一次。"
+          % CYCLES_MEASURED)
+elif ovh_us < 0.1 * theo_us:
+    print("   → 固定开销不到硬件的 10%，这个块长下可以忽略。")
+else:
+    print("   → **固定开销占实测的 %.0f%%**，它已经不是小数了。" % (100.0 * ovh_us / fpga_us))
+    print("     这一段不是硬件，是 Python 的来回；核变快之后它就成了主项。")
+    print("     压它只有两条路：块调大（摊薄固定开销），或者改成 PL 连续搬、")
+    print("     Python 不参与每一块。逐档量法见 fir_chunk_sweep.py。")
 
 # ---------------- 对撞 ----------------
 print("\n" + "=" * 72)
@@ -178,16 +206,20 @@ print("   CPU   %.3f µs/采样   (%6.2fx 实时)" % (cpu_us, budget_us / cpu_us
 print("   核    %.3f µs/采样   (%6.2fx 实时)" % (fpga_us, budget_us / fpga_us))
 print("   → 核比同一颗芯片上的 ARM 快 **%.1f 倍**" % (cpu_us / fpga_us))
 print()
-print("   ⚠️ 引用这个数必须带上这三条，否则会虚高：")
+print("   ⚠️ 引用这个数必须带上这四条，否则会虚高：")
 print("      1. 两边精度不同 —— CPU 是 float64，核是 Q1.15 定点 16 位。")
 print("         核做的是更粗的活，快的一部分是这一条换来的（定点设计的取舍，")
 print("         不是 FPGA 白得的便宜）。")
 print("      2. CPU 那边是 scipy 的 C 实现，属于「优化过的软件」，不是随便写的。")
-print("      3. 核的耗时含 Python 写寄存器 + cache 维护（上面那行证明它很小）。")
+print("         也不是极限 —— 手写 NEON float32 的 FIR 还能再快 3~5 倍（估计值，没试过）。")
+print("      3. 核的耗时含 Python 写寄存器 + cache 维护 + 轮询，上面已经把这一项")
+print("         单独算出来了；块长越小它越重。")
+print("      4. 两边工作量对等：都是每采样 579 次有效乘法（核是 3 × 195 = 585，")
+print("         尾巴上 6 个是补零）。**这一条以前写错过**，见 data/results/accel_cpu_vs_fpga.md。")
 print()
 print("   两个都够实时（预算 %.1f µs/采样）。**板子上的账不在吞吐上** ——" % budget_us)
 print("   ARM 那个数只是勉强实时，一旦要同时干别的（录音、写文件、跑界面）就顶不住；")
-print("   核是**确定性的 4.5 µs**，不随系统负载变。这才是上硬件的理由。")
+print("   核是**确定性的 %.3f µs**（硬件那一段不随负载变），这才是上硬件的理由。" % theo_us)
 
 # ---------------- 结果一致性 ----------------
 # 两边精度不同，不可能逐位一样；这里只查"是不是同一件事"：
