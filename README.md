@@ -11,11 +11,11 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 
 - Python 参考基线用 48 kHz、4 段相减式分频、193 抽头线性相位低通。最近一次本地运行记在 `data/results/baseline_metrics.md`。
 - 自研 HLS 核的单独综合与实现结果在 `data/results/impl_metrics.md`。
-- 核已经和 PYNQ 音频 codec 一起集成进整机 overlay。`board/overlay/fir.bit` 就是它，由 `board/overlay/build_fir.tcl` 构建；`board/scripts/fir_core.py` 走 AXI-Lite 驱动这个核。在板子上，核处理了 144,000 个采集样本（18 块），直通结果按 96 拍群延迟逐位对齐、错配 0 个；但采集电平近乎静音，不能作为可听的麦克风压缩 A/B 证据。合成信号压缩检查通过。
-- 同芯片实测 —— Zynq PS 侧的 ARM 与跑同一算法的 PL 核：每采样 6.116 µs 对 4.507 µs，加速比 1.4 倍。`data/results/accel_cpu_vs_fpga.md` 记着这个数的前提，以及引用时必须一起带上的免责说明。
+- 核已经和 PYNQ 音频 codec 一起集成进整机 overlay。`board/overlay/fir.bit` 就是它，由 `board/overlay/build_fir.tcl` 构建；`board/scripts/fir_core.py` 走 AXI-Lite 驱动这个核。在板子上，核处理了 144,000 个采集样本（18 块），直通结果按 96 拍群延迟逐位对齐、错配 0 个；但那次采集电平近乎静音，不能作为可听的麦克风压缩 A/B 证据。合成信号压缩检查通过。麦克风 → 核 → 耳机「边录边放」的真·实时通路已经跑通（`board/scripts/fir_live.py`）：连续 8/10/24 秒全部 1.00 倍、一块不丢，24 秒那档 2401 块、960000/960000 采样逐位自检通过；核接口没改，`fir.bit` 没重跑。
+- ⛔ 同芯片 ARM vs PL 加速比：**过期**。原来记的是 Zynq PS 侧 ARM 每采样 6.116 µs、PL 核 4.507 µs、加速比 1.4 倍；`board/scripts/compare_cpu_fpga.py` 已经改过，但**还没在板上重跑**，新值未知，旧的 1.4 倍不能再引用，等重跑后再补。
 - 早期还测过一个开源参考 overlay。结果在 `data/results/reference_overlay_metrics.md`，和自研核无关，别混着引用。
 - 当前英文海报在 `report/poster_en/pynq_multiband_audio_poster_v2.pptx`；早期 `pynq_multiband_audio_poster_draft.pptx` 已被它取代。海报明确把核级 OOC 资源数据和板级吞吐数据分开。
-- RTL 和 Python/HLS/RTL 三路对比还没做；`src/rtl/` 是空的。
+- Python/HLS/RTL 三实现对比还没做。`src/rtl/fir_lp.v` 已存在（只有 3 个低通，没有相减 / DRC / AXI 外壳），xsim 逐位对拍通过。
 
 ## 目录结构
 
@@ -23,7 +23,7 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 | --- | --- |
 | `src/python/` | Python 基线、系数与测试数据导出、比对与分析工具 |
 | `src/hls/` | HLS 核与 C 测试台 |
-| `src/rtl/` | 预留给 RTL 实现；目前没有自研 RTL 源码 |
+| `src/rtl/` | 自研 RTL：`fir_lp.v`（3 个低通，无相减 / DRC / AXI 外壳） |
 | `sim/hls_csim/` | C 仿真用的 FIR 系数文件 |
 | `build/hls/` | HLS 与 Vivado 的脚本、指令文件和报告 |
 | `board/` | PYNQ 笔记本、整机 overlay（`overlay/fir.bit`）、核驱动、板级脚本 |
@@ -80,8 +80,9 @@ python src/python/compare_golden_vs_hw.py
 
 `board/overlay/fir.bit` 是本项目的 overlay：自研多频段 HLS 核加 PYNQ 音频 codec。
 `board/scripts/fir_core.py` 是寄存器级驱动；`board/scripts/fir_audio_loop.py`
-从麦克风录音、过核、再放出来；`board/scripts/fir_selftest.py` 做直通和分块连续性检验；
-`board/scripts/compare_cpu_fpga.py` 在同一块板子上量 ARM 基线与核的对比。该 1.4× 数值比较 ARM float64/scipy 与 PL Q1.15，未与手写 NEON 实现比较。
+从麦克风录音、过核、再放出来（一块一块处理）；`board/scripts/fir_live.py` 跑麦克风 → 核 → 耳机的真·实时通路；
+`board/scripts/fir_selftest.py` 做直通和分块连续性检验；
+`board/scripts/compare_cpu_fpga.py` 在同一块板子上量 ARM 基线与核的对比（⛔ 该脚本已改但尚未在板上重跑，旧的 1.4× 对比已过期，别引用）。
 
 `overlay/ps_only.bit` 是更早的板级放音产物，PL 里是空的。
 `overlay/audio.bit` 是更早的「我们自己建的工程能出声」里程碑产物，只有音频 codec。

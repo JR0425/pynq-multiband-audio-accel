@@ -2,13 +2,13 @@
 
 ## Design report draft
 
-**Status as of 2026-10-01:** the Python reference path and the custom HLS core are present. The core is integrated into a board overlay together with the PYNQ audio codec (`board/overlay/fir.bit`), has processed real captured audio on the board, and has been measured on the same chip against the Zynq ARM running the identical algorithm. Out-of-context and integrated-in-overlay figures are reported separately and labelled; the reference-overlay measurements are a different experiment and are kept apart from the custom core.
+**Status as of 2026-10-07:** the Python reference path and the custom HLS core are present. The core is integrated into a board overlay together with the PYNQ audio codec (`board/overlay/fir.bit`), has processed real captured audio on the board, and now runs a real-time microphone → core → headphone duplex path (section 5.4). Out-of-context and integrated-in-overlay figures are reported separately and labelled; the reference-overlay measurements are a different experiment and are kept apart from the custom core. The same-chip ARM comparison script has been revised (`compare_cpu_fpga.py`) but has not been re-run on the board, so no current speedup ratio is quoted.
 
 ## 1. Project goal
 
 The project explores a multiband dynamic-range-compression (DRC) audio pipeline on a PYNQ-Z2 board. DRC reduces the level of signals above a threshold. The algorithm divides audio into frequency bands, applies the same compression rule to each band, and sums the results.
 
-The planned comparison uses a Python reference, an HLS implementation, and an RTL implementation. At this snapshot the repository contains the Python reference and HLS source. No custom RTL source or three-way comparison is present.
+The planned comparison uses a Python reference, an HLS implementation, and an RTL implementation. At this snapshot the repository contains the Python reference, the HLS source, and low-pass RTL (`src/rtl/fir_lp.v`, three low-pass filters only — no subtractive band, DRC, or AXI shell), checked bit-for-bit against the C simulation in xsim. The three-way comparison is not yet present.
 
 ## 2. Current algorithm
 
@@ -45,7 +45,7 @@ The diagram separates the project's custom HLS core from the open-source referen
 
 The current local run used Python 3.9.12, NumPy 2.0.2, SciPy 1.13.1, Matplotlib 3.9.4, and SoundFile 0.13.1. The latest best-of-five processing run took 89.5 ms for 10.58 s of audio, or 0.176 µs per sample and 118.3× host real time. The host CPU model was unavailable, so this is a local reference measurement, not a portable benchmark, and it must not be divided by the board-side figures — a 3 GHz desktop x86 and a 100 MHz FPGA differ by orders of magnitude by construction.
 
-The comparison that carries the speedup claim is measured on the board itself, on the same chip, with the same algorithm on both sides: the Zynq ARM in software against the PL core. That measurement gives 6.116 µs against 4.507 µs per sample, a 1.4× ratio. `data/results/accel_cpu_vs_fpga.md` records the conditions and caveats that must travel with the number: CPU float64 versus core Q1.15, scipy's optimized C implementation (but no hand-written NEON comparison), and the core's symmetry optimization, which halves its multiplication count relative to this CPU run. The PL time includes software register/cache handling; at this block size it was measured to be negligible relative to the 4.500 µs schedule.
+The comparison that would carry the speedup claim is measured on the board itself, on the same chip, with the same algorithm on both sides: the Zynq ARM in software against the PL core. That measurement is currently stale: the board-side comparison script (`compare_cpu_fpga.py`) was revised since the last board run, so the previously recorded 6.116 µs against 4.507 µs per sample (a 1.4× ratio) no longer applies and no current ratio is quoted here. `data/results/accel_cpu_vs_fpga.md` records the conditions and caveats that must travel with any such number: CPU float64 versus core Q1.15, and scipy's optimized C implementation (but no hand-written NEON comparison). Both sides compute the same number of effective multiplications (579 per sample); the earlier claim that the core halved its multiplication count via filter symmetry was wrong (`FIR_FOLD` is off). The PL time includes software register/cache handling; at this block size it was measured to be negligible relative to the scheduled per-sample time, which is now 0.28 µs.
 
 The current run reported a maximum coefficient-sum reconstruction error of `3.469e-18` before DRC. Its output artifacts are `data/audio/multiband_output.wav` and `data/figures/multiband_comparison.png`. The independent 1,000-sample test vector used by the HLS testbench is in `data/audio/test_input.txt`; the corresponding Python golden output is `data/results/python_golden.txt`.
 
@@ -55,25 +55,25 @@ The current run reported a maximum coefficient-sum reconstruction error of `3.46
 
 | Metric | Core alone (out of context) | Core inside the board overlay |
 | --- | ---: | ---: |
-| LUT | 3,962 (7.5%) | 6,422 (12.07%) |
-| Flip-flops | 5,514 (5.2%) | 9,416 (8.85%) |
-| DSP | 202 (91.8%) | 202 (91.82%) |
-| BRAM | 51.5 (36.8%) | 54.5 (38.9%) |
-| Worst negative slack at a 10 ns constraint | +1.624 ns | +0.256 ns |
+| LUT | 3,670 (6.90%) | 6,127 (11.52%) |
+| Flip-flops | 5,547 (5.21%) | 9,427 (8.86%) |
+| DSP | 200 (90.91%) | 200 (90.91%) |
+| BRAM | 49 (35.00%) | 52 (37.14%) |
+| Worst negative slack at a 10 ns constraint | +1.832 ns | +1.283 ns |
 | Failing endpoints | 0 | 0 |
-| HLS schedule | 449 cycles/sample | 450 cycles/sample |
+| HLS schedule | 28 cycles/sample | 28 cycles/sample |
 
 The out-of-context column describes the core by itself and excludes the surrounding AXI, audio, and overlay logic. The integrated column describes the full design as built into `board/overlay/fir.bit`. Use the integrated column when describing the system, and state which column a figure came from.
 
-At 100 MHz, 450 cycles correspond to 4.500 µs per sample against the 20.83 µs sample period at 48 kHz — a 4.6× real-time margin. The board measurement of the same core is 4.507 µs per sample, within 0.2% of the scheduled figure.
+At 100 MHz, 28 cycles correspond to a theoretical 0.28 µs per sample against the 20.83 µs sample period at 48 kHz — a 55.6× real-time margin (about 67× on the longer block measured). The board measurement of the same core is 0.4 µs per sample over a 1,000-sample run, and 0.311 µs on the longer block.
 
-The core's remaining cost is dominated by data movement, not arithmetic. Its synthesis loop table attributes 398 of the 450 cycles to shifting the 193-entry delay line; the three low-pass filters together take 11 cycles. A circular buffer with a rotating read index would remove that movement, and the estimate in `data/results/impl_metrics.md` puts it at several times faster. It is recorded as future work and is deliberately not implemented: changing the structure would invalidate the verified timing and require the whole on-board check suite to be repeated.
+The core's cost was dominated by data movement, not arithmetic: the synthesis loop table attributed 398 of the original 450 cycles to shifting the 193-entry delay line, with the three low-pass filters together taking 11 cycles. That movement is now removed by the compile-time switch `-DFIR_SHIFT_CHAIN=1`, which cuts the schedule from 450 to 28 cycles per sample without changing the algorithm; the switch defaults off and the default build path is byte-for-byte unchanged. The change is implemented and verified on the board, not left as future work.
 
 The implementation history and measurement limitations are documented in `data/results/impl_metrics.md`. Do not compare the out-of-context rows with rows measured using a different flow without accounting for the methodology change.
 
 ## 5. Board evidence
 
-The project overlay is `board/overlay/fir.bit`: the custom multiband HLS core together with the PYNQ audio codec, built from `board/overlay/build_fir.tcl`. `board/scripts/fir_core.py` drives the core over AXI-Lite, and `board/scripts/fir_audio_loop.py` runs microphone → core → headphone one block at a time.
+The project overlay is `board/overlay/fir.bit`: the custom multiband HLS core together with the PYNQ audio codec, built from `board/overlay/build_fir.tcl`. `board/scripts/fir_core.py` drives the core over AXI-Lite, and `board/scripts/fir_audio_loop.py` runs microphone → core → headphone one block at a time. A real-time duplex path (`board/scripts/fir_live.py`, with its own streaming audio path in `board/scripts/audio_stream.cpp` and `build_audio_stream.sh`) now runs microphone → core → headphone continuously, without any change to the core.
 
 The recorded on-board checks passed:
 
@@ -151,9 +151,9 @@ Two consequences are worth stating. First, a per-band instantaneous compressor c
 
 ### 5.4 Demonstration path
 
-The demonstration is block-at-a-time, not a real-time stream: the script reads a fixed-length input, runs the core over it, and plays the result back. Making it sample-by-sample would need a streaming interface on the core, which would invalidate the verified schedule and timing. The core's throughput is not the obstacle; the audio port's buffer mechanism is.
+The demonstration now runs as a real-time duplex stream: `board/scripts/fir_live.py` drives microphone → core → headphone continuously for 8, 10, and 24 s, all at 1.00× real time with no block dropped (the 24 s run self-checked 960,000 of 960,000 samples bit for bit). This was achieved without changing the core or its interface — `fir.bit` was not rebuilt, and no streaming interface was added. The core's throughput was never the obstacle; the bottleneck is on the Python/PS side: the audio driver's `play()` spends 3.33 ms per call on eight I2C transactions, the audio IP has no DMA so streaming in and out each occupy a core, and the format conversion runs on the sample-feeding thread, which has zero margin.
 
-The same-board speedup measurement is in section 3. `data/results/reference_overlay_metrics.md` records a different, earlier experiment: an open-source 27-tap reference overlay. It validates a board-side DMA path but does not execute the custom core and must not be presented as this project's accelerator result.
+The same-board speedup comparison — currently stale pending a re-run on the board (see section 3) — is discussed there. `data/results/reference_overlay_metrics.md` records a different, earlier experiment: an open-source 27-tap reference overlay. It validates a board-side DMA path but does not execute the custom core and must not be presented as this project's accelerator result.
 
 ## 6. Validation status
 
@@ -170,8 +170,8 @@ The same-board speedup measurement is in section 3. `data/results/reference_over
 | Custom-core board audio through the real capture path | Complete: 144,000 samples in 18 blocks, 0 mismatches |
 | Custom-core board audio through the fixed input | Complete on 2026-10-06: bypass 0 mismatches over 288,000 samples; compressed output differs at 287,910 of 288,000 |
 | Compressor input-output level curve | Measured on 2026-10-06: 40.0 dB in against 31.3 dB out, narrowed 8.7 dB; figure in `data/figures/drc_transfer_curve.png`, raw run in `data/results/fir_audio_loop_run_20261006.txt` |
-| Same-chip ARM against PL core timing | Measured: 6.116 µs against 4.507 µs per sample, 1.4× |
-| RTL implementation and Python/HLS/RTL comparison | Pending; `src/rtl/` is empty |
+| Same-chip ARM against PL core timing | Stale: `compare_cpu_fpga.py` was revised but has not been re-run on the board, so the earlier 6.116 µs against 4.507 µs per sample (1.4×) no longer applies and no ratio is currently quoted |
+| RTL implementation and Python/HLS/RTL comparison | Low-pass RTL present (`src/rtl/fir_lp.v`, three low-pass filters only — no subtractive band, DRC, or AXI shell), verified bit for bit against the C simulation in xsim; the three-way comparison remains pending |
 
 The current stored HLS output passes comparison against the newly generated 193-tap Python golden file — 75.4 dB SNR at best lag 0 — and the stored transparent output matches the input delayed by the expected 96 samples bit for bit. The C simulation behind those outputs was rebuilt from source on 2026-09-30 with Vitis HLS 2020.2, so the producing toolchain and flags are on record rather than inferred from filenames: `build/hls/run_csim.tcl` drives the build and the coefficient-width sweep outputs are kept in `data/results/fixed_dw16_cw12/16/18/20.txt`.
 
@@ -194,7 +194,7 @@ The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the READ
 
 1. The target environment is settled: PYNQ 2.7 with Vivado/Vitis HLS 2020.2 is the project's declared toolchain, and it is what all board evidence in this repository was produced with.
 2. The 193-tap C simulation was rebuilt from source on 2026-09-30 with the documented toolchain and compared against the regenerated Python golden data; the record is in section 6 and the raw outputs are in `data/results/`.
-3. Produce the same-input Python/HLS/RTL comparison after an RTL implementation exists.
+3. Produce the same-input Python/HLS/RTL comparison. Low-pass RTL now exists (`src/rtl/fir_lp.v`); the subtractive band, DRC, and AXI shell do not yet.
 4. Choose the final compressor parameter set. The measurements bound the choice — set 1 narrows the frame-level dynamic range by 1.9 dB, set 6 by 6.5 dB — but which one ships is a design preference (a heavier setting makes the effect visible at the cost of a larger change to the timbre), not something the measurements decide. The same setting must be written back into the board script and used for the video and the poster.
 5. Record the demonstration video from the board evidence, review the English poster, and run a clean-machine reproduction.
 

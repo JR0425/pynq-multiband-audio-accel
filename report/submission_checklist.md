@@ -1,6 +1,6 @@
 # Submission Checklist
 
-Status updated 2026-10-01 from the files currently present in this repository. A checked box means repository evidence exists; it does not replace team review or a live board demonstration.
+Status updated 2026-10-07 from the files currently present in this repository. A checked box means repository evidence exists; it does not replace team review or a live board demonstration.
 
 ## Repository and Python work
 
@@ -20,10 +20,10 @@ Status updated 2026-10-01 from the files currently present in this repository. A
 - [x] Reference overlay board measurements are separately documented in `data/results/reference_overlay_metrics.md`.
 - [x] Custom HLS core integrated into the board overlay: `board/overlay/fir.bit`, built by `board/overlay/build_fir.tcl`; timing and utilisation in `board/overlay/fir_timing.rpt` and `fir_util.rpt`.
 - [x] Custom-core board measurement: 144,000 samples of captured audio through the core in 18 blocks, bit-exact against the reference; bypass and block-continuity checks also passed.
-- [x] Same-chip speedup measured: ARM 6.116 µs against the core's 4.507 µs per sample, 1.4×, with caveats recorded in `data/results/accel_cpu_vs_fpga.md`.
-- [ ] Live audio demonstration clip: the saved 2026-10-01 capture was nearly silent (effective value 1,342), so the audible microphone A/B is still outstanding. The script demonstrated compression with a synthetic signal; rerun with a usable mic or line input and record the clip.
+- [ ] Same-chip ARM-versus-core speedup: stale. `compare_cpu_fpga.py` was revised but has not been re-run on the board, so the previously recorded ARM 6.116 µs against the core's 4.507 µs per sample (1.4×) no longer applies and no current ratio is quoted. Caveats for any such number are recorded in `data/results/accel_cpu_vs_fpga.md`.
+- [ ] Live audio demonstration clip: the real-time microphone → core → headphone path is working (`board/scripts/fir_live.py`; 8/10/24 s runs, all 1.00× real time, no block dropped, with the 24 s run self-checking 960,000/960,000 samples bit for bit), so the remaining step is only to record the clip. The earlier saved 2026-10-01 capture was nearly silent (effective value 1,342).
 - [ ] Python/HLS/RTL comparison on the same input and with documented alignment and precision.
-- [ ] RTL implementation and RTL simulation evidence.
+- [x] RTL implementation and RTL simulation evidence: `src/rtl/fir_lp.v` (three low-pass filters only — no subtractive band, DRC, or AXI shell) passes a bit-for-bit xsim comparison against the C simulation. The full three-way comparison is still outstanding.
 
 ## Documentation and presentation
 
@@ -39,6 +39,6 @@ Status updated 2026-10-01 from the files currently present in this repository. A
 ## Final gate
 
 - [ ] All final source and build files needed for reproduction are present.
-- [x] End-to-end audio path demonstrated on the target board: microphone → core → headphone, block-at-a-time, in `board/scripts/fir_audio_loop.py`. A sample-by-sample real-time stream is not implemented.
+- [x] End-to-end audio path demonstrated on the target board: microphone → core → headphone. A block-at-a-time path exists in `board/scripts/fir_audio_loop.py`, and a real-time duplex stream is implemented in `board/scripts/fir_live.py` (8/10/24 s runs, all 1.00× real time, no block dropped), with no change to the core or its interface.
 - [ ] All performance claims in the report and poster cite the correct measurement scope.
 - [ ] Submission package is checked against the official competition guide.
