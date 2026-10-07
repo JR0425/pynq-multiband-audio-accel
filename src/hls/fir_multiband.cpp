@@ -147,6 +147,13 @@
 #define FIR_FOLD 0
 #endif
 
+/* 移位循环的写法开关（见下面 for(n) 里的长注释）：
+ * 0 = 直写 `hist[k] = hist[k-1]`（有环依赖，编译器只能一拍一格地跑）
+ * 1 = 改成 `prev` 串接写法，语义完全相同，但能被展成真正的移位寄存器 */
+#ifndef FIR_SHIFT_CHAIN
+#define FIR_SHIFT_CHAIN 0
+#endif
+
 #if FIR_FOLD
 /* 折叠后要算多少项：N_TAPS/2 对 + 1 个中心抽头 */
 #define N_FOLD ((N_TAPS + 1) / 2)
@@ -274,6 +281,31 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
          *
          *   要改的话标准做法是**环形缓冲区 + 转动的读下标**，每采样零搬运。
          *   没做 —— 设计已定案，改它要连带重跑综合、时序和全套上板验证。 */
+#if FIR_SHIFT_CHAIN
+        /* ---- 移位写成"串起来的临时变量"（FIR_SHIFT_CHAIN=1）----
+         * 和下面那段**语义完全相同**（hist[k] 一律取旧的 hist[k-1]），
+         * 但写法让 HLS 能真的把它展成移位寄存器：
+         *
+         *   展开前：hist[k] = hist[k-1] —— 有环依赖（distance 1），
+         *           C 语义要求按顺序执行，**编译器必须拒绝展开**
+         *           （日志：`II Violation ... carried dependence constraint`）。
+         *           所以它只能一拍一格地跑：194 次移位 = 194 拍。
+         *   展开后：依赖只落在标量 prev 上，展平之后就是**一根根的线**，
+         *           零逻辑、零拍数 —— 这才是"寄存器之间接几根线"的原意。
+         *
+         * ⚠️ 前提是 hist 必须全在寄存器里（配 -DFIR_HIST_FULL）。 */
+        {
+            data_t prev = samp_in(in[n]);
+            for (int k = 0; k < N_TAPS_ALLOC; k++) {
+#if FIR_PRAGMA
+#pragma HLS UNROLL
+#endif
+                data_t old = hist[k];
+                hist[k] = prev;
+                prev = old;
+            }
+        }
+#else
 #if FIR_PRAGMA
 #pragma HLS UNROLL
 #endif
@@ -284,6 +316,7 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
          * 不是数值换算，硬件里零成本（见 fir_types.h 的 samp_in）。
          * 浮点模式下这里才是"量化发生的地方"。 */
         hist[0] = samp_in(in[n]);
+#endif
 
         /* ---- 3 个低通各自算一遍 ---- */
         acc_t ylp[N_LP];
