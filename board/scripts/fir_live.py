@@ -4,7 +4,7 @@
 ================================ 为什么现在能做 ================================
 三条都已经在这块板子上实测过，缺一条这件事就做不成：
 
-  ① 核够快       实测 **0.311 µs/采样**，48 kHz 的预算 20.83 µs —— 余量 67 倍
+  ① 核够快       实测 **0.317 µs/采样**（每块 8000 点），48 kHz 的预算 20.83 µs —— 余量 65.7 倍
   ② 延迟线跨块保持 分块跑和整块跑**逐位相同**，0 错配（fir_selftest.py 第 5 节）
   ③ 音频通路能全双工  录 0.2 s ‖ 播 0.2 s 同时跑，墙钟 0.203 s（＝max 不是 sum）
                  （audio_duplex_probe.py）
@@ -120,6 +120,10 @@
     LIVE_NBUF=3       槽位数 = **端到端延迟有几个块**（默认 3）
     LIVE_SECONDS=20   跑多少秒（默认 20；给 0 表示一直跑到 Ctrl-C）
     LIVE_BYPASS=1     直通（不压缩）—— 想做 A/B 对照时用
+    LIVE_VOLUME=62    播放音量（0~62，默认 62 = 满）。**耳机麦插着时别给满** ——
+                      麦克风那一路的输入增益是 +19 dB（codec 寄存器 R8/R9 = 0xB3），
+                      音量再给满，耳机→空气→麦克风这一圈的总增益就超过 1，
+                      会啸叫（自激），进核的信号整段贴满量程。
     LIVE_PIN=0        关掉绑核（默认绑：io→cpu0，dsp→cpu1）
     LIVE_RT_IO=20     搬样线程的 SCHED_FIFO 优先级（0=不开实时）
     LIVE_RT_DSP=10    过核线程的（0=不开）
@@ -155,7 +159,7 @@ SECONDS = float(os.environ.get("LIVE_SECONDS", "20"))
 BYPASS = os.environ.get("LIVE_BYPASS", "0") not in ("0", "", "no")
 PIN = os.environ.get("LIVE_PIN", "1") not in ("0", "", "no")
 SRC = os.environ.get("LIVE_SRC", "mic").lower()
-VOLUME = 62                                         # 62 是上限（源码写 "[0,63)"）
+VOLUME = int(os.environ.get("LIVE_VOLUME", "62"))   # 62 是上限（源码写 "[0,63)"）
 
 # 压缩参数。出厂默认（阈值 0.1 / 比 0.7）对分成四段之后的信号几乎没作用 ——
 # 每一段只剩总能量的一小块，够不到 0.1。这组是按实测电平重定的，
@@ -279,6 +283,7 @@ ol = Overlay(BIT)
 audio = ol.audio_codec_ctrl_0
 audio.configure()
 audio.set_volume(VOLUME)
+print("   音量 %d（上限 62）；耳机麦插着时给满会啸叫" % VOLUME)
 
 k = FirMultiband(ol.fir_multiband_0.mmio)
 
@@ -307,8 +312,8 @@ print("   uio=%s iic=%s mmio.length=0x%x" % (UIO, IIC, MMIO_LEN))
 block_sec = L / FS
 print("   每块 %d 个采样 = %.2f ms；%d 个槽位 → 延迟约 %.0f ms"
       % (L, block_sec * 1000, NBUF, NBUF * block_sec * 1000))
-print("   实时预算 %.2f µs/采样；核实测 0.311 µs/采样（余量 %.0f 倍）"
-      % (1e6 / FS, (1e6 / FS) / 0.311))
+print("   实时预算 %.2f µs/采样；核实测 0.317 µs/采样（余量 %.0f 倍）"
+      % (1e6 / FS, (1e6 / FS) / 0.317))
 
 # ---------------- 缓冲 ----------------
 slots = []
