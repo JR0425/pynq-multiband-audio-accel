@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Wed Oct  7 19:54:38 2026" VIVADOVERSION="2020.2">
+<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Fri Oct  9 21:26:28 2026" VIVADOVERSION="2020.2">
 
   <SYSTEMINFO ARCH="zynq" DEVICE="7z020" NAME="fir" PACKAGE="clg400" SPEEDGRADE="-1"/>
 
@@ -3031,6 +3031,14 @@
             <REGISTER NAME="Memory_drc_ratio">
               <PROPERTY NAME="DESCRIPTION" VALUE="Memory drc_ratio"/>
               <PROPERTY NAME="ADDRESS_OFFSET" VALUE="56"/>
+              <PROPERTY NAME="SIZE" VALUE="8"/>
+              <PROPERTY NAME="ACCESS" VALUE="read-write"/>
+              <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
+              <PROPERTY NAME="RESET_VALUE" VALUE="0"/>
+            </REGISTER>
+            <REGISTER NAME="Memory_band_gain">
+              <PROPERTY NAME="DESCRIPTION" VALUE="Memory band_gain"/>
+              <PROPERTY NAME="ADDRESS_OFFSET" VALUE="80"/>
               <PROPERTY NAME="SIZE" VALUE="8"/>
               <PROPERTY NAME="ACCESS" VALUE="read-write"/>
               <PROPERTY NAME="IS_ENABLED" VALUE="true"/>
