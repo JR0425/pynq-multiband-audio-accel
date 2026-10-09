@@ -76,12 +76,31 @@ typedef ap_fixed<FIR_ACC_W, 8, AP_TRN, AP_WRAP> acc_t;
  *   浮点模式下它等于 float,所以这一层不影响浮点版。 */
 typedef ap_fixed<24, 2, AP_TRN, AP_SAT> drc_t;
 
+/* 每段增益：Q7.8（1 个符号位 + 7 个整数位 + 8 个小数位）。
+ *
+ *     范围  ±128  →  ±42 dB      1.0 的原始整数 = 256
+ *     步进  1/256 →  0.034 dB
+ *
+ * 为什么不用 Q1.15（±1，也就是只能调 0 dB 上下的一点点）：
+ * 助听器的处方增益按听力损失给，轻度 20~30 dB、中度 30~50 dB、
+ * 重度 50~60 dB —— **这个数会大于 1**，Q1.15 一格都动不了。
+ * ±42 dB 覆盖到重度损失那一档（再往上要靠总增益/更大功率，
+ * 那不是这一级的事）。
+ *
+ * 为什么是 16 位而不是 18 位（和 coef_t 一样）：
+ * 24×16 的乘法器正好塞进一个 DSP48E1（25×18 的输入），24×18 也一样，
+ * 但 16 位的寄存器文件小一点，而且 Q7.8 的步进（0.034 dB）已经
+ * 远细于任何人耳能听出的差别（约 1 dB）。
+ */
+typedef ap_fixed<16, 8, AP_TRN, AP_SAT> gain_t;
+
 #else
 
 typedef float data_t;
 typedef float coef_t;
 typedef float acc_t;
 typedef float drc_t;
+typedef float gain_t;
 
 #endif /* FIR_FIXED */
 
@@ -114,6 +133,14 @@ static inline data_t samp_in(int16_t q) {
     return s;
 }
 
+/* 增益寄存器也是"贴比特"：Q7.8 的原始整数就是一个 int16，
+ * 和小数点落在哪无关。硬件里一根线都不花。 */
+static inline gain_t gain_in(int16_t q) {
+    gain_t g;
+    g.range() = (samp_int_t)q;
+    return g;
+}
+
 static inline int16_t samp_out(data_t s) {
     return (int16_t)s.range();
 }
@@ -126,6 +153,11 @@ static inline int16_t samp_out(data_t s) {
 
 static inline data_t samp_in(int16_t q) {
     return (float)q * SAMP_SCALE;
+}
+
+/* 浮点对照路径：Q7.8 的原始整数除以 256 就是真值。 */
+static inline gain_t gain_in(int16_t q) {
+    return (float)q * (1.0f / 256.0f);
 }
 
 /* 四舍五入 + 饱和。定点那边的 (data_t)acc 是截断，
