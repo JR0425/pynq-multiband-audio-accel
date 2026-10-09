@@ -38,7 +38,8 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
                    const int16_t drc_thr[N_BANDS],
                    const int16_t drc_ratio[N_BANDS],
                    int reset,
-                   int bypass);
+                   int bypass,
+                   const int16_t band_gain[N_BANDS]);
 
 #define Q15_MAX 32767
 #define Q15_MIN (-32768)
@@ -88,10 +89,14 @@ int main(int argc, char **argv) {
 
     /* ---- 2. 实际参数跑一遍 ----
      * 阈值/压缩比是运行期参数（板上来自 AXI 寄存器）。
-     * 默认值 0.1 / 0.7 在 Q1.15 下是 3277 / 22938 —— 和 Python 基线一致。 */
+     * 默认值 0.1 / 0.7 在 Q1.15 下是 3277 / 22938 —— 和 Python 基线一致。
+     * 增益是 Q7.8：**1.0 = 256**（不是 1，也不是 32768）。
+     * 这里给单位增益，所以这一步的输出必须和"加增益之前"那一版**逐位相同**
+     * —— 这是加了这一级之后 csim 唯一的硬判据。 */
     const int16_t thr[N_BANDS]   = {3277, 3277, 3277, 3277};
     const int16_t ratio[N_BANDS] = {22938, 22938, 22938, 22938};
-    fir_multiband(x.data(), y.data(), length, thr, ratio, 1 /* reset */, 0 /* bypass */);
+    const int16_t gain[N_BANDS]  = {256, 256, 256, 256};
+    fir_multiband(x.data(), y.data(), length, thr, ratio, 1 /* reset */, 0 /* bypass */, gain);
 
     std::ofstream fout(out_path);
     if (!fout.is_open()) {
@@ -106,11 +111,14 @@ int main(int argc, char **argv) {
 
     /* ---- 3. 直通检验：bypass = 1，跳过压缩 ----
      * 各段之和恒等于延迟 D 拍的输入（见文件头），所以输出应当**逐位等于**输入。
-     * 阈值/压缩比在这种模式下不参与运算，随便给。 */
+     * 阈值/压缩比/增益在这种模式下都不参与运算，随便给 —— 给增益是为了
+     * 钉死"bypass 不吃增益"这条：如果哪天有人把增益挪到 if 外面，
+     * 这一段的位移比对会立刻错掉。 */
     const int16_t thr_any[N_BANDS]   = {3277, 3277, 3277, 3277};
     const int16_t ratio_any[N_BANDS] = {22938, 22938, 22938, 22938};
+    const int16_t gain_any[N_BANDS]  = {256, 256, 256, 256};
     std::vector<int16_t> t(length, 0);
-    fir_multiband(x.data(), t.data(), length, thr_any, ratio_any, 1 /* reset */, 1 /* bypass */);
+    fir_multiband(x.data(), t.data(), length, thr_any, ratio_any, 1 /* reset */, 1 /* bypass */, gain_any);
 
     std::ofstream ftr(tr_path);
     if (!ftr.is_open()) {

@@ -28,7 +28,9 @@
  * ⚠️ 代价一：各段**必须等长**。以后想给高频段用短滤波器省资源，会把重建弄坏。
  * ⚠️ 代价二：压缩之后 ΣDRC(b_i) 不再等于输入（旧写法也一样），响信号可能超量程。
  *    这里靠 samp_out 的饱和兜住，但"压缩后整体变大"这件事本身没解决 ——
- *    要真正解决得加一级总增益或限幅器。现在没有，记在风险里。
+ *    要真正解决得加一级总增益或限幅器。**仍然没有**，记在风险里。
+ *    （2026-10-09 加了每段的独立增益 band_gain，那是"验配"要的旋钮，
+ *      不是总限幅器：它反而让整体更容易超量程，所以这条风险比原先更实。）
  *
  * ---- 第 4 段为什么不用额外延迟线 ----
  *     hist[D] 就是 D 拍前那个输入（hist[0] 最新，hist[k] 是第 k 拍前），
@@ -213,12 +215,24 @@ static drc_t drc(drc_t x, drc_t thr, drc_t ratio) {
  *    想靠"把阈值设到最大"来绕过压缩是**不行的**：阈值是 Q1.15，
  *    最大只能到 32767/32768，而相减式下 b_i 是两段之差、幅度能到 ±2，
  *    照样会落进压缩支路 —— 必须有一个真正的旁路。
- *    代价：每段多一个二选一（4 个），可以忽略。 */
+ *    代价：每段多一个二选一（4 个），可以忽略。
+ *
+ * `band_gain`：每段的独立增益，Q7.8（1.0 = 256，范围 ±128 ≈ ±42 dB）。
+ *     助听器验配的核心就是这一级 —— 不同频段的听力损失不一样，
+ *     哪一段听不见就单独把哪一段抬起来。压缩（drc）**只会衰减**，
+ *     抬不动，所以那一步在核里是缺的，只能靠加这一级补上。
+ *
+ *  ⚠️ 参数顺序：band_gain 必须**加在最后**。HLS 的 AXI4-Lite 偏移是
+ *     按签名顺序排的，往中间插一个会把后面所有寄存器（reset / bypass）
+ *     的地址整体挪位，已经在板上跑着的 Python 驱动当场失效。
+ *     加在末尾，新寄存器落在现有最后一个（bypass @0x48）之后的 0x50，
+ *     老地址一个都不动。 */
 void fir_multiband(const int16_t *in, int16_t *out, int length,
                    const int16_t drc_thr[N_BANDS],
                    const int16_t drc_ratio[N_BANDS],
                    int reset,
-                   int bypass) {
+                   int bypass,
+                   const int16_t band_gain[N_BANDS]) {
     /* 抽头延迟线：hist[0] 是最新采样，hist[N_TAPS_ALLOC-1] 是最旧的。
      * 长度用 N_TAPS_ALLOC（补齐后的），尾巴上那几格配的是 0 系数，纯占位。
      * static —— 块间保持，理由见上。 */
@@ -254,17 +268,20 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
 
     /* DRC 参数：寄存器里是 Q1.15 的整数，drc_t 是 Q2.22。
      * 这一步只是"重新解释小数点在哪"，定点下 samp_in 就是贴一下比特，
-     * 硬件里一根线都不花。 */
-    drc_t thr[N_BANDS];
-    drc_t ratio[N_BANDS];
+     * 硬件里一根线都不花。增益同理（Q7.8，见 fir_types.h 的 gain_in）。 */
+    drc_t  thr[N_BANDS];
+    drc_t  ratio[N_BANDS];
+    gain_t g[N_BANDS];
 #pragma HLS ARRAY_PARTITION variable=thr complete dim=1
 #pragma HLS ARRAY_PARTITION variable=ratio complete dim=1
+#pragma HLS ARRAY_PARTITION variable=g complete dim=1
     for (int i = 0; i < N_BANDS; i++) {
 #if FIR_PRAGMA
 #pragma HLS UNROLL
 #endif
         thr[i]   = (drc_t)samp_in(drc_thr[i]);
         ratio[i] = (drc_t)samp_in(drc_ratio[i]);
+        g[i]     = gain_in(band_gain[i]);
     }
 
     for (int n = 0; n < length; n++) {
@@ -393,14 +410,32 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
         band[2] = ylp[2] - ylp[1];
         band[3] = (acc_t)hist[FIR_GROUP_DELAY] - ylp[2];
 
-        /* 4 段各自压缩，再相加。压缩后才会有"总幅度超过输入"的可能 ——
-         * 最后一步的饱和是兜底，不是正常路径。 */
+        /* 4 段各自"先乘增益、再压缩"，最后相加。
+         *
+         * 顺序不能反：验配要的是"把这一段整体抬到听得见"，抬起来之后
+         * 如果峰值顶过阈值，压缩器再把它收回来 —— 这才是助听器的做法。
+         * 反过来（先压后抬）抬完的峰值没人管，会直接削顶。
+         *
+         * ⚠️ 增益**只在这个分支里**。bypass 那条路必须保持"逐位等于
+         *    延迟 D 拍的输入"这条性质（见文件头 / 出参注释），
+         *    挂上增益就把它破坏了 —— 而那是唯一能把"结构接错了"和
+         *    "量化误差大了"分开的检查。所以直通时不乘增益。
+         *
+         * 打字面量乘法的类型：band 是 acc_t(Q8.32)，先窄化成 drc_t(Q2.22)
+         * 再乘以 gain_t(Q7.8) —— 24 位 × 16 位，正好一个 DSP48。
+         * 若两边都撑到 40 位，HLS 会去综合 40×40 的乘法器全落进 LUT
+         * （这个坑在下面 FIR 抽头那一段已经踩过一次，见那条注释）。
+         * 定点下 ap_fixed 自己对齐小数点：Q2.22 × Q7.8 的积小数位是 30，
+         * 收进 drc_t（小数位 22）就等于 >>8 —— 不用手写移位。
+         * 增益给 1.0（原始 256）时乘积**逐位等于**原来的 (drc_t)band[i]，
+         * 所以这一步加进来不影响任何已有结果（csim 的硬判据）。 */
         acc_t acc = (acc_t)0;
         for (int i = 0; i < N_BANDS; i++) {
             if (bypass) {
                 acc += band[i];
             } else {
-                acc += (acc_t)drc((drc_t)band[i], thr[i], ratio[i]);
+                drc_t gb = (drc_t)band[i] * g[i];
+                acc += (acc_t)drc(gb, thr[i], ratio[i]);
             }
         }
         /* 出参 int16/Q1.15：定点下 (data_t)acc 就是截断到 16 位（带饱和），
