@@ -2,21 +2,25 @@
 name: pynq-audio-playback
 description: >
   Get sound out of and audio into a PYNQ-Z2 through the factory base overlay,
-  and past the five things that block it: root-only device nodes, a wrong volume
-  ceiling, the 24-bit stereo 48 kHz wav restriction, DC offset on capture, and the
-  headset switch that latches once on insertion. Use when the board is silent, when the
-  microphone records only noise floor, when set_volume raises ValueError, when
-  Audio.load rejects a wav file, or when planning how to demonstrate audio I/O.
+  and past the seven things that block it: root-only device nodes, a wrong volume
+  ceiling, the 24-bit stereo 48 kHz wav restriction, DC offset on capture, the
+  headset switch that latches once on insertion (and may need several replugs), a
+  codec that stays unconfigured until some script configures it, and a live
+  record+play loop that drives the microphone input into full-scale
+  self-oscillation. Use when the board is silent, when the microphone records only
+  noise floor, when set_volume raises ValueError, when Audio.load rejects a wav
+  file, when capture reads near full scale while recording and playing at the same
+  time, or when planning how to demonstrate audio I/O.
 license: MIT
 compatibility: PYNQ-Z2 image 2.7.0 + factory base overlay
 metadata:
-  version: "1.0.1"
-  updated: "2026-09-27"
+  version: "1.0.3"
+  updated: "2026-10-10"
 ---
 
 # PYNQ-Z2 板子出声 / 录音
 
-出厂 base overlay 的音频通路怎么跑通，以及四个会卡住人的地方。
+出厂 base overlay 的音频通路怎么跑通，以及七个会卡住人的地方。
 实测：PYNQ-Z2 + PYNQ 2.7.0 + 出厂 base overlay，2026-09-27。
 
 ## 什么时候用
@@ -24,6 +28,7 @@ metadata:
 - 板子不出声，或者录音全是本底噪声
 - set_volume 报 ValueError: Volume has to be in [0,63]!
 - Audio.load() 拒绝一个 wav 文件
+- 边录边放时录回来的电平贴着满量程，而且你不说话它也不掉
 - 要确认音频搬运到底是 CPU 干的还是 FPGA 干的
 - 演示前要定用哪种接法（耳麦还是 Line-in）
 
@@ -38,6 +43,8 @@ metadata:
 |---|---|---|
 | 1.0.0 | 2026-09-27 | 初版 |
 | 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
+| 1.0.2 | 2026-10-10 | 坑 5 补实测：拔插**一次不一定够**，要拔到电平表跳起来为止（10/09 连续拔插到第 35.5 秒才跳） |
+| 1.0.3 | 2026-10-10 | 新增坑 7：边录边放时麦克风输入会被推成满幅自激（定位到 `stream_begin` 的 4 次 I2C 写，但留了一处待复现的矛盾） |
 
 ## 跑通它
 
@@ -108,7 +115,7 @@ x = x - x.mean()
 
 不减的话，频谱在 0 Hz 处会出现一根很高的假峰，把真正要看的东西压下去。
 
-## 坑 5：耳机麦插着也不出声，要拔了重插一次
+## 坑 5：耳机麦插着也不出声，要拔插到电平表跳起来为止
 
 `HP + Mic` 口里有一颗 TI **TS3A226AE** 自动耳机开关（原理图 U41，9 球封装），
 负责判断插头是 CTIA 还是 OMTP，再把麦克风接到正确的那根触点上。
@@ -119,7 +126,11 @@ x = x - x.mean()
 
 症状：录音有效值只剩本底，左右两路都不动，说话、敲麦都没反应。
 
-做法：板子开着，把耳机**拔掉停两秒再插回去**，然后重跑录音脚本。
+做法：板子开着，把耳机**拔掉再插回去**，然后重跑录音脚本看电平表。
+**一次不一定够 —— 要拔插到电平表跳起来为止。**
+
+10/09 实测：连续拔插，到**第 35.5 秒**电平才跳起来，之后一直是真的。
+所以「拔了一次还是没声」不等于这条路不通，是还没插到那一下。
 
 拔插前后实测（`board/scripts/mic_watch.py`，int16 域有效值）：
 
@@ -127,6 +138,7 @@ x = x - x.mean()
 |---|---|---|
 | 插着但没检测到 | 7 ～ 45 | 70 ～ 113 |
 | 拔插一次之后说话 | 400 ～ 1200 | 2000 ～ 5400 |
+| 拔插到第 35.5 秒跳起来（10/09） | 11822 | 32768 |
 
 麦克风是单声道，被同时送进左右两个声道，所以两边数字几乎一样。
 
@@ -143,7 +155,7 @@ x = x - x.mean()
 | `Line-in` | 只能输入 | 电脑耳机口（当测试音源） |
 
 有源音箱必须插 `HP + Mic`（`Line-in` 是输入口，插不了）。**插上音箱就没有麦克风了。**
-耳机麦插着却录不到声音，先看坑 5——多半要拔了重插一次。
+耳机麦插着却录不到声音，先看坑 5——多半要拔了重插，而且要拔插到电平表跳起来为止。
 
 演示前先定走哪一种，两种的数字通路是同一条，代码不用改（区别只是 codec 选哪个输入口）：
 
@@ -174,6 +186,65 @@ find /home/xilinx/jupyter_notebooks -newermt "<开机时刻>"   # 开机后有�
 实测（10/08）：开机后未配置 → 嗡嗡声；跑一次 `configure()` 之后 → 三遍
 1 kHz 干净正弦每遍都是干净的一声「嘟」，停下之后也没有底噪。
 **实时通路代码一个字没改** —— 它本来就不是坏的。
+
+## 坑 7：边录边放时，麦克风输入被推成满幅自激
+
+**症状**：一边收一边放（自己编的 `duplex_block` 那条边录边放通路）时，
+录回来的电平贴着满量程，**你不说话它也不掉**，耳机里是一直在响的噪声，
+不是人声。而**同一个麦克风口**、同一时刻，让 `audio.record()`（只录不放）
+或者只调 `capture_block`（不写 TX）去读，是安静的。
+
+实测（10/10）：
+
+| 量法 | int16 域 rms |
+|---|---|
+| `mic_level.py`，走 PYNQ 驱动的 `audio.record()` | 28 |
+| 自己编的 C 库，`capture_block` 只收不放（不写 TX、不写 I2C） | 230 |
+| `stream_begin` 那 4 次 I2C 写**之后**再只收 | **46551** |
+| duplex 且 TX 全填 0 | **45843** |
+
+后两行相等、而且 TX 填的是 0 —— **跟发出去什么、输出多大都无关**。
+收到的那一块长这样：`min=7815  max=16777199`，在 0 到 2^24 整个范围里乱撞。
+
+**先排掉这几条**（10/10 都试过，都不是）：
+
+- **不是声学反馈。** 把播放音量设成 0 dB（耳机全哑）电平仍 29803；
+  把四段增益压到 −41.9 dB（送出去的只剩 0.008 倍）电平仍 32740。
+  环路必须靠输出幅度撑着，而它不靠。
+- **不是 24 位转 16 位写错了。** 加 `to_signed` 前后 rms 一模一样
+  （10191.4 / 10191.4），原始值全都远小于 2^23，那一步是空操作。
+- **不是直流偏置。** 加一阶高通去直流之后电平不动。
+  （坑 4 那 1.2% 的直流是真的，但只有 1.2%，撑不起满量程。）
+- **不是 `duplex_block` 的实现。** 它读 RX `0x00/0x04`、写 TX `0x08/0x0C`，
+  和驱动自己的 `bypass()` 一致。
+
+**剩下的差别只有一处**：`stream_begin` 会写 4 个 I2C 寄存器，
+`capture_begin` 一个都不写。地址从板上 `audio_adau1761.h` 抄来，不用猜：
+
+| 寄存器 | 地址 | 是什么 | `stream_begin` 写 | `stream_end`（静音）写 |
+|---|---|---|---|---|
+| R22 | 0x1C | 左播放混音控制 0 | 0x21 | 0x01 |
+| R24 | 0x1E | 右播放混音控制 0 | 0x41 | 0x01 |
+| R29 / R30 | 0x23 / 0x24 | 左/右耳机音量 | `(vol<<2)\|3` | 不动 |
+| R23 / R25 | 0x1D / 0x1F | 左/右播放混音控制 1 | **不动** | 0x00 |
+| R8 / R9 | 0x0E / 0x0F | 左/右输入音量 | 不动 | 不动 |
+
+`stream_begin` 和 `stream_end` 在 R22/R24 上只差第 5 位（左）/第 6 位（右）。
+**一个还没验的猜想**：如果 `configure()` 把 R23/R25（混音控制 1，看名字是各路
+混音输入的电平）留在某个不小的值上，而 `stream_begin` 只在 R22/R24 里打开了
+对应的通路，那就是「新开的路 × 旧的音量」，一次抬几十 dB 完全可能 ——
+`stream_end` 正是把 R23/R25 写成 0x00 来静音的，说明这两个确实是电平。
+
+**还有一处矛盾没解开，写在这里免得下次当成定论：**
+
+10/09 同一条边录边放通路实测是「进核电平 中位 347 / 峰 15270」，是健康的；
+10/10 同脚本、同音量量出来 29803~32740。那 4 次 I2C 写 10/09 也执行了。
+所以"就是那 4 次写"**还不能算结论**。下一步应该是**先复现 10/09 那个好结果**，
+如果复现不出来再去拆寄存器 —— 否则容易把一条假线索做成一整套改动。
+
+**排查这类问题的方法提醒**：同一个进程里连着做三段、每段只差一个动作
+（不写 / 只写 I2C / 写 TX），比"改一次跑一次想一次"快得多，结论也硬。
+上面那张表就是这么量出来的。
 
 ## 实测：搬运是 CPU 干的，不是 FPGA
 
