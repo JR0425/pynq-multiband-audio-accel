@@ -148,6 +148,9 @@ def note(msg):
 # codec 每个采样是 24 位，塞在 int32 的低 3 字节里。
 # 核是 Q1.15 的 int16。两头都差 8 位，所以就是移 8 位 —— 不引入任何误差，
 # 丢掉的只是最后 8 位精度（48 dB 底噪，远低于 codec 自己的本底）。
+#
+# ⚠️ 收到的那一路还**带着一个大直流偏置**，见 fir_live.py 里 adc_to_i16 的注释。
+# 这个函数只做格式换算、不去直流；喂核前要再去一次。
 
 def i32_to_i16_chan(buf, ch):
     return (buf.reshape(-1, 2)[:, ch] >> 8).astype(np.int16)

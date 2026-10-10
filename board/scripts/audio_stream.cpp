@@ -262,6 +262,36 @@ extern "C" void stream_end(void* h)
     free_handle(s);
 }
 
+/*
+ * 单独写一个 codec 寄存器。
+ *
+ * 为什么留这个口子：`stream_begin` 那 4 次 I2C 写会把**麦克风输入**推成满幅
+ * 自激。2026-10-10 实测的分辨实验（cap_probe2.py）：
+ *
+ *     段1  什么都不写，只收      原始 6e4~1.1e5，16 位域 rms 230   ＝ 安静
+ *     段2  只做那 4 次 I2C 写，再收  原始 0~2^24 整幅乱撞，rms 46551
+ *     段3  TX 全填 0 的 duplex      同上，rms 45843
+ *
+ * 也就是**跟 TX 发什么、跟输出多大都无关**，就是那 4 次写。
+ * 要定位到具体是哪一位、哪一次，就得能单独 poke。
+ *
+ * 用法（Python，cffi）：先 `audio.select_microphone()`，再
+ *     lib.stream_reg_write(0x1C, 0x21, audio.iic_index)
+ */
+extern "C" int stream_reg_write(unsigned char reg, unsigned char val,
+                                int iic_index)
+{
+    int fd = setI2C((unsigned int)iic_index, IIC_SLAVE_ADDR);
+    if (fd < 0) {
+        printf("audio_stream: stream_reg_write 开不了 i2c %d\n", iic_index);
+        return -1;
+    }
+    write_audio_reg(reg, val, fd);
+    unsetI2C(fd);
+    return 0;
+}
+
+
 
 /* ---------------------------------------------------------------- 录音 ---- */
 

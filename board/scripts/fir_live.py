@@ -102,6 +102,32 @@
   NBUF=3、L=480 → 30 ms + 2 ms = 32 ms 左右，再加 codec/驱动自己的缓冲（没量）。
   想要更小就把 NBUF 调到 2（约 22 ms）—— 代价是流水线的余量变薄。
 
+========================== 实时调参（2026-10-10 加） ==========================
+**跑着的时候能随时改 4 段增益**，不用停音、不用重启。
+
+    界面（板子自带的 Jupyter 网页）
+      │  写 /dev/shm/fir_tune.json
+      ▼
+    dsp 线程（每 0.05 s 看一次）→ 核的 band_gain 寄存器
+      │  写 /dev/shm/fir_status.json
+      ▼
+    界面（后台线程轮询，20 Hz）
+
+通道本身在 `fir_tune.py`，那里讲了为什么用文件、**以及为什么是 /dev/shm 而不是
+/tmp**（板上实测：/tmp 在 SD 卡上，一次写 2168 µs，会让每 30 秒多丢 17 块音）。
+这里只记三条被前三个坑逼出来的规矩：
+
+  · **读旋钮的活放在 dsp 线程上**，io 线程一个字不碰（它零余量）。
+    而且不是每块都读，每 LIVE_POLL 秒读一次（默认 0.05 s）——够跟手，
+    也不给 dsp 那条线程薄薄的余量添负担。
+  · **改增益不会"啪"一声**：新值分 LIVE_RAMP 块线性走到位（默认 4 块 = 40 ms）。
+    直接跳变是幅度上的一个阶跃，耳机里就是一声脆响。
+  · **界面完全不碰 MMIO**。电平表读的是这条程序自己算好写出来的数，
+    不是让浏览器去轮询寄存器 —— 后者会把"电平表能干什么"说大。
+
+自检也跟着改了：原来是一次 `process()` 重算（只有一个增益），现在**按每块当时
+实际用的那组参数**逐块重算，所以"边拖滑杆边跑"这一趟也照样能逐位比对。
+
 ================================ 怎么跑 ================================
 
 **先编那条音频通路**（板上自带 gcc；只要编一次）：
@@ -120,14 +146,30 @@
     LIVE_NBUF=3       槽位数 = **端到端延迟有几个块**（默认 3）
     LIVE_SECONDS=20   跑多少秒（默认 20；给 0 表示一直跑到 Ctrl-C）
     LIVE_BYPASS=1     直通（不压缩）—— 想做 A/B 对照时用
-    LIVE_VOLUME=62    播放音量（0~62，默认 62 = 满）。**耳机麦插着时别给满** ——
-                      麦克风那一路的输入增益是 +19 dB（codec 寄存器 R8/R9 = 0xB3），
-                      音量再给满，耳机→空气→麦克风这一圈的总增益就超过 1，
-                      会啸叫（自激），进核的信号整段贴满量程。
+    LIVE_GAIN_DB="0,0,0,0"  **开机那一刻**四段增益，低→高，单位 dB，逗号分隔。
+                      例：-6,0,6,12 = 低频压 6 dB、1~2 kHz 不动、高频抬 12 dB。
+                      量程 ±42 dB（Q7.8 定的，超出直接报错不静默削）。
+                      界面上拖过滑杆之后会盖掉它 —— 这个只管开机那一下。
+    LIVE_VOLUME=62    播放音量（0~62）。**不给就用音源自己的默认：麦克风 40、
+                      wav 62。** 麦克风那一路的输入增益是 +19 dB（codec 寄存器
+                      R8/R9 = 0xB3），音量再给满，耳机→空气→麦克风这一圈的总增益
+                      就超过 1，会啸叫（自激），进核的信号整段贴满量程。
+                      加了每段增益之后这条更要注意：抬 +20 dB 再配满音量，
+                      啸叫的阈值一下就到了。
+                      **怎么判断正在啸叫**：状态文件里的 in_rms 贴到 20000 以上、
+                      而且你不说话它也不掉 —— 正常说话大概是 300~2000。
+                      真啸叫了先摘耳机，再 Ctrl-C / 把 LIVE_VOLUME 调小重开。
+                      （2026-10-10 之前这个口的输入还带一个 31% 满量程的直流偏置，
+                      静音时 in_rms 也读 10000 上下，已由 adc_to_i16 去掉。）
     LIVE_PIN=0        关掉绑核（默认绑：io→cpu0，dsp→cpu1）
     LIVE_RT_IO=20     搬样线程的 SCHED_FIFO 优先级（0=不开实时）
     LIVE_RT_DSP=10    过核线程的（0=不开）
     LIVE_SWITCH=0.0005  Python 线程切换间隔（秒）
+    LIVE_POLL=0.05    多久看一次旋钮文件（秒）。0.05 = 20 Hz，够跟手。
+    LIVE_RAMP=4       新增益分几块走到位（4 块 = 40 ms）。给 1 = 直接跳变，会咔。
+    LIVE_STATUS=0.1   多久写一次状态文件（秒）。界面靠它画电平表。
+                      10 Hz 对一根电平条够了；**这是整条循环里唯一花钱的动作**
+                      （一次 23 µs），所以宁可少写几帧也不要写贵了。
     LIVE_SRC=wav      不从麦克风录，改放 board_input_48k.wav（循环）——
                       人在外面、没插麦的时候也能验流水线。
                       注意它仍然走真的 duplex_block（放音那一半是真的），
@@ -138,6 +180,7 @@
 对上了，说明这条流水线在数值上就是原来那条路，没有因为分线程而错位。
 """
 
+import fcntl
 import os
 import queue
 import sys
@@ -149,7 +192,29 @@ import numpy as np
 from pynq import Overlay, allocate
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from fir_core import FirMultiband
+from fir_core import FirMultiband, db_to_gain, gain_to_db
+
+try:
+    from fir_tune import (read_tune, write_status, clear_status,
+                          TUNE_PATH, STATUS_PATH)
+except ImportError as _e:
+    raise SystemExit("缺 fir_tune.py —— 它要和本文件放同一个目录：%s" % _e)
+
+# ---------------- 同时只允许跑一条 ----------------
+# 两条 fir_live 同时跑有两个后果，第二个很难查：
+#   ① 两边都想开 /dev/mem 里的同一个音频 IP，MMIO 互相踩；
+#   ② **两条都往同一个状态文件里写**，界面读到的帧在两条之间跳来跳去 ——
+#      实测见过块号从 3002 跳回 401、实时倍率从 0.92 跳到 0.87，
+#      看上去像"这条通路在抽搐"，其实是两个进程在抢着汇报。
+# 用文件锁挡住。进程一没锁就自动消失，不会像 pid 文件那样留下假的"还在跑"。
+_lock_file = open("/dev/shm/fir_live.lock", "w")
+try:
+    fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError:
+    raise SystemExit(
+        "已经有一条 fir_live 在跑了。\n"
+        "  同时跑两条会互相踩 MMIO，界面上的数字也会在两条之间乱跳。\n"
+        "  先停掉那条：pkill -INT -f fir_live.py")
 
 # ---------------- 配置 ----------------
 FS = 48000.0
@@ -159,13 +224,49 @@ SECONDS = float(os.environ.get("LIVE_SECONDS", "20"))
 BYPASS = os.environ.get("LIVE_BYPASS", "0") not in ("0", "", "no")
 PIN = os.environ.get("LIVE_PIN", "1") not in ("0", "", "no")
 SRC = os.environ.get("LIVE_SRC", "mic").lower()
-VOLUME = int(os.environ.get("LIVE_VOLUME", "62"))   # 62 是上限（源码写 "[0,63)"）
+# LIVE_DIAG=1 时把收到的原始数据打前几块出来（查"电平为什么贴顶"用）
+DIAG = os.environ.get("LIVE_DIAG", "0") not in ("0", "", "no")
+# 麦克风那一路的输入增益是 +19 dB（codec R8/R9 = 0xB3）。耳机戴在头上时，
+# 耳机→空气→麦克风这一圈很容易自激，**环路增益过 1 就是啸叫**。
+# 所以没显式给 LIVE_VOLUME 时，麦克风音源默认 40、不是满 62；
+# wav 音源里没有麦克风这一圈，给满没事。
+# （踩过：音量 45 + 每段增益里有 +16 dB，麦克风立刻贴满量程 = 啸叫。）
+_v = os.environ.get("LIVE_VOLUME")
+VOLUME = int(_v) if _v is not None else (40 if SRC == "mic" else 62)
 
 # 压缩参数。出厂默认（阈值 0.1 / 比 0.7）对分成四段之后的信号几乎没作用 ——
 # 每一段只剩总能量的一小块，够不到 0.1。这组是按实测电平重定的，
 # 和 fir_audio_loop.py 现在用的那组一致（阈值 0.030 / 比 0.5）。
 THR_Q15 = 983
 RATIO_Q15 = 16384
+
+
+# 每段增益（低→高四段），开机时的值。dB 进、"Q7.8 原始整数"出（1.0 = 256）。
+# 量程是 Q7.8 定的：±128 ≈ ±42 dB。**超了直接报错，不静默削** ——
+# 静默削会让人以为"拖到 +40 还在变"，其实早就到底了。
+GAIN_LIMIT_DB = 41.9
+
+
+def _parse_gain_db(s):
+    v = []
+    for x in str(s).replace(" ", "").split(","):
+        if x != "":
+            v.append(float(x))
+    if len(v) != 4:
+        raise SystemExit('LIVE_GAIN_DB 要 4 个数（低→高），给的是 %r' % (s,))
+    return v
+
+
+GAIN_DB = _parse_gain_db(os.environ.get("LIVE_GAIN_DB", "0,0,0,0"))
+for _g in GAIN_DB:
+    if not -GAIN_LIMIT_DB <= _g <= GAIN_LIMIT_DB:
+        raise SystemExit("LIVE_GAIN_DB 超量程（Q7.8 只到 ±%.1f dB）：%r"
+                         % (GAIN_LIMIT_DB, GAIN_DB))
+
+# 调参通道的三个节奏（见 fir_tune.py、以及上面"实时调参"那一节）
+POLL_SEC = float(os.environ.get("LIVE_POLL", "0.05"))        # 多久看一次旋钮
+STATUS_SEC = float(os.environ.get("LIVE_STATUS", "0.1"))     # 多久写一次状态
+RAMP_BLOCKS = max(1, int(os.environ.get("LIVE_RAMP", "4")))  # 新增益几块走到位
 
 CAPTURE_MAX = int(FS * 20)      # 自检最多留 20 秒的样本，别把内存吃光
 
@@ -187,11 +288,30 @@ t_prep = []          # dsp 里：cout → 24 位交织立体声 + 算 rms
 t_dsp_wall = []      # dsp 里：调 k.run 的墙钟（不是它自己报的 dt）
 t_proc = []          # 每块 k.run 自己报的耗时
 n_blocks = [0]
+diag = [0]           # LIVE_DIAG=1 时，把收到的原始数据长什么样打前几块出来
 in_rms = []
 out_rms = []
 cap_in = []          # 自检用：这次真跑过的每块输入
 cap_out = []         # 对应的每块输出
 captured = [0]       # 已经存了多少个采样（CAPTURE_MAX 封顶，别吃光内存）
+
+# ---------------- 实时调参的状态（见 fir_tune.py） ----------------
+# gain_cur 是**正在施加**的（浮点 Q7.8，为了能做斜坡），gain_dst 是滑块想要的那个。
+# 两者之间由 ramp 逐块逼近，见 stage_dsp。
+gain_cur = [float(db_to_gain(g)) for g in GAIN_DB]      # 施加中
+gain_dst = [db_to_gain(g) for g in GAIN_DB]             # 目标（整数）
+gain_dst_db = list(GAIN_DB)                             # 目标（dB，给界面看）
+ramp_left = [0]                                         # 还要走几块（列表是为了能在函数里改）
+thr_cur = [(THR_Q15,) * 4]
+ratio_cur = [(RATIO_Q15,) * 4]
+bypass_cur = [BYPASS]
+tune_last = [None]                                      # 上一次读到的旋钮内容
+t_poll = [0.0]
+t_status = [0.0]
+t_start = [time.time()]                                 # 主循环和状态文件都要用
+applied_log = []     # 每块**实际**用了什么参数，自检按它逐块重算
+events = []          # 从实时线程里攒下来的话，交给主线程打印
+                     # （dsp 线程不许 print —— 它带着 SCHED_FIFO，卡在 I/O 上会丢音）
 
 
 def qget(q):
@@ -235,12 +355,184 @@ def _pin(cpu, rt_prio=0):
             errors.append(("rt", "SCHED_FIFO 没设上 %r（权限？）" % (e,)))
 
 
+# ---------------- 实时调参：读旋钮 / 写状态 ----------------
+
+def db_to_q15(db):
+    """dBFS -> Q1.15 原始整数。1.0 满量程 = 32768。
+
+    门限用这个（它和核里的阈值一样是"相对满量程的比例"，不能大于 1），
+    增益不用 —— 增益要能大于 1，走 fir_core.db_to_gain 的 Q7.8。
+    **这两个别搞混**，混了就正好差 8 位。
+    """
+    return max(0, min(32767, int(round(32768.0 * (10.0 ** (db / 20.0))))))
+
+
+def poll_tune(now):
+    """看一次旋钮文件。**只读、只改目标值** —— 不碰核、不碰 io 线程。
+
+    不是每块都读：每 POLL_SEC 秒一次（0.05 s = 20 Hz）就够跟手，
+    也省得给 dsp 那条线程本来就薄的余量添负担。
+
+    文件里认四个键，都可有可无，缺哪个就哪个不动：
+
+        gain_db   [4 个数]  每段增益（dB），低→高
+        thr_db    [4 个数]  压缩门限（dBFS）
+        ratio     [4 个数]  压缩比 0~1
+        bypass    0 / 1
+
+    数值不合法就**保留当前值**，不抛 —— 界面发来一个 NaN，不该让音频停。
+    """
+    if now - t_poll[0] < POLL_SEC:
+        return
+    t_poll[0] = now
+
+    d = read_tune()
+    if d is None or d == tune_last[0]:
+        return
+    tune_last[0] = d
+    what = []
+
+    g = d.get("gain_db")
+    if isinstance(g, (list, tuple)) and len(g) == 4:
+        for j in range(4):
+            try:
+                v = float(g[j])
+            except (TypeError, ValueError):
+                continue
+            if not v == v:                       # NaN
+                continue
+            v = max(-GAIN_LIMIT_DB, min(GAIN_LIMIT_DB, v))
+            gain_dst_db[j] = v
+            gain_dst[j] = db_to_gain(v)
+        ramp_left[0] = RAMP_BLOCKS               # 有新目标 → 重新开始走
+        what.append("增益 " + "/".join("%.1f" % x for x in gain_dst_db) + " dB")
+
+    t = d.get("thr_db")
+    if isinstance(t, (list, tuple)) and len(t) == 4:
+        try:
+            thr_cur[0] = tuple(db_to_q15(float(x)) for x in t)
+            what.append("门限 " + "/".join("%.3f" % (db_to_q15(float(x)) / 32768.0)
+                                          for x in t))
+        except (TypeError, ValueError):
+            pass
+
+    r = d.get("ratio")
+    if isinstance(r, (list, tuple)) and len(r) == 4:
+        try:
+            ratio_cur[0] = tuple(max(0, min(32767, int(round(float(x) * 32768.0))))
+                                 for x in r)
+            what.append("压缩比 " + "/".join("%.2f" % float(x) for x in r))
+        except (TypeError, ValueError):
+            pass
+
+    if "bypass" in d:
+        bypass_cur[0] = bool(d["bypass"])
+        what.append("直通=%s" % bypass_cur[0])
+
+    if what:
+        # **不在这里 print** —— 这条线程带着 SCHED_FIFO，卡在 stdout 上就是丢音。
+        # 攒起来给主线程打印。
+        events.append("   [调参] " + "；".join(what))
+
+
+def _win_rms(ts, k=10):
+    """最近 k 块的合成有效值。**不是**最后一块那个数 ——
+    单块 rms 跳得厉害，做电平表会一闪一闪，看不出在说话。"""
+    a = ts[-k:]
+    if not a:
+        return 0.0
+    return float(np.sqrt(np.mean(np.square(np.asarray(a, dtype=np.float64)))))
+
+
+def _median_ms(ts, k=64):
+    a = ts[-k:]
+    if not a:
+        return 0.0
+    return float(np.median(np.asarray(a, dtype=np.float64)) * 1e3)
+
+
+def publish_status(now, running=True, ok=None):
+    """把"现在什么状态"写出去给界面看。
+
+    界面要的三样东西都在这里：**当前增益**（回显）、**电平**（画表）、
+    **实时倍率 / 丢块数**（判断这条通路还活着）。
+    """
+    n = n_blocks[0]
+    audio_sec = n * block_sec
+    wall = now - t_start[0]
+    lost = int(max(0.0, wall - audio_sec) / block_sec)
+    write_status({
+        "t": now,
+        "n": n,
+        "running": bool(running),
+        "ok": ok,
+        "gain_db": list(gain_dst_db),
+        "gain_applied_db": [gain_to_db(g) for g in
+                            (int(round(x)) for x in gain_cur)],
+        "bypass": bool(bypass_cur[0]),
+        "in_rms": _win_rms(in_rms),
+        "out_rms": _win_rms(out_rms),
+        "rt": (audio_sec / wall) if wall > 0 else 0.0,
+        "lost_blocks": lost,
+        "io_ms": _median_ms(t_io),
+        "dsp_ms": _median_ms(t_dsp_wall),
+        "error": errors[0][1] if errors else None,
+    })
+
+
+def maybe_status(now):
+    if now - t_status[0] < STATUS_SEC:
+        return
+    t_status[0] = now
+    try:
+        publish_status(now)
+    except OSError:
+        pass          # 写不出去（目录没了、盘满）不该影响音频
+
+
 # ---------------- 24 位 ⇄ 16 位 ----------------
-# 和 fir_audio_loop.py 里那两行**完全一样**（codec 是 24 位，核是 Q1.15 int16，
-# 两头差 8 位，就是移 8 位）。改一处必须改两处。
+# codec 每个采样是 24 位，塞在 int32 的低 3 字节里；核是 Q1.15 的 int16。
+# 两头差 8 位，所以就是移 8 位。不引入任何误差，丢掉的只是最后 8 位精度
+# （48 dB 底噪，远低于 codec 自己的本底）。
+_HALF24 = 1 << 23
+_FULL24 = 1 << 24
+
 
 def i32_to_i16_chan(buf, ch=0):
     return (buf.reshape(-1, 2)[:, ch] >> 8).astype(np.int16)
+
+
+# 去直流：一阶高通（慢速跟踪均值再减掉）。状态跨块带着走，块边界连续无台阶。
+# 系数 0.05/块 → 时间常数 20 块 = 200 ms → 转折约 0.8 Hz，50 Hz 以上几乎不受影响。
+#
+# ⚠️ 这个函数的**由来**要记清楚，因为它一开始的判断是错的。
+#
+# 2026-10-10 用 LIVE_DIAG=1 打出收到的原始缓冲区，四块都是这样：
+#     dtype=int32  size=960  min=2583601  max=2629504  均值=2609092
+# 一个 10 ms 块里交流只有 ±4.5e4，均值却有 2.6e6 —— 换算到核的刻度是
+# 「均值 10192，交流 ±90」。当时据此判断"这个口的输入带着 31% 满量程的
+# 直流偏置"，于是加了这一步。
+#
+# **这个判断后来被证伪了。** 那 2.6e6 不是麦克风的直流偏置，是
+# `stream_begin` 里 4 次 I2C 写把 codec 的输入通路搞成满幅自激的结果
+# （见 cap_probe2.py 和 `audio_stream.cpp` 里 stream_reg_write 那段注释）。
+# 修好那一处之后，输入本来就是干净的。
+#
+# 那这一步还留不留？**留。** 因为它去掉的是真东西：在**没被搞坏**的通路上
+# 实测（cap_probe.py）原始均值约 1.0e5 → 16 位域约 390，也就是 1.2% 满量程
+# 的直流偏置确实存在，只是没到 31% 那种夸张程度。一阶高通去掉它是对的，
+# 而且给核省下动态范围、也让 in_rms 真的反映声音。
+# 只是**别把它当成当初那件事的解药** —— 那件事在 codec 那边。
+_dc_est = [None]
+
+
+def adc_to_i16(buf, ch=0):
+    """麦克风那一块原始缓冲区 → 喂核的 int16，顺带去掉慢漂的直流。"""
+    u = buf.reshape(-1, 2)[:, ch].astype(np.float64)
+    m = float(u.mean())
+    _dc_est[0] = m if _dc_est[0] is None else _dc_est[0] + 0.05 * (m - _dc_est[0])
+    v = (u - _dc_est[0]) / 256.0
+    return np.clip(np.rint(v), -32768.0, 32767.0).astype(np.int16)
 
 
 def i16_to_i32_stereo(x16):
@@ -283,7 +575,12 @@ ol = Overlay(BIT)
 audio = ol.audio_codec_ctrl_0
 audio.configure()
 audio.set_volume(VOLUME)
-print("   音量 %d（上限 62）；耳机麦插着时给满会啸叫" % VOLUME)
+print("   音量 %d（上限 62）"
+      "%s" % (VOLUME,
+              "；麦克风音源，没显式给 LIVE_VOLUME 所以用了保守的 40 —— "
+              "耳机戴头上时这一圈容易啸叫" if (SRC == "mic"
+                                          and os.environ.get("LIVE_VOLUME") is None)
+              else "；耳机麦插着时给满会啸叫"))
 
 k = FirMultiband(ol.fir_multiband_0.mmio)
 
@@ -408,7 +705,19 @@ def stage_dsp():
         # 原来在 io 线程上，0.08 ms/块 —— 就是它让 8 秒丢了 8 块。
         try:
             if src_wav is None:
-                np.copyto(cin, i32_to_i16_chan(abuf_in))
+                np.copyto(cin, adc_to_i16(abuf_in))
+                if DIAG and diag[0] < 4:
+                    # 把**收到的原始数据**原样打出来。别靠推理猜表示法 ——
+                    # 量一下 min/max/均值。均值远大于交流摆幅就说明有直流偏置。
+                    diag[0] += 1
+                    _f = np.asarray(abuf_in.reshape(-1, 2)[:, 0],
+                                    dtype=np.int64)
+                    events.append(
+                        "[诊断] 原始 dtype=%s size=%d min=%d max=%d 均值=%.0f"
+                        "（摆幅 %d）| 去直流后 rms=%.1f | 直流估计值=%.0f"
+                        % (abuf_in.dtype, abuf_in.size, int(_f.min()),
+                           int(_f.max()), _f.mean(), int(_f.max() - _f.min()),
+                           rms(cin), _dc_est[0]))
             else:
                 # wav 模式：放音那一半是真的，只是"收到什么"被 wav 顶掉
                 if pos + L > src_wav.size:
@@ -420,11 +729,22 @@ def stage_dsp():
             stop.set()
             return
 
+        # 每块先做两件事：看一次旋钮（最多 20 Hz），再让**施加值**往目标走一步。
+        # 走斜坡而不是直接跳：不跳变幅度就在耳机里听不到"啪"那一声。
+        # 这一段在 dsp 线程上 —— io 那边一个字不碰（它零余量）。
+        t_now = time.time()
+        poll_tune(t_now)
+        if ramp_left[0] > 0:
+            for j in range(4):
+                gain_cur[j] += (gain_dst[j] - gain_cur[j]) / ramp_left[0]
+            ramp_left[0] -= 1
+        gains_int = tuple(int(round(x)) for x in gain_cur)
+
         t_d = time.perf_counter()
         try:
             dt, _spins = k.run(cin, cout, L, reset=first,
-                               thr=(THR_Q15,) * 4, ratio=(RATIO_Q15,) * 4,
-                               bypass=BYPASS)
+                               thr=thr_cur[0], ratio=ratio_cur[0],
+                               gain=gains_int, bypass=bypass_cur[0])
         except Exception as e:                               # noqa: BLE001
             errors.append(("dsp", repr(e)))
             stop.set()
@@ -444,11 +764,18 @@ def stage_dsp():
 
         # 留一份给逐位自检。**从第一块就开始留** —— 离线的重算要从 reset
         # 那一刻起对齐，中间少一块就对不上了。cap_in/cap_out 必须同进同出。
+        # applied_log 也在这里跟着留：**它记的是这一块当时用的那组参数**，
+        # 所以"跑的过程中调过旋钮"不会让自检失效。
         if captured[0] < CAPTURE_MAX:
+            applied_log.append((gains_int, thr_cur[0], ratio_cur[0], bypass_cur[0]))
             cap_in.append(np.array(cin, dtype=np.int16))
             cap_out.append(np.array(cout, dtype=np.int16))
             captured[0] += L
         q2.put(i)
+
+        # 写状态文件放在 q2.put 之**后** —— io 那边等着要这个槽，
+        # 先把它交出去，再干这种不着急的活。
+        maybe_status(t_now)
 
 
 # 线程切换间隔。原来是 0.0005（0.5 ms）——"块才 10 ms，调细点"。
@@ -467,22 +794,46 @@ if MMIO_LEN is None:
     raise SystemExit("audio 的 mmio 没有 length 属性？驱动变了")
 
 hr("1. 开始（说句话，耳机里应该能听到处理过的实时声音）")
+
+# 启动时会**把上次留下的旋钮文件当成用户预设直接吃进去**（这是"先拧好再启动"
+# 那个用法要的）。但遗留值可能是上一趟调完没收的，这一趟就带着它跑 ——
+# 实测踩过：遗留的 +16 dB 高频 + 音量 45 + 麦克风 +19 dB 输入增益 = 直接啸叫。
+# 所以这里做成**看得见的**警告，让人知道现在到底按哪组值在跑。
+_d0 = read_tune()
+if _d0 is not None:
+    try:
+        _g0 = "/".join("%.1f" % float(x) for x in _d0["gain_db"])
+    except (KeyError, TypeError, ValueError):
+        _g0 = None
+    if _g0:
+        print("   ⚠️ %s 里有上次留下的旋钮值：%s dB —— **这一趟就按它跑**。"
+              % (TUNE_PATH, _g0))
+        print("      不想要就先删掉它再启动，或者在界面里把滑杆拨回去。")
+
+print("   每段增益 %s dB（Q7.8 原始值 %s）"
+      % ("/".join("%.1f" % x for x in GAIN_DB), list(gain_dst)))
+print("   压缩门限 %.3f，压缩比 %.2f，直通=%s"
+      % (THR_Q15 / 32768.0, RATIO_Q15 / 32768.0, BYPASS))
+print("   调参：界面写 %s，状态写在 %s" % (TUNE_PATH, STATUS_PATH))
 if SECONDS > 0:
     print("   跑 %.0f 秒（也可以 Ctrl-C 提前停）" % SECONDS)
 else:
     print("   一直跑，Ctrl-C 停")
 print()
 
+clear_status()                       # 先删旧状态，免得界面读到上一趟的数字
 ths = [threading.Thread(target=f, name=n, daemon=True)
        for f, n in ((stage_io, "io"), (stage_dsp, "dsp"))]
+t_start[0] = time.time()             # 线程一开跑就开始计时（状态文件要用）
 for t in ths:
     t.start()
 
-t_start = time.time()
 try:
     while not stop.is_set():
         time.sleep(0.25)
-        if SECONDS > 0 and time.time() - t_start >= SECONDS:
+        while events:                # 实时线程攒下来的话，在这里打印
+            print(events.pop(0))
+        if SECONDS > 0 and time.time() - t_start[0] >= SECONDS:
             break
 except KeyboardInterrupt:
     print("\n   Ctrl-C —— 收工")
@@ -495,8 +846,14 @@ finally:
         print("   ⚠️ 有线程没停下来，跳过收尾（那一下静音不做了）")
     else:
         lib.stream_end(h)
+for _e in events:
+    print(_e)
 
-wall = time.time() - t_start
+# 主循环在这之前就停了，所以这个时刻就是"这次跑到哪儿为止"。
+# 下面自检要把每一块重新过一遍核，收尾还要关音频通路 —— 那都是**跑完之后**的事，
+# 不能算进"墙钟"。所以先把时刻冻住，最后那一帧状态用它。
+t_end = time.time()
+wall = t_end - t_start[0]
 
 # ---------------- 2. 结果 ----------------
 hr("2. 跑得怎么样")
@@ -549,20 +906,22 @@ if in_rms:
           % (np.median(in_rms), max(in_rms)))
     if np.median(in_rms) < 200:
         print("   ⚠️ 几乎是静音 —— 麦克风没插、插错口，或者没说话。")
-        print("      插着耳机麦还这样：把耳机**拔掉停两秒再插回去**（板上那颗")
-        print("      自动耳机开关 U41 只在插头插入那一下做检测）。")
+        print("      插着耳机麦还这样：把耳机拔掉再插回去，**一次不一定够** ——")
+        print("      要拔到电平表跳起来为止（板上那颗自动耳机开关 U41 只在插头")
+        print("      插入那一下做检测；实测连续拔插到第 35.5 秒才跳）。")
     if np.median(in_rms) > 20000:
-        print("   ⚠️ 电平顶到满量程了 —— 24 位转 16 位那里可能没对上，")
-        print("      或者输入被削顶。先看这一条再听别的。")
+        print("   ⚠️ 电平顶到满量程了 —— 多半是啸叫（耳机→空气→麦克风自激），")
+        print("      或者输入被削顶。真啸叫就摘耳机、把音量调小重开。")
 if out_rms:
     print("   出核的电平：中位 %.0f" % np.median(out_rms))
 
 # ---------------- 3. 逐位自检 ----------------
 hr("3. 逐位自检：这条流水线 == 原来那条路")
-print("""   做法：把这次真跑出来的输入块和输出块各拼起来，再用离线的
-   process(chunk=L) 重算一遍，逐位比。
+print("""   做法：把这次真跑出来的输入块和输出块各拼起来，再用**每一块当时实际用的
+   那组参数**逐块重算，逐位比。
 
-   对上了说明：分线程没有让块错位、reset 只给了一次、缓冲没有被踩。
+   对上了说明：分线程没有让块错位、reset 只给了一次、缓冲没有被踩，
+   而且**跑的过程中调过旋钮也没算错**（所以"边拖滑杆边跑"这一趟照样能自检）。
    这是"能出声"之外唯一还算硬的判据 —— 好不好听只能靠耳朵。
 """)
 
@@ -572,8 +931,30 @@ if len(cap_in) >= 3:
     y_cat = np.concatenate(cap_out)
     nb = len(cap_in)
     print("   拿这次真跑过的 %d 块（%d 个采样）重算" % (nb, x_cat.size))
-    ref, _dt, _bl = k.process(x_cat, reset=True, chunk=L, bypass=BYPASS,
-                              thr=(THR_Q15,) * 4, ratio=(RATIO_Q15,) * 4)
+
+    n_change = 0
+    for j in range(1, nb):
+        if applied_log[j][0] != applied_log[j - 1][0]:
+            n_change += 1
+    if n_change:
+        print("   这一趟增益**变过 %d 次** —— 正是「边拖滑杆边跑」要验的那一下"
+              % n_change)
+
+    # 逐块重算。**不能再用 k.process(x_cat, gain=...) 一把梭** ——
+    # 那个接口一次只接受一组增益，中途变过就对不上了。
+    ref = np.empty(x_cat.size, dtype=np.int16)
+    ib = allocate(shape=(L,), dtype=np.int16)
+    ob = allocate(shape=(L,), dtype=np.int16)
+    try:
+        for j in range(nb):
+            gj, thj, raj, byj = applied_log[j]
+            np.copyto(ib, x_cat[j * L:(j + 1) * L])
+            k.run(ib, ob, L, reset=(j == 0), thr=thj, ratio=raj,
+                  gain=gj, bypass=byj)
+            np.copyto(ref[j * L:(j + 1) * L], ob)
+    finally:
+        del ib, ob
+
     bad = np.flatnonzero(ref != y_cat)
     if bad.size == 0:
         ok = True
@@ -587,10 +968,27 @@ if len(cap_in) >= 3:
 else:
     print("   跑的块数太少（%d），跳过自检。" % len(cap_in))
 
+# 收尾：状态文件里记一笔"跑完了"+自检结论。界面靠 running=False 判断收工，
+# 不是靠"数字不动了"—— 停了和卡住在这条上长得一模一样。
+#
+# 时刻用 t_end（主循环停下的那一刻），**不能用 time.time()**：
+# 上面那段自检会把每一块重新过一遍核，几秒到几十秒都有可能，
+# 用现在的时间算出来的墙钟会把这段也算进去 —— 界面上就会显示成
+# "实时倍率 0.87x、丢了 60 块"，而脚本自己打印的是 0.99x、丢 4 块。
+# 同一趟跑出两个数，看的人只会以为通路坏了。
+try:
+    publish_status(t_end, running=False, ok=ok)
+except OSError:
+    pass
+
 hr("4. 说明")
 print("""
    · **好不好听只能靠耳朵。** 这个脚本能证明的是：延迟线没错位、没成片丢音、
      电平正常。音质、压缩的手感、有没有咔声 —— 这些没有数字判据。
+
+   · **边跑边拖滑杆**：另开板子自带的 Jupyter 网页，跑
+     `board/notebooks/w5_tuning_ui.ipynb`（4 条滑杆 + 电平表）。
+     它和本脚本之间只有两个 JSON 文件，界面关掉不影响这条音频通路。
 
    · 想 A/B 对照：LIVE_BYPASS=1 跑一遍（直通），再 LIVE_BYPASS=0 跑一遍
      （压缩），别的参数都一样。
