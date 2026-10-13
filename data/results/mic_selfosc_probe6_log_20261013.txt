@@ -1,0 +1,131 @@
+cap_probe6.py 原始日志 —— 2026-10-13 深夜
+板:PYNQ-Z2,COM6,路径 /home/xilinx/jupyter_notebooks
+跑法:echo xilinx | sudo -S sh -c 'cd /home/xilinx/jupyter_notebooks && XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 cap_probe6.py'
+
+目的:把播放通路钉在"坏状态"(R22=0x21 R24=0x41 R29/R30=音量),然后一次只掐一处,
+      每组重复三遍、顺序交替 —— 因为同一个寄存器值三遍里能满一次。
+
+读法:rms16 = 收到的原始 24 位数据 / 256 之后的 rms。全幅方波约 36000 上下。
+      安静(没有自激)时约 150。
+
+------------------------------------------------------------------------------
+readback check: wrote 0x23=0xFB, read 0x23=FB (mismatch => ignore 0x columns)
+------------------------------------------------------------------------------
+读回校验对上 —— 说明这次收到的数字本身是可信的,不是读协议错。
+
+  pass0  control_bad     rms16= 36083.0 pk=65535.6 | raw24 min=      10 max=16777109 mean=  5466593
+  pass0  playback_off    rms16= 43037.3 pk=65536.0 | raw24 min=     237 max=16777204 mean=  7476084
+  pass0  rec_mixer_off   rms16= 65444.9 pk=65487.7 | raw24 min=16734657 max=16764860 mean= 16752525
+  pass0  input_muted     rms16=  3991.9 pk= 7274.8 | raw24 min=  561015 max= 1862344 mean=  1083937
+  pass0  lden_off        rms16=   264.1 pk=  481.3 | raw24 min=   36939 max=  123225 mean=    71663
+  pass0  gain_m12dB      rms16=    37.7 pk=   69.0 | raw24 min=    5084 max=   17666 mean=    10207
+  pass0  gain_0dB        rms16=   154.4 pk=  281.9 | raw24 min=   21532 max=   72161 mean=    41924
+  pass0  gain_p21dB      rms16=   155.7 pk=  279.5 | raw24 min=   20303 max=   71549 mean=    41876
+  pass0  hp_driver_off   rms16=   194.7 pk=  292.6 | raw24 min=   18397 max=   74899 mean=    47640
+  pass0  hp_vol_m57dB    rms16=   145.3 pk=  305.6 | raw24 min=    8045 max=   78245 mean=    40120
+  pass0  nGate_off       rms16= 45141.6 pk=65535.7 | raw24 min=      30 max=16777128 mean=  8391814
+  pass1  nGate_off       rms16= 48477.4 pk=65535.8 | raw24 min=      18 max=16777155 mean=  9570204
+  pass1  hp_vol_m57dB    rms16= 65429.6 pk=65536.0 | raw24 min=       2 max=16777211 mean= 16399262
+  pass1  hp_driver_off   rms16=   172.9 pk=  275.3 | raw24 min=    8187 max=   70485 mean=    43863
+  pass1  gain_p21dB      rms16=   141.6 pk=  259.7 | raw24 min=   17076 max=   66485 mean=    38391
+  pass1  gain_0dB        rms16=   107.0 pk=  195.1 | raw24 min=   14930 max=   49936 mean=    29036
+  pass1  gain_m12dB      rms16=   143.0 pk=  261.3 | raw24 min=   19965 max=   66884 mean=    38850
+  pass1  lden_off        rms16=   148.3 pk=  271.2 | raw24 min=   20678 max=   69437 mean=    40278
+  pass1  input_muted     rms16=     1.7 pk=    3.7 | raw24 min=       0 max=     946 mean=      441
+  pass1  rec_mixer_off   rms16=   139.5 pk=  255.8 | raw24 min=   19272 max=   65493 mean=    37881
+  pass1  playback_off    rms16=  5990.2 pk=65534.1 | raw24 min=   21365 max=16776740 mean=  1528014
+  pass1  control_bad     rms16= 46061.5 pk=65535.4 | raw24 min=      54 max=16777071 mean=  8640262
+  pass2  control_bad     rms16= 50715.8 pk=65535.2 | raw24 min=     334 max=16777012 mean= 10457180
+  pass2  playback_off    rms16= 47287.3 pk=65535.9 | raw24 min=     293 max=16777198 mean=  9048787
+  pass2  rec_mixer_off   rms16= 65196.6 pk=65351.4 | raw24 min=16618527 max=16729950 mean= 16685045
+  pass2  input_muted     rms16=  3974.9 pk= 7255.1 | raw24 min=  557718 max= 1857295 mean=  1079482
+  pass2  lden_off        rms16=   312.5 pk=  570.6 | raw24 min=   43790 max=  146069 mean=    84871
+  pass2  gain_m12dB      rms16=    55.1 pk=  101.5 | raw24 min=    7574 max=   25974 mean=    14981
+  pass2  gain_0dB        rms16=   164.9 pk=  302.4 | raw24 min=   22954 max=   77411 mean=    44833
+  pass2  gain_p21dB      rms16=   161.4 pk=  294.7 | raw24 min=   21369 max=   75436 mean=    43457
+  pass2  hp_driver_off   rms16=   179.4 pk=  287.4 | raw24 min=   11800 max=   73574 mean=    44893
+  pass2  hp_vol_m57dB    rms16=   150.4 pk=  308.0 | raw24 min=    9621 max=   78842 mean=    40452
+  pass2  nGate_off       rms16= 45703.3 pk=65534.3 | raw24 min=     265 max=16776789 mean=  8455079
+
+==============================================================================
+  step            median rms16   trials          mean raw24
+  control_bad       46061.5      36083 46062 50716    8640262
+  playback_off      43037.3      43037 5990 47287    7476084
+  rec_mixer_off     65196.6      65445 140 65197   16685045
+  input_muted        3974.9      3992 2 3975    1079482
+  lden_off            264.1      264 148 313      71663
+  gain_m12dB           55.1      38 143 55      14981
+  gain_0dB            154.4      154 107 165      41924
+  gain_p21dB          155.7      156 142 161      41876
+  hp_driver_off       179.4      195 173 179      44893
+  hp_vol_m57dB        150.4      145 65430 150      40452
+  nGate_off         45703.3      45142 48477 45703    8455079
+restored PYNQ default codec config
+
+==============================================================================
+  ==== 结论 ====
+==============================================================================
+
+基础状态(BAD)= PYNQ 的 select_microphone 之后,再写 stream_begin 那 4 个寄存器
+(R22=0x21 R24=0x41 R29/R30=0xFB)。这就是 run_live.sh 每次开声的原始状态。
+
+三遍全静(自激被切断)的只有三组:
+
+  hp_driver_off   195 / 173 / 179   耳机功放整个关掉(R29/R30=0x02)
+  gain_0dB        154 / 107 / 165   话筒 PGA boost 降到 0 dB(R5/R7=0x08)
+  lden_off        264 / 148 / 313   差分输入关掉(R8/R9=0x00)
+  gain_m12dB      38 / 143 / 55     同上,再叠输入音量 -12 dB
+  gain_p21dB      156 / 142 / 161   同上,再叠输入音量 +21 dB
+  (gain_0dB / gain_m12dB / gain_p21dB 都属"boost 降 0 dB",输入音量那三档全静
+   → 说明起决定作用的是 PGA 那级 boost,不是输入音量那级)
+
+三遍里至少满一次(没治好)的:
+
+  control_bad     36083 / 46062 / 50716   坏状态本身
+  rec_mixer_off   65445 / 140  / 65197    关录音混音器
+  playback_off    43037 / 5990 / 47287    把 DAC 摘出播放混音(R22/R24=0x01)
+  input_muted     3992  / 1.7  / 3975     录音混音器 boost 静音(有残留 ~4000,
+                                          带一个约 1/16 满幅的直流偏移)
+  hp_vol_m57dB    145   / 65430 / 150     耳机音量 -57 dB,但功放还开着
+  nGate_off       45142 / 48477 / 45703   关噪声门(比基础状态更凶)
+
+=== 三条结论 ===
+
+1. 环路的另一头是耳机功放。
+   10-10 记的"环不在耳机那条路上(音量设 0 照样满)"要改:当时的 0 实际是 0x03
+   = -57 dB,功放仍然使能;真正把功放关掉(0x02,芯片自己的默认值)才三遍全静。
+   所以"跟输出多大无关"是对的,但原因是**只要功放开着就够**,和信号电平无关。
+
+2. 环路增益只是刚刚超过 1。
+   两头各砍一刀都能断;hp_vol_m57dB 那一档开始出现"三遍里满一次"的双稳态,
+   probe5 里"同一个寄存器值有时啸有时静"就是这么来的。
+
+3. probe3 的 G 行(R8/R9 归零就治好)不是"那个寄存器是开关",而是"总增益掉到 1
+   以下"。同理 R5/R7 降 20 dB 也断,而且更划算 —— 差分输入那级 +21 dB 还在。
+
+=== 修法 ===
+board/scripts/fir_live.py 选完麦克风之后加:
+    lib.stream_reg_write(0x0B, 0x08, IIC)   # R5 左,boost +20 dB -> 0 dB
+    lib.stream_reg_write(0x0D, 0x08, IIC)   # R7 右
+话筒 +41 dB -> +21 dB,听的那一头完全不动。
+
+=== 顺带 ===
+rec_mixer_off 与 nGate_off 冲到接近满幅方波(mean ≈ 半幅),而 input_muted 只剩
+一个带直流偏移的小残留 —— 这两组测出来的"照样满"里,有多少是自激、有多少是
+关掉混音器之后 ADC 输入悬空本身的产物,cap_probe7 没能分开。它们都不影响
+上面那两条结论:那是**唯一**能让它停下来的一组(耳机功放 / 话筒增益),
+其余全都没停。
+
+=== 附:cap_probe7.py 第一次跑为什么失败(2026-10-13 深夜) ===
+跑出来是报错,不是数据:
+
+    AttributeError: function/symbol 'stream_reg_write' not found in library
+    '/home/xilinx/jupyter_notebooks/libaudio_stream.so'
+    ... undefined symbol: stream_reg_write
+
+板上那份 libaudio_stream.so 是 10-10 之前编的,里面没有 stream_reg_write
+(这个函数 10-10 才加进 audio_stream.cpp,当时就注明"板上 .so 还没重编")。
+本文件上面"修法"里那两行 fir_live.py 用的正是同一个函数 —— 所以那个修法
+照现在的样子一开麦就崩。先重编库再跑:
+
+    sh /home/xilinx/jupyter_notebooks/build_audio_stream.sh
