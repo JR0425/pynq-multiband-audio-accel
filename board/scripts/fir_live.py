@@ -290,6 +290,7 @@ t_dsp_wall = []      # dsp 里：调 k.run 的墙钟（不是它自己报的 dt�
 t_proc = []          # 每块 k.run 自己报的耗时
 n_blocks = [0]
 diag = [0]           # LIVE_DIAG=1 时，把收到的原始数据长什么样打前几块出来
+lvl_t = [0.0]        # LIVE_DIAG=1 时，每秒记一行电平（只攒文本，跑完一起打）
 in_rms = []
 out_rms = []
 cap_in = []          # 自检用：这次真跑过的每块输入
@@ -506,33 +507,34 @@ def i32_to_i16_chan(buf, ch=0):
 # 去直流：一阶高通（慢速跟踪均值再减掉）。状态跨块带着走，块边界连续无台阶。
 # 系数 0.05/块 → 时间常数 20 块 = 200 ms → 转折约 0.8 Hz，50 Hz 以上几乎不受影响。
 #
-# ⚠️ 这个函数的**由来**要记清楚，因为它一开始的判断是错的。
+# 这一步留着，因为直流偏置是真的：cap_probe.py 在干净通路上量到原始均值约 1.0e5
+# → 16 位域约 390（1.2% 满量程）。去掉它给核省下动态范围，也让 in_rms 真的反映声音。
 #
-# 2026-10-10 用 LIVE_DIAG=1 打出收到的原始缓冲区，四块都是这样：
-#     dtype=int32  size=960  min=2583601  max=2629504  均值=2609092
-# 一个 10 ms 块里交流只有 ±4.5e4，均值却有 2.6e6 —— 换算到核的刻度是
-# 「均值 10192，交流 ±90」。当时据此判断"这个口的输入带着 31% 满量程的
-# 直流偏置"，于是加了这一步。
-#
-# **这个判断后来被证伪了。** 那 2.6e6 不是麦克风的直流偏置，是
-# `stream_begin` 里 4 次 I2C 写把 codec 的输入通路搞成满幅自激的结果
-# （见 cap_probe2.py 和 `audio_stream.cpp` 里 stream_reg_write 那段注释）。
-# 修好那一处之后，输入本来就是干净的。
-#
-# 那这一步还留不留？**留。** 因为它去掉的是真东西：在**没被搞坏**的通路上
-# 实测（cap_probe.py）原始均值约 1.0e5 → 16 位域约 390，也就是 1.2% 满量程
-# 的直流偏置确实存在，只是没到 31% 那种夸张程度。一阶高通去掉它是对的，
-# 而且给核省下动态范围、也让 in_rms 真的反映声音。
-# 只是**别把它当成当初那件事的解药** —— 那件事在 codec 那边。
+# ⚠️ 这一段以前写着「那 2.6e6 是 stream_begin 那 4 次 I2C 写把输入通路搞成满幅
+# 自激」。**10-13 的 probe10（一次 I2C 写都不做）和 10-14 的 probe11 都不支持它。**
+# probe11 在 after_cfg 里实测到同形态的瞬态：3900 → 0，约 1 秒衰完。所以那 2.6e6
+# 更可能就是 codec 打开后 ADC 自己的直流建立过程；而"爬满"整件事是读法的算术假象
+# （见 cap_probe11.py 文件头）。**别再按自激去查。**
 _dc_est = [None]
+
+_ADC_FULL24 = 1 << 24
+_ADC_HALF24 = 1 << 23
 
 
 def adc_to_i16(buf, ch=0):
-    """麦克风那一块原始缓冲区 → 喂核的 int16，顺带去掉慢漂的直流。"""
-    u = buf.reshape(-1, 2)[:, ch].astype(np.float64)
-    m = float(u.mean())
+    """麦克风那一块原始缓冲区 → 喂核的 int16，顺带去掉慢漂的直流。
+
+    低 24 位是**二进制补码、没有做符号扩展**（bits[31:24] = 0），所以必须先把
+    负样本按补码还原、再 /256。2026-10-10 那版直接在 content 上减均值：
+    一个跨零的近零信号，content 一半贴 0、一半贴 16777216，减掉约 8388608 之后
+    就成了 ±32767 的**满幅方波** —— 耳机里那声很响的噪声就是这么来的。
+    probe11 实测噪声底只有 ±50 LSB（约 -58 dBFS），原来的读法报成 rms 46000。
+    """
+    u = buf.reshape(-1, 2)[:, ch].astype(np.int64) & 0xFFFFFF
+    s = np.where(u >= _ADC_HALF24, u - _ADC_FULL24, u)
+    m = float(s.mean()) / 256.0
     _dc_est[0] = m if _dc_est[0] is None else _dc_est[0] + 0.05 * (m - _dc_est[0])
-    v = (u - _dc_est[0]) / 256.0
+    v = s.astype(np.float64) / 256.0 - _dc_est[0]
     return np.clip(np.rint(v), -32768.0, 32767.0).astype(np.int16)
 
 
@@ -649,22 +651,18 @@ if SRC == "wav":
     print("   音源：%s（%d 个采样，循环放）" % (p, src_wav.size))
 else:
     audio.select_microphone()
-    # 话筒那两级增益：PYNQ 的 select_microphone 写的是 PGA boost +20 dB（R5/R7=0x10）
-    # 叠上差分输入 +21 dB（R8/R9=0xB3），一共 +41 dB。
+    # 话筒两级增益由 PYNQ 的 select_microphone 自己写：LDBOOST +20 dB（R5/R7=0x10）
+    # 叠差分输入 +26.25 dB（R8/R9=0xB3），一共约 +46 dB。
     #
-    # ⚠️ **这两级降到 +27 dB 并不能止住自激 —— 别把它当成修法。**
-    # cap_probe6/7 说"boost 0 + 输入 +27 = 三遍全静"，那是每步只跑 0.2 秒截出来的
-    # 假象：cap_probe8.py 把同一套寄存器跑满 3 秒，头三格 286/74/20，第四格就 2120、
-    # 第五格 29070，一路贴到满量程。而且**把话筒输入整级 mute 掉（R8/R9=0x00）
-    # 照样满** —— 电平根本不是从话筒这条链路进来的。所以这四行**不解决**任何问题。
-    # 留着只是因为台面上少 14 dB 增益没有坏处（还不占实时预算），等查清真正那条
-    # 环路再决定动不动它。详见 data/results/mic_selfosc_probe8_log_20261013.txt。
-    lib.stream_reg_write(0x0B, 0x08, IIC)   # R5 左：PGA boost +20 -> 0 dB
-    lib.stream_reg_write(0x0D, 0x08, IIC)   # R7 右
-    lib.stream_reg_write(0x0E, 0xD3, IIC)   # R8 左：差分输入 +21 -> +27 dB
-    lib.stream_reg_write(0x0F, 0xD3, IIC)   # R9 右
-    time.sleep(0.3)
-    print("   音源：麦克风（话筒增益 +41 -> +27 dB；注意：**这不解决自激**）")
+    # 这里**曾经**有四行 stream_reg_write 把增益压到 +27 dB。它们当初是当「止住自激的
+    # 修法」写进来的，而自激已被 cap_probe11 证明是 24 位补码没做符号扩展的读数假象
+    # —— 本来就不修任何东西。2026-10-14 的 cap_probe14/15 又实测出它们还有副作用：
+    # A（PYNQ 原样 0x10/0xB3）与 C（那四行的 0x08/0xD3）交叉跑 A1/C1/A2/C2，
+    # 读数**跟着寄存器来回跳**（rms 11.1 → 3.4 → 12.6 → 2.3），差约 11 dB。
+    # 话筒本来就弱，这 11 dB 正好是「实时管线里全是底噪」的直接原因，所以删掉。
+    # 要再调增益就动 R8/R9（0x0E/0x0F）：0xB3 = +26.25 dB，0xFF = +35.25 dB。
+    # （旧注释里那一串 probe6/7/8 的推理已整条作废，见 PROGRESS.md 2026-10-14 那节。）
+    print("   音源：麦克风（PYNQ 原样两级增益，约 +46 dB）")
 
 
 # ---------------- 两条线程 ----------------
@@ -723,16 +721,21 @@ def stage_dsp():
             if src_wav is None:
                 np.copyto(cin, adc_to_i16(abuf_in))
                 if DIAG and diag[0] < 4:
-                    # 把**收到的原始数据**原样打出来。别靠推理猜表示法 ——
-                    # 量一下 min/max/均值。均值远大于交流摆幅就说明有直流偏置。
+                    # 把**收到的原始数据**原样打出来，而且**两个域并排给**：
+                    # 低 24 位是二进制补码、没有做符号扩展，只有「补码域」那一列
+                    # 才是真实电平。2026-10-14 之前只有左边那一列，于是把一个
+                    # 贴着数字零的信号读成了 46000（见 adc_to_i16 的说明）。
                     diag[0] += 1
-                    _f = np.asarray(abuf_in.reshape(-1, 2)[:, 0],
-                                    dtype=np.int64)
+                    _u = np.asarray(abuf_in.reshape(-1, 2)[:, 0],
+                                    dtype=np.int64) & 0xFFFFFF
+                    _s = np.where(_u >= _ADC_HALF24, _u - _ADC_FULL24, _u)
                     events.append(
-                        "[诊断] 原始 dtype=%s size=%d min=%d max=%d 均值=%.0f"
-                        "（摆幅 %d）| 去直流后 rms=%.1f | 直流估计值=%.0f"
-                        % (abuf_in.dtype, abuf_in.size, int(_f.min()),
-                           int(_f.max()), _f.mean(), int(_f.max() - _f.min()),
+                        "[诊断] 原始 dtype=%s size=%d | 原样域 min=%d max=%d 均值=%.0f"
+                        " | 补码域 min=%d max=%d 均值=%.1f rms=%.1f"
+                        " | 去直流后喂核 rms=%.1f | 直流估计=%.1f"
+                        % (abuf_in.dtype, abuf_in.size, int(_u.min()),
+                           int(_u.max()), _u.mean(), int(_s.min()), int(_s.max()),
+                           _s.mean(), rms(_s.astype(np.float64)) / 256.0,
                            rms(cin), _dc_est[0]))
             else:
                 # wav 模式：放音那一半是真的，只是"收到什么"被 wav 顶掉
@@ -778,6 +781,16 @@ def stage_dsp():
         in_rms.append(rms(cin[::16].astype(np.float64)))
         t_prep.append(time.perf_counter() - t_p)
 
+        # 每秒一行电平。看的是"沉默→说话→沉默"的形状：一个中位数分不清
+        # "话筒好的但你没出声"和"话筒这一路根本没信号"，形状分得清。
+        # 只往 events 里攒字符串 —— dsp 线程带着 SCHED_FIFO，在这里 print
+        # 会卡在串口 I/O 上丢音（见 events 的定义）。
+        if DIAG and t_now - lvl_t[0] >= 1.0:
+            lvl_t[0] = t_now
+            events.append("   [电平] t=%4.1fs  进核 rms=%5.0f 峰=%5.0f  |  出核 rms=%5.0f"
+                          % (t_now - t_start[0], rms(cin),
+                             float(np.abs(np.asarray(cin)).max()), rms(cout)))
+
         # 留一份给逐位自检。**从第一块就开始留** —— 离线的重算要从 reset
         # 那一刻起对齐，中间少一块就对不上了。cap_in/cap_out 必须同进同出。
         # applied_log 也在这里跟着留：**它记的是这一块当时用的那组参数**，
@@ -814,8 +827,8 @@ hr("1. 开始（说句话，耳机里应该能听到处理过的实时声音）"
 # 启动时会**把上次留下的旋钮文件当成用户预设直接吃进去**（这是"先拧好再启动"
 # 那个用法要的）。但遗留值可能是上一趟调完没收的，这一趟就带着它跑 ——
 # 实测踩过：遗留的 +16 dB 高频 + 音量 45 + 麦克风 +19 dB 输入增益 = 直接啸叫。
-# （"啸叫"这个归因 2026-10-13 已被 probe8/9 否掉，但"遗留旋钮会让这一趟带错值"
-#  这个提醒本身仍然成立，所以这段保留。）
+# （「啸叫」这个归因后来整个不成立了 —— 见 adc_to_i16 的说明和 PROGRESS.md
+#  2026-10-14 那节。但「遗留旋钮会让这一趟带错值」这个提醒仍然成立，保留。）
 # 所以这里做成**看得见的**警告，让人知道现在到底按哪组值在跑。
 _d0 = read_tune()
 if _d0 is not None:
@@ -920,18 +933,22 @@ if t_proc:
 
 print()
 if in_rms:
-    print("   进核的电平：中位 %.0f  峰 %.0f（int16 域，满量程 32767）"
-          % (np.median(in_rms), max(in_rms)))
-    if np.median(in_rms) < 200:
-        print("   ⚠️ 几乎是静音 —— 麦克风没插、插错口，或者没说话。")
-        print("      插着耳机麦还这样：把耳机拔掉再插回去，**一次不一定够** ——")
-        print("      要拔到电平表跳起来为止（板上那颗自动耳机开关 U41 只在插头")
-        print("      插入那一下做检测；实测连续拔插到第 35.5 秒才跳）。")
-    if np.median(in_rms) > 20000:
-        print("   ⚠️ 电平顶到满量程了。这句原来写的是「多半是啸叫」，**那个归因")
-        print("      2026-10-13 已被 probe8/9 否掉**：话筒增益、话筒静音、输出幅度、")
-        print("      耳机功放开关都对它无效，原因至今没查清（线索：数字侧读通路 / ALC）。")
-        print("      见 data/results/mic_selfosc_probe8_log_20261013.txt、probe9_log。")
+    _p90 = float(np.percentile(in_rms, 90))
+    print("   进核的电平：中位 %.0f  P90 %.0f  峰 %.0f（int16 域，满量程 32767）"
+          % (np.median(in_rms), _p90, max(in_rms)))
+    # 判据用 P90、不用中位：说话是有顿挫的，整段的中位会被停顿拉低。2026-10-15
+    # 实测：说话时中位 107 / P90 上千 / 峰 24076；话筒没信号时中位 15 / P90 25 / 峰 82。
+    # （原来卡在中位 200，于是正常说话也会触发"几乎是静音"，见 PROGRESS.md。）
+    if _p90 < 100:
+        print("   ⚠️ 这一趟基本没有信号进来（P90 < 100）。")
+        print("      先试**拔插耳机**：U41 那颗自动耳机开关（TS3A226AE）只在插头")
+        print("      插入的上升沿检测一次并锁存，插一次可能锁在错的那一档。一边")
+        print("      说话一边拔插，直到上面那一行的 P90 跳到几百以上 —— 2026-10-15")
+        print("      实测要连续拔插到第 18 秒才跳对。")
+    if np.median(in_rms) > 10000:
+        print("   ⚠️ 电平顶到满量程了 —— 真到这一步就是**新**问题，不是 10-13 记的")
+        print("      「自激」：那个已坐实是读法的算术假象（24 位补码没做符号扩展），")
+        print("      adc_to_i16 修好之后就再也量不到它了。见 PROGRESS.md 2026-10-14 那节。")
 if out_rms:
     print("   出核的电平：中位 %.0f" % np.median(out_rms))
 

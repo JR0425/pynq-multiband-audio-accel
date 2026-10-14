@@ -1,5 +1,15 @@
 # cap_probe6.py -- microphone self-oscillation: which knob breaks the loop?
 #
+# !! RETRACTED 2026-10-15. There is no self-oscillation and there never was.
+# The railing level is a READING ARTIFACT: the low 24 bits of the I2S capture
+# register are two's complement and were read as unsigned, so the digital zero
+# (DC offset ~31679 in the 16-bit domain ~ 2**23 * 0.966, right at the sign
+# boundary) came out as rms 46341 = 65535/sqrt(2). See cap_probe11.py, which
+# found the arithmetic, and cap_probe12.py. Every "quiet" reading below is an
+# artifact of a 0.2 s observation window on top of that. This script is kept as
+# a record of the error -- do NOT cite it as evidence, and do not act on the
+# "fixes" its output suggests.
+#
 # Background (2026-10-13): with the playback path open (R22=0x21, R24=0x41,
 # R29/R30 = volume) the ADC rails at full scale even though the DAC is fed
 # silence.

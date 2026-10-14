@@ -26,7 +26,7 @@
 #      也就是说这是"优化过的软件",不是"随便写写的软件"。
 #   3. **核的耗时里含 Python 写寄存器 + cache 维护 + 等 DONE 的轮询**。
 #      这一条在 v18（450 拍/采样）时几乎看不见 —— 硬件本身 4.5 µs，
-#      Python 那点固定开销被摊掉了。**核改成 31 拍/采样之后它就不再可忽略**，
+#      Python 那点固定开销被摊掉了。**核砍到几十拍之后它就不再可忽略**，
 #      会直接决定实测值。所以下面会把它算出来、单独打一行，不再一句"很小"带过。
 #
 # 用法（板子上,要 root）：
@@ -52,9 +52,11 @@ SECONDS = 3.0
 REPEAT = 3
 FPGA_MHZ = 100.0
 # 拍/采样,见 data/results/impl_metrics.md。
-# v18_axi_shell 是 450；v19_shift_chain（改了延迟线写法）之后是 28。
-# 默认按现在的 bit（v19）算，要复现旧数就 CYCLES_MEASURED=450。
-CYCLES_MEASURED = int(os.environ.get("CYCLES_MEASURED", "28"))
+# **现在是两代,别混**:当前出货的 `v20_gain`(含 band_gain)是 **35 拍**;
+# 2026-10-08 那次对照测的是 `v19`(无 band_gain)= **31 拍**;
+# t 系列中间实验才是 28 拍。这个脚本量的是**板上当前那颗**核,所以默认 35。
+# 要复现 19.5 倍那次(CYCLES_MEASURED=31)或 450 拍那版(=450)就显式给。
+CYCLES_MEASURED = int(os.environ.get("CYCLES_MEASURED", "35"))
 # 每块多少采样。核的 m_axi 缓冲深度是 8192，8000 是留了余量。
 # **这个值以前硬编码 8000，是错的** —— 上面那个 4.5 µs 里 Python 开销只占 0.2%，
 # 是因为核本身慢（450 拍），Python 那点开销被摊掉了。核快 16 倍之后
@@ -188,7 +190,8 @@ print("   实测 − 理论  = %.3f µs/采样，折成每块 **%.1f µs** 的�
 print("      （固定开销 = 写 10 个寄存器 + 2 次 cache flush + 1 次 invalidate + 轮询 DONE）")
 if theo_us > fpga_us:
     print("   ⚠️ 实测比理论还快 —— 要么量到的是噪声，要么拍数不是 %d。"
-          "先确认板上这版 bit 是不是 v19，再 CYCLES_MEASURED=<实际值> 重跑一次。"
+          "先确认板上这版 bit 是哪一代（v20_gain=35 / v19=31），"
+          "再 CYCLES_MEASURED=<实际值> 重跑一次。"
           % CYCLES_MEASURED)
 elif ovh_us < 0.1 * theo_us:
     print("   → 固定开销不到硬件的 10%，这个块长下可以忽略。")
