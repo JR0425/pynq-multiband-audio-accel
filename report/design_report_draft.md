@@ -2,7 +2,7 @@
 
 ## Design report draft
 
-**Status as of 2026-10-08:** the Python reference path and the custom HLS core are present. The core is integrated into a board overlay together with the PYNQ audio codec (`board/overlay/fir.bit`), has processed real captured audio on the board, and now runs a real-time microphone → core → headphone duplex path (section 5.4). Out-of-context and integrated-in-overlay figures are reported separately and labelled; the reference-overlay measurements are a different experiment and are kept apart from the custom core. The same-chip ARM comparison was re-measured on the board on 2026-10-08: 19.5× at 6.199 µs per sample for the ARM against 0.317 µs for the core (raw run in `data/results/compare_cpu_fpga_run_20261008.txt`; that run used the 31-cycle bit, before the per-band gain — see section 4 for the delivered 35-cycle bit). Section 7 states the novelty claim and the prior work it is measured against, including the one difference that runs against the project.
+**Status as of 2026-10-15:** the Python reference path and the custom HLS core are present. The core is integrated into a board overlay together with the PYNQ audio codec (`board/overlay/fir.bit`), has processed real captured audio on the board, and now runs a real-time microphone → core → headphone duplex path (section 5.4); a 40 s live run on 2026-10-15 held 1.00× with a bit-exact self-check and was audible in the headphones (raw run in `data/results/fir_live_run_20261015.txt`). That run used the default flat per-band gains, so it demonstrates the path, not per-band tuning by ear. Out-of-context and integrated-in-overlay figures are reported separately and labelled; the reference-overlay measurements are a different experiment and are kept apart from the custom core. The same-chip ARM comparison was measured on the board on 2026-10-08: 19.5× at 6.199 µs per sample for the ARM against 0.317 µs for the core (raw run in `data/results/compare_cpu_fpga_run_20261008.txt`; that run used the 31-cycle `v19` bit, before the per-band gain — the delivered bit schedules at 35 cycles and has not been re-measured against the ARM, see section 4). Section 7 states the novelty claim and the prior work it is measured against, including the one difference that runs against the project.
 
 ## 1. Project goal
 
@@ -180,7 +180,7 @@ The same-board speedup comparison, re-measured on 2026-10-08, is discussed there
 | Custom-core board audio through the real capture path | Complete: 144,000 samples in 18 blocks, 0 mismatches |
 | Custom-core board audio through the fixed input | Complete on 2026-10-06: bypass 0 mismatches over 288,000 samples; compressed output differs at 287,910 of 288,000 |
 | Compressor input-output level curve | Measured on 2026-10-06: 40.0 dB in against 31.3 dB out, narrowed 8.7 dB; figure in `data/figures/drc_transfer_curve.png`, raw run in `data/results/fir_audio_loop_run_20261006.txt` |
-| Same-chip ARM against PL core timing | Measured on 2026-10-08: ARM 6.199 µs/sample (3.36× real time) against the PL core 0.317 µs/sample (65.69× real time), a 19.5× ratio; raw run in `data/results/compare_cpu_fpga_run_20261008.txt`, conditions and caveats in `data/results/accel_cpu_vs_fpga.md` |
+| Same-chip ARM against PL core timing | Measured on 2026-10-08 against the 31-cycle `v19` bit: ARM 6.199 µs/sample (3.36× real time) against the PL core 0.317 µs/sample (65.69× real time), a 19.5× ratio; raw run in `data/results/compare_cpu_fpga_run_20261008.txt`, conditions and caveats in `data/results/accel_cpu_vs_fpga.md`. The delivered 35-cycle bit has not been re-measured against the ARM; scaling by cycle count puts it near 17×, which is a projection. |
 | RTL implementation and Python/HLS/RTL comparison | Low-pass RTL present (`src/rtl/fir_lp.v`, three low-pass filters only — no subtractive band, DRC, or AXI shell), verified bit for bit against the C simulation in xsim; the three-way comparison remains pending |
 
 The current stored HLS output passes comparison against the newly generated 193-tap Python golden file — 75.4 dB SNR at best lag 0 — and the stored transparent output matches the input delayed by the expected 96 samples bit for bit. The C simulation behind those outputs was rebuilt from source on 2026-09-30 with Vitis HLS 2020.2, so the producing toolchain and flags are on record rather than inferred from filenames: `build/hls/run_csim.tcl` drives the build and the coefficient-width sweep outputs are kept in `data/results/fixed_dw16_cw12/16/18/20.txt`.
@@ -262,6 +262,8 @@ The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the READ
 3. Produce the same-input Python/HLS/RTL comparison. Low-pass RTL now exists (`src/rtl/fir_lp.v`); the subtractive band, DRC, and AXI shell do not yet.
 4. Choose the final compressor parameter set. The measurements bound the choice — set 1 narrows the frame-level dynamic range by 1.9 dB, set 6 by 6.5 dB — but which one ships is a design preference (a heavier setting makes the effect visible at the cost of a larger change to the timbre), not something the measurements decide. The same setting must be written back into the board script and used for the video and the poster.
 5. Record the demonstration video from the board evidence, review the English poster, and run a clean-machine reproduction.
+6. Verify the per-band gain **by ear**. The register path is verified numerically and a 40 s live run completed, but every live run so far has used the default flat gains, so what is demonstrated is the path rather than audible per-band tuning. Set the four gains away from flat and A/B on the board.
+7. Resync the board copies of `mic_level.py` and `mic_live.py` (their thresholds lag the repository, which uses 200), and rebuild `libaudio_stream.so` with `build_audio_stream.sh` as the `xilinx` user, since `board/scripts/audio_stream.cpp` changed on 2026-10-15.
 
 ## 10. Project artifacts
 
@@ -274,6 +276,7 @@ The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the READ
 - Current Python metrics: `data/results/baseline_metrics.md`
 - HLS implementation metrics: `data/results/impl_metrics.md`
 - On-board audio-loop run: `data/results/fir_audio_loop_run_20261006.txt`
+- On-board real-time duplex run: `data/results/fir_live_run_20261015.txt`
 - Reference-overlay metrics: `data/results/reference_overlay_metrics.md`
 - Collaboration record: `report/llm_collab_log/`
 - Skill package: `skill/`
