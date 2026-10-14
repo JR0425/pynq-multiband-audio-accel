@@ -11,8 +11,8 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 
 - Python 参考基线用 48 kHz、4 段相减式分频、193 抽头线性相位低通。最近一次本地运行记在 `data/results/baseline_metrics.md`。
 - 自研 HLS 核的单独综合与实现结果在 `data/results/impl_metrics.md`。
-- 核已经和 PYNQ 音频 codec 一起集成进整机 overlay。`board/overlay/fir.bit` 就是它，由 `board/overlay/build_fir.tcl` 构建；`board/scripts/fir_core.py` 走 AXI-Lite 驱动这个核。在板子上，核处理了 144,000 个采集样本（18 块），直通结果按 96 拍群延迟逐位对齐、错配 0 个；但那次采集电平近乎静音，不能作为可听的麦克风压缩 A/B 证据。合成信号压缩检查通过。麦克风 → 核 → 耳机「边录边放」的实时通路写好了（`board/scripts/fir_live.py`）：连续 8/10/24 秒全部 1.00 倍、一块不丢，24 秒那档 2401 块、960000/960000 采样逐位自检通过；核接口没改，`fir.bit` 没重跑。但 2026-10-13 发现这条通路**目前演不了**：边录边放时采集进来的电平会在约 0.7 秒里被推成满幅自激（话筒增益、话筒静音、输出幅度、耳机功放开关都对它无效，原因还没查清），耳机里是持续的响声而不是人声 —— 所以演示用分块录制的素材，不承诺实时监听。
-- 同芯片 ARM vs PL 加速比：**19.5 倍**（2026-10-08 板上实测，原始输出 `data/results/compare_cpu_fpga_run_20261008.txt`）。Zynq PS 侧的 ARM 每采样 **6.199 µs**（3.36× 实时），PL 里的核 **0.317 µs**（65.69× 实时；理论 0.310 µs = 31 拍 @ 100 MHz）。引用这个数必须带四条说明 —— 两边精度不同（float64 vs Q1.15）、CPU 那边是 scipy 的 C 实现、核的耗时里含每块约 52 µs 的 Python 开销（占长块实测约 2%）、两边每采样都是 579 次有效乘法。全文见 `data/results/accel_cpu_vs_fpga.md`。
+- 核已经和 PYNQ 音频 codec 一起集成进整机 overlay。`board/overlay/fir.bit` 就是它，由 `board/overlay/build_fir.tcl` 构建；`board/scripts/fir_core.py` 走 AXI-Lite 驱动这个核。在板子上，核处理了 144,000 个采集样本（18 块），直通结果按 96 拍群延迟逐位对齐、错配 0 个；但那次采集电平近乎静音，不能作为可听的麦克风压缩 A/B 证据。合成信号压缩检查通过。麦克风 → 核 → 耳机「边录边放」的实时通路写好了（`board/scripts/fir_live.py`）：连续 8/10/24 秒全部 1.00 倍、一块不丢，24 秒那档 2401 块、960000/960000 采样逐位自检通过；核接口没改，`fir.bit` 没重跑。但 2026-10-13 记的「这条通路演不了：采集电平在约 0.7 秒里被推成满幅自激」**是错判** —— 那是低 24 位补码没做符号扩展的**读法假象**（数字零被读成 rms 46341 = 65535/√2），不是硬件、也不是通路问题。2026-10-15 话筒这一路查通、端到端跑成：麦克风 → 核 → 耳机 40 秒（4000 块 / 40.00 秒音频 / 40.19 秒墙钟 = 1.00 倍，逐位自检 960000/960000），进核 rms 中位 107 / 峰 24076，**用户亲耳听到了自己的处理声**。当时卡住的是 `HP + Mic` 口里那颗 U41（TI TS3A226AE 自动耳机开关，只在插头插入的上升沿检测一次并锁存）—— **演示前要先拔插到电平跳起来（实测要 18 秒）再开始，之后全程别碰插头**。注意那趟**四段增益全是 0.0 dB**（`LIVE_GAIN_DB` 的默认值），验的是通路成立，**还不是**「四段各调各的、听感跟着变」；后者没做过。另：40 秒那趟墙钟多出 0.19 秒 ≈ 丢 18 块，耳机里会断续（搬样线程空转轮询占到 99% 预算，见 `PROGRESS.md`）。
+- 同芯片 ARM vs PL 加速比：**19.5 倍**（2026-10-08 板上实测，原始输出 `data/results/compare_cpu_fpga_run_20261008.txt`）。Zynq PS 侧的 ARM 每采样 **6.199 µs**（3.36× 实时），PL 里的核 **0.317 µs**（65.69× 实时；理论 0.310 µs = 31 拍 @ 100 MHz）。这组数是**当时板上那一版 `v19`** 的：10-09 起核里加了每段增益 `band_gain`，**当前出货版 `v20_gain` 是 35 拍 / 0.350 µs**，没有重新和 ARM 对测，按拍数折算约 17 倍（折算不是实测）——口径见 `data/results/impl_metrics.md`。引用这个数必须带四条说明 —— 两边精度不同（float64 vs Q1.15）、CPU 那边是 scipy 的 C 实现、核的耗时里含每块约 52 µs 的 Python 开销（占长块实测约 2%）、两边每采样都是 579 次有效乘法。全文见 `data/results/accel_cpu_vs_fpga.md`。
 - 早期还测过一个开源参考 overlay。结果在 `data/results/reference_overlay_metrics.md`，和自研核无关，别混着引用。
 - 当前英文海报在 `report/poster_en/pynq_multiband_audio_poster_v2.pptx`；早期 `pynq_multiband_audio_poster_draft.pptx` 已被它取代。海报明确把核级 OOC 资源数据和板级吞吐数据分开。
 - Python/HLS/RTL 三实现对比还没做。`src/rtl/fir_lp.v` 已存在（只有 3 个低通，没有相减 / DRC / AXI 外壳），xsim 逐位对拍通过。
@@ -80,7 +80,7 @@ python src/python/compare_golden_vs_hw.py
 
 `board/overlay/fir.bit` 是本项目的 overlay：自研多频段 HLS 核加 PYNQ 音频 codec。
 `board/scripts/fir_core.py` 是寄存器级驱动；`board/scripts/fir_audio_loop.py`
-从麦克风录音、过核、再放出来（一块一块处理）；`board/scripts/fir_live.py` 跑麦克风 → 核 → 耳机的实时通路（数据通路 1.00 倍、一块不丢，但采集电平目前会被推成满幅自激，见上）；
+从麦克风录音、过核、再放出来（一块一块处理）；`board/scripts/fir_live.py` 跑麦克风 → 核 → 耳机的实时通路（2026-10-15 已端到端跑通并能听到处理声，见上）；
 `board/scripts/fir_selftest.py` 做直通和分块连续性检验；
 `board/scripts/compare_cpu_fpga.py` 在同一块板子上量 ARM 基线与核的对比（2026-10-08 板上实测 **19.5 倍**，见 `data/results/accel_cpu_vs_fpga.md`）。
 

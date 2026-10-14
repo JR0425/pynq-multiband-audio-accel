@@ -1,5 +1,13 @@
 # cap_probe7.py -- verify the fix on the real duplex path (the one the demo uses)
 #
+# !! RETRACTED 2026-10-15. There is nothing to fix. The "self-oscillation" is a
+# reading artifact: the low 24 bits of the I2S capture register are two's
+# complement and were read as unsigned, so the digital zero came out as
+# rms 46341 = 65535/sqrt(2). See cap_probe11.py. Worse, the "fix" this probe
+# verifies -- R5/R7 = 0x08 plus R8/R9 = 0xD3 -- was actually installed in
+# fir_live.py and cost the microphone about 11 dB for nothing; it was removed
+# on 2026-10-15. Do NOT cite this script as evidence.
+#
 # cap_probe6.py found two things that each kill the mic self-oscillation, 3/3 runs:
 #   * R29/R30 = 0x02  -> headphone driver OFF          (mute the output)
 #   * R5/R7  = 0x08   -> mic PGA boost 0 dB, not +20 dB (cut the input gain)
