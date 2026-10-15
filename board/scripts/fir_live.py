@@ -271,6 +271,20 @@ RAMP_BLOCKS = max(1, int(os.environ.get("LIVE_RAMP", "4")))  # 新增益几块�
 
 CAPTURE_MAX = int(FS * 20)      # 自检最多留 20 秒的样本，别把内存吃光
 
+# ---------------- 实时波形（给 w5_tuning_ui.ipynb 画时域/频谱） ----------------
+# 默认**关**。这一路是给演示新加的，不该改变已经量过的那些数字；演示那趟
+# 显式加 LIVE_SCOPE=1 才打开。
+#
+# 写在 dsp 线程上 —— 那里每块有 7 ms 空闲（见 stage_dsp 的说明），搬样那条
+# 一个字不碰。和状态文件同一个节奏（10 Hz），一次 3.8 KB。
+SCOPE_ON = os.environ.get("LIVE_SCOPE", "0") not in ("0", "", "no")
+SCOPE_PATH = os.environ.get("LIVE_SCOPE_PATH", "/dev/shm/fir_scope.bin")
+SCOPE_SEC = float(os.environ.get("LIVE_SCOPE_SEC", "0.1"))
+# 每声道给界面留多少个采样。960 个 = 20 ms：48 kHz 下 FFT 分辨率 50 Hz，
+# 够把 500/1000/2000 三个分段点看出来。
+SCOPE_N = max(int(os.environ.get("LIVE_SCOPE_N", "960")), L)
+SCOPE_MAGIC = 0x504F4353                    # b"SCOP" 小端
+
 
 def hr(t):
     print("\n" + "=" * 74)
@@ -490,6 +504,78 @@ def maybe_status(now):
         publish_status(now)
     except OSError:
         pass          # 写不出去（目录没了、盘满）不该影响音频
+
+
+# ---------------- 实时波形：写 /dev/shm/fir_scope.bin ----------------
+_scope_fd = [None]
+_scope_hist_in = np.zeros(SCOPE_N, dtype=np.int16)
+_scope_hist_out = np.zeros(SCOPE_N, dtype=np.int16)
+_scope_t = [0.0]
+_scope_seq = [0]
+
+
+def clear_scope():
+    """开跑之前删掉上一次的波形文件。
+
+    不删的话，界面在头几秒画的是**上一趟**的波形 —— 看着像"已经在动了"，
+    最坑的一种假象。理由同 clear_status()。
+    """
+    if _scope_fd[0] is not None:
+        try:
+            os.close(_scope_fd[0])
+        except OSError:
+            pass
+        _scope_fd[0] = None
+    try:
+        os.unlink(SCOPE_PATH)
+    except OSError:
+        pass
+
+
+def publish_scope(now, cin, cout):
+    """把最近 SCOPE_N 个采样的进核/出核波形写成一条**定长**记录。
+
+    定长（16 字节头 + 2*N*2 字节）是为了让读的一边一眼看出这一帧读全了没有：
+    长度不对就当没写，界面保留上一帧。理由和 fir_tune.py 里状态文件那段一样。
+
+    记录（小端）：`4i` 魔数、序号、每声道采样数、距开跑的 ms；
+    接着 2*N 个 `i2`：先进核 N 个，再出核 N 个。
+    """
+    if not SCOPE_ON or now - _scope_t[0] < SCOPE_SEC:
+        return
+    _scope_t[0] = now
+
+    a = np.asarray(cin, dtype=np.int16)
+    b = np.asarray(cout, dtype=np.int16)
+    k = min(a.size, b.size, L)
+    if k <= 0:
+        return
+    # 滚动历史：新的一块挪到尾部（SCOPE_N >= L，所以 k 不会超过历史长度）
+    _scope_hist_in[:-k] = _scope_hist_in[k:]
+    _scope_hist_out[:-k] = _scope_hist_out[k:]
+    _scope_hist_in[-k:] = a[:k]
+    _scope_hist_out[-k:] = b[:k]
+
+    hdr = np.array([SCOPE_MAGIC, _scope_seq[0], SCOPE_N,
+                    int((now - t_start[0]) * 1000.0)], dtype=np.int32).tobytes()
+    buf = hdr + _scope_hist_in.tobytes() + _scope_hist_out.tobytes()
+    if _scope_fd[0] is None:
+        _scope_fd[0] = os.open(SCOPE_PATH,
+                               os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+    fd = _scope_fd[0]
+    os.lseek(fd, 0, os.SEEK_SET)
+    os.write(fd, buf)
+    os.ftruncate(fd, len(buf))
+    _scope_seq[0] += 1
+
+
+def maybe_scope(now, cin, cout):
+    if not SCOPE_ON:
+        return
+    try:
+        publish_scope(now, cin, cout)
+    except OSError:
+        pass          # 同 maybe_status：波形写不出去不该影响音频
 
 
 # ---------------- 24 位 ⇄ 16 位 ----------------
@@ -805,6 +891,7 @@ def stage_dsp():
         # 写状态文件放在 q2.put 之**后** —— io 那边等着要这个槽，
         # 先把它交出去，再干这种不着急的活。
         maybe_status(t_now)
+        maybe_scope(t_now, cin, cout)
 
 
 # 线程切换间隔。原来是 0.0005（0.5 ms）——"块才 10 ms，调细点"。
@@ -853,6 +940,7 @@ else:
 print()
 
 clear_status()                       # 先删旧状态，免得界面读到上一趟的数字
+clear_scope()                        # 波形同理
 ths = [threading.Thread(target=f, name=n, daemon=True)
        for f, n in ((stage_io, "io"), (stage_dsp, "dsp"))]
 t_start[0] = time.time()             # 线程一开跑就开始计时（状态文件要用）
