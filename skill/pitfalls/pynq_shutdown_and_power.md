@@ -8,8 +8,8 @@ description: >
 license: MIT
 compatibility: PYNQ-Z2 image 2.7.0
 metadata:
-  version: "1.0.1"
-  updated: "2026-09-25"
+  version: "1.0.2"
+  updated: "2026-10-16"
 ---
 
 # PYNQ-Z2 断电与关机
@@ -34,6 +34,7 @@ metadata:
 |---|---|---|
 | 1.0.0 | 2026-09-25 | 初版 |
 | 1.0.1 | 2026-10-02 | 按官方 Agent Skill 的 SKILL.md 写法补 frontmatter 和适用范围 |
+| 1.0.2 | 2026-10-16 | 补「拔电到底把卡弄坏没有」的实测判据；指向新增的死机抓现场笔记 |
 
 ## 分三档
 
@@ -81,8 +82,48 @@ Reached target Power-Off.
 3. 要收起来过夜 → 软件关机
 4. 以上都不是，就是想重插一下 → 直接拔
 
+## 板子硬死的时候人是被迫断电的
+
+板子挂到没有输出、连 panic 都没有的时候，唯一能做的就是按电源 —— 这不是「随手拔」，
+是没得选。所以真正要回答的问题是：**这一次（和前面每一次）断电，把卡弄坏没有。**
+
+这个不用猜，卡自己的账本可以读，全是只读命令（多数要 `sudo`）：
+
+```sh
+# ext4 自己认为它坏没有 + 挂载次数 + 上次 fsck
+tune2fs -l /dev/mmcblk0p2 | grep -iE "state|mount count|check|error"
+# 内核报过几次 mmc / ext4 / I/O 错
+dmesg | grep -iE "mmc|sdhci|ext4|jbd2|i/o error"
+# ext4 累计报过几次内部错 + 最近一次是什么函数哪一行
+cat /sys/fs/ext4/mmcblk0p2/errors_count
+# SDHCI 硬件层自己数的命令超时 / CRC 错
+cat /sys/kernel/debug/mmc0/err_stats
+# 卡的产品名 / 序列号 / 出厂日期
+for f in name serial date; do printf '%s=' "$f"; cat /sys/block/mmcblk0/device/$f; done
+# 这个文件系统有生以来被写了多少 KB（磨损）
+cat /sys/fs/ext4/mmcblk0p2/lifetime_write_kbytes
+```
+
+2026-10-16 实测（一块被反复硬死、被迫断电多次的板子）：
+
+| 读到的 | 值 | 怎么读 |
+|---|---|---|
+| `Filesystem state` | **clean** | ext4 自己认为它没坏 |
+| `Errors behavior` | `Continue` | 真出 I/O 错也不会 remount-rw，只会记一笔 |
+| dmesg 里的 mmc / ext4 / I/O 错 | **一条都没有** | 连一条坏块记录都没有 |
+| 每次开机的 `EXT4-fs (mmcblk0p2): recovery complete` | — | **是日志回放成功，不是失败** |
+| `Mount count` / `Last checked` | 63 次 / 停在镜像创建那天 | 从没 fsck 过；这是默认关掉了周期检查，不是故障 |
+| 写入速度 | 约 200 KB/s | 慢，但它是「燃料」不是病因 |
+
+**结论：反复硬死 + 被迫断电本身没有把卡弄坏。** 留下来的只有"要回放日志"，
+不是坏块。（顺带：这块卡在内核里的产品名是 `asdfg` —— 旁证，不是证据。）
+
+留一句反话：账本干净只说明**到目前为止**没坏，不说明断电无害。
+第三档仍然存在，它保护的是那个「万一」，代价只是等一下。
+
 ## 相关
 
+- 抓死机现场（栈、串口、判「断电」还是「死机」）：`skill/pitfalls/pynq_board_hang_capture.md`
 - 网络配置：`skill/pitfalls/pynq_direct_ethernet_windows.md`
 - 串口控制台：`skill/pitfalls/pynq_serial_console.md`
 - 连通性自检：`skill/checkers/check_board_connection.bat`

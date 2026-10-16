@@ -1,0 +1,1475 @@
+===== 2026-10-16 深夜「N_short」那一轮的 RCU stall 全任务转储（串口原文，一个字节没改）
+=====
+===== 来自 tools/_tmp/round7/console.log 的前 1457 行（第 1460 行起是重启后的 U-Boot）。
+===== 配置是基线（实时优先级开着，没关），起跑 up=526，**用的是默认的 stall 超时**。
+=====   · 正文第 22 行的 `fqs=3000` ⇒ 这一轮超时是默认 **60 秒**
+=====     （对照 round6 那份的 `fqs=500`：那一臂带了 `FASTSTALL=1`，压到 10 秒）
+=====   · 同一行还有个细节要如实看：`softirq=8573/8575`，**两个数不相等** ——
+=====     说明这 60 秒里 CPU0 的 RCU 软中断还**跑过 2 次**，不是完全跑不动。
+=====     所以这一份能证的是"CPU0 被饿到静默态报不上去"，不是"一次都没跑"。
+=====     （round6 那份是 `10908/10908`，那一次才是完全没跑。）
+=====
+===== 和 round6 那份（board_hang_rcu_stall_dump_20261016.txt）同一个机制，两份互为复现。
+===== 放在一起看能确认：转储的形态是**稳定可复现**的，不是一次偶然。
+=====
+===== ⚠ 同一轮的下一臂 R_rtoff（LIVE_RT_IO=0 LIVE_RT_DSP=0）**换了一种死法**：
+=====   串口一个字都没有、无 panic、arp -a 里连 192.168.2.99 的条目都没了、
+=====   网口 LinkSpeed 仍 1 Gbps（⇒ 死机不是断电）、3 分钟不回来、要人按电源。
+=====   **那一臂没有转储**（静默硬死，什么都打不出来），所以这里只有 N_short 这一份。
+=====
+===== capture start 2026-10-16 23:06:55 =====
+rcu: INFO: rcu_preempt self-detected stall on CPU
+rcu: 	0-....: (1 GPs behind) idle=f4e/1/0x40000002 softirq=8573/8575 fqs=3000 
+Kernel panic - not syncing: RCU Stall
+CPU1: stopping
+CPU: 1 PID: 0 Comm: swapper/1 Tainted: G           O      5.4.0-xilinx-v2020.2 #1
+Hardware name: Xilinx Zynq Platform
+[<c010e39c>] (unwind_backtrace) from [<c010a15c>] (show_stack+0x10/0x14)
+[<c010a15c>] (show_stack) from [<c08ce004>] (dump_stack+0xb4/0xd0)
+[<c08ce004>] (dump_stack) from [<c010c984>] (ipi_cpu_stop+0x3c/0x98)
+[<c010c984>] (ipi_cpu_stop) from [<c010d1d0>] (handle_IPI+0x64/0x80)
+[<c010d1d0>] (handle_IPI) from [<c0476794>] (gic_handle_irq+0x84/0x90)
+[<c0476794>] (gic_handle_irq) from [<c0101a8c>] (__irq_svc+0x6c/0xa8)
+Exception stack(0xdf483f20 to 0xdf483f68)
+3f20: 00000000 0000008a 1eee0000 dfb242c0 c0d36f54 00000000 dfb23678 00000000
+3f40: c07dcc77 c0cea246 0000008a 0000008a fffffff5 df483f70 c068ab2c c068ab50
+3f60: 60010013 ffffffff
+[<c0101a8c>] (__irq_svc) from [<c068ab50>] (cpuidle_enter_state+0xec/0x288)
+[<c068ab50>] (cpuidle_enter_state) from [<c068ad28>] (cpuidle_enter+0x28/0x38)
+[<c068ad28>] (cpuidle_enter) from [<c0140aac>] (do_idle+0x230/0x258)
+[<c0140aac>] (do_idle) from [<c0140c38>] (cpu_startup_entry+0x18/0x20)
+[<c0140c38>] (cpu_startup_entry) from [<0010242c>] (0x10242c)
+  task                PC stack   pid father
+systemd         S    0     1      0 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xdf445fa8 to 0xdf445ff0)
+5fa0:                   ffffffff 00000000 00000004 0060dc50 00000051 ffffffff
+5fc0: ffffffff 00000000 b6fee860 000000fc 00000004 0060dc50 00000004 0060dc50
+5fe0: 000000fc be809970 b6f53f51 b6ecdbe6
+kthreadd        S    0     2      0 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c013685c>] (kthreadd+0x118/0x1d8)
+[<c013685c>] (kthreadd) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf467fb0 to 0xdf467ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+rcu_gp          I    0     3      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf469fb0 to 0xdf469ff8)
+9fa0:                                     00000000 00000000 00000000 00000000
+9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+rcu_par_gp      I    0     4      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf46bfb0 to 0xdf46bff8)
+bfa0:                                     00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/0:0     I    0     5      2 0x00000000
+Workqueue:  0x0 (events_power_efficient)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf46dfb0 to 0xdf46dff8)
+dfa0:                                     00000000 00000000 00000000 00000000
+dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+dfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/0:0H    I    0     6      2 0x00000000
+Workqueue:  0x0 (mmc_complete)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf471fb0 to 0xdf471ff8)
+1fa0:                                     00000000 00000000 00000000 00000000
+1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+mm_percpu_wq    I    0     8      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf475fb0 to 0xdf475ff8)
+5fa0:                                     00000000 00000000 00000000 00000000
+5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+5fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+ksoftirqd/0     R  running task        0     9      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0138fd8>] (smpboot_thread_fn+0x1a8/0x280)
+[<c0138fd8>] (smpboot_thread_fn) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf477fb0 to 0xdf477ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+rcu_preempt     I    0    10      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5614>] (schedule_timeout+0xbc/0xec)
+[<c08e5614>] (schedule_timeout) from [<c01673ac>] (rcu_gp_kthread+0x5e4/0x7c0)
+[<c01673ac>] (rcu_gp_kthread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf47dfb0 to 0xdf47dff8)
+dfa0:                                     00000000 00000000 00000000 00000000
+dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+dfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+migration/0     S    0    11      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0138fd8>] (smpboot_thread_fn+0x1a8/0x280)
+[<c0138fd8>] (smpboot_thread_fn) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf481fb0 to 0xdf481ff8)
+1fa0:                                     00000000 00000000 00000000 00000000
+1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+cpuhp/0         S    0    12      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0138fd8>] (smpboot_thread_fn+0x1a8/0x280)
+[<c0138fd8>] (smpboot_thread_fn) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf485fb0 to 0xdf485ff8)
+5fa0:                                     00000000 00000000 00000000 00000000
+5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+5fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+cpuhp/1         S    0    13      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0138fd8>] (smpboot_thread_fn+0x1a8/0x280)
+[<c0138fd8>] (smpboot_thread_fn) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf487fb0 to 0xdf487ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+migration/1     S    0    14      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0138fd8>] (smpboot_thread_fn+0x1a8/0x280)
+[<c0138fd8>] (smpboot_thread_fn) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf489fb0 to 0xdf489ff8)
+9fa0:                                     00000000 00000000 00000000 00000000
+9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+ksoftirqd/1     S    0    15      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0138fd8>] (smpboot_thread_fn+0x1a8/0x280)
+[<c0138fd8>] (smpboot_thread_fn) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf48dfb0 to 0xdf48dff8)
+dfa0:                                     00000000 00000000 00000000 00000000
+dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+dfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/1:0     I    0    16      2 0x00000000
+Workqueue:  0x0 (memcg_kmem_cache)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf48ffb0 to 0xdf48fff8)
+ffa0:                                     00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kdevtmpfs       S    0    18      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0535550>] (devtmpfsd+0xac/0x2dc)
+[<c0535550>] (devtmpfsd) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf495fb0 to 0xdf495ff8)
+5fa0:                                     00000000 00000000 00000000 00000000
+5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+5fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+netns           I    0    19      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf4d5fb0 to 0xdf4d5ff8)
+5fa0:                                     00000000 00000000 00000000 00000000
+5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+5fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+rcu_tasks_kthre S    0    20      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01641e4>] (rcu_tasks_kthread+0xb4/0x3d4)
+[<c01641e4>] (rcu_tasks_kthread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf4d7fb0 to 0xdf4d7ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/1:1     I    0    22      2 0x00000000
+Workqueue:  0x0 (events)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf503fb0 to 0xdf503ff8)
+3fa0:                                     00000000 00000000 00000000 00000000
+3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+3fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+oom_reaper      S    0    23      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01d8854>] (oom_reaper+0x7c/0x1ec)
+[<c01d8854>] (oom_reaper) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf557fb0 to 0xdf557ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+writeback       I    0    24      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf559fb0 to 0xdf559ff8)
+9fa0:                                     00000000 00000000 00000000 00000000
+9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/u4:1    I    0    26      2 0x00000000
+Workqueue:  0x0 (events_unbound)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf55ffb0 to 0xdf55fff8)
+ffa0:                                     00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kblockd         I    0    72      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf5cffb0 to 0xdf5cfff8)
+ffa0:                                     00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+blkcg_punt_bio  I    0    73      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf5d1fb0 to 0xdf5d1ff8)
+1fa0:                                     00000000 00000000 00000000 00000000
+1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+edac-poller     I    0    74      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf5a3fb0 to 0xdf5a3ff8)
+3fa0:                                     00000000 00000000 00000000 00000000
+3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+3fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+watchdogd       S    0    75      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0136478>] (kthread_worker_fn+0x144/0x174)
+[<c0136478>] (kthread_worker_fn) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf589fb0 to 0xdf589ff8)
+9fa0:                                     00000000 00000000 00000000 00000000
+9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+rpciod          I    0    76      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf5f9fb0 to 0xdf5f9ff8)
+9fa0:                                     00000000 00000000 00000000 00000000
+9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/u5:0    I    0    77      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf5fbfb0 to 0xdf5fbff8)
+bfa0:                                     00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+xprtiod         I    0    78      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf5fdfb0 to 0xdf5fdff8)
+dfa0:                                     00000000 00000000 00000000 00000000
+dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+dfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+cfg80211        I    0    79      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf61dfb0 to 0xdf61dff8)
+dfa0:                                     00000000 00000000 00000000 00000000
+dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+dfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kswapd0         S    0    80      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01e422c>] (kswapd+0x13c/0x664)
+[<c01e422c>] (kswapd) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf625fb0 to 0xdf625ff8)
+5fa0:                                     00000000 00000000 00000000 00000000
+5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+5fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+nfsiod          I    0    81      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf62bfb0 to 0xdf62bff8)
+bfa0:                                     00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kthrotld        I    0    84      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf68ffb0 to 0xdf68fff8)
+ffa0:                                     00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+spi0            S    0    85      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0136478>] (kthread_worker_fn+0x144/0x174)
+[<c0136478>] (kthread_worker_fn) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdec5bfb0 to 0xdec5bff8)
+bfa0:                                     00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+ci_otg          I    0    88      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdec83fb0 to 0xdec83ff8)
+3fa0:                                     00000000 00000000 00000000 00000000
+3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+3fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+sdhci           I    0    89      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdec7ffb0 to 0xdec7fff8)
+ffa0:                                     00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+irq/29-mmc0     S    0    90      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c015c41c>] (irq_thread+0x190/0x1b8)
+[<c015c41c>] (irq_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdec79fb0 to 0xdec79ff8)
+9fa0:                                     00000000 00000000 00000000 00000000
+9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+ipv6_addrconf   I    0    91      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdece5fb0 to 0xdece5ff8)
+5fa0:                                     00000000 00000000 00000000 00000000
+5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+5fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+mmc_complete    I    0    93      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xded17fb0 to 0xded17ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/1:1H    I    0   100      2 0x00000000
+Workqueue:  0x0 (events_highpri)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdee45fb0 to 0xdee45ff8)
+5fa0:                                     00000000 00000000 00000000 00000000
+5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+5fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/1:2H    I    0   101      2 0x00000000
+Workqueue:  0x0 (kblockd)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdee47fb0 to 0xdee47ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+jbd2/mmcblk0p2- S    0   102      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c02d6fa4>] (kjournald2+0x244/0x280)
+[<c02d6fa4>] (kjournald2) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdee3ffb0 to 0xdee3fff8)
+ffa0:                                     00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+ext4-rsv-conver I    0   103      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c01314d4>] (rescuer_thread+0x248/0x268)
+[<c01314d4>] (rescuer_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdee39fb0 to 0xdee39ff8)
+9fa0:                                     00000000 00000000 00000000 00000000
+9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+9fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/0:2H    R  running task        0   104      2 0x00000000
+Workqueue:  0x0 (mmc_complete)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdee5bfb0 to 0xdee5bff8)
+bfa0:                                     00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+systemd-journal S    0   121      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd5491fa8 to 0xd5491ff0)
+1fa0:                   ffffffff 00000000 00000007 00503a70 00000022 ffffffff
+1fc0: ffffffff 00000000 b6f08710 000000fc 00000007 00503a70 00000007 00503a70
+1fe0: 000000fc beb12830 b6e6df51 b6de7be6
+systemd-udevd   S    0   151      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd5615fa8 to 0xd5615ff0)
+5fa0:                   b6f3db10 00000000 00000009 005b0d50 0000000a ffffffff
+5fc0: b6f3db10 00000000 b6f3dfd0 000000fc 00000000 004c40d4 004f4030 00000028
+5fe0: 000000fc beb16978 b6e9cf25 b6e16be6
+systemd-resolve S    0   153      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xdefd1fa8 to 0xdefd1ff0)
+1fa0:                   b6f19010 00000000 00000004 0070cc90 0000000e ffffffff
+1fc0: b6f19010 00000000 b6f194d0 000000fc 00000000 0000000e 00000004 0070cc90
+1fe0: 000000fc bea17950 b6e80f25 b6dfabe6
+systemd-timesyn S    0   154      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd5729fa8 to 0xd5729ff0)
+9fa0:                   ffffffff 00000000 00000004 004e7d28 00000008 ffffffff
+9fc0: ffffffff 00000000 b6f36710 000000fc 00000004 004e7d28 00000004 004e7d28
+9fe0: 000000fc be86e9e0 b6e9bf51 b6e15be6
+sd-resolve      S    0   199      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5580>] (schedule_timeout+0x28/0xec)
+[<c08e5580>] (schedule_timeout) from [<c070e130>] (__skb_wait_for_more_packets+0x120/0x168)
+[<c070e130>] (__skb_wait_for_more_packets) from [<c07fb698>] (unix_dgram_recvmsg+0xc8/0x2f4)
+[<c07fb698>] (unix_dgram_recvmsg) from [<c07008ac>] (__sys_recvfrom+0xa8/0x118)
+[<c07008ac>] (__sys_recvfrom) from [<c0700934>] (sys_recv+0x14/0x1c)
+[<c0700934>] (sys_recv) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd56a5fa8 to 0xd56a5ff0)
+5fa0:                   00000000 00000000 00000007 b6391ca4 00002800 00000000
+5fc0: 00000000 00000000 b6397780 00000123 00000007 b6391ca4 b6391b98 b6391c28
+5fe0: 00000123 b6391b28 b6e9c90d b6e15be6
+zocl-scheduler- S    0   168      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<bf0077f4>] (scheduler+0xa8/0x91c [zocl])
+[<bf0077f4>] (scheduler [zocl]) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xd3c87fb0 to 0xd3c87ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/u4:2    I    0   198      2 0x00000000
+Workqueue:  0x0 (events_unbound)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xd3c23fb0 to 0xd3c23ff8)
+3fa0:                                     00000000 00000000 00000000 00000000
+3fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+3fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+haveged         S    0   200      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c02361f8>] (do_select+0x250/0x554)
+[<c02361f8>] (do_select) from [<c0236bdc>] (core_sys_select+0x144/0x200)
+[<c0236bdc>] (core_sys_select) from [<c0236d54>] (kern_select+0xbc/0xfc)
+[<c0236d54>] (kern_select) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd3cdffa8 to 0xd3cdfff0)
+ffa0:                   00000000 b6f54f80 00000004 00000000 bec03b24 00000000
+ffc0: 00000000 b6f54f80 00000000 0000008e 00000003 004d79a8 000001f8 80045200
+ffe0: 0000008e bec03a60 b6e871a3 b6e05be6
+avahi-daemon    S    0   204      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xdefbffa8 to 0xdefbfff0)
+ffa0:                   004d5440 b6f124e0 004dbff8 0000000a 002f59c3 00000000
+ffc0: 004d5440 b6f124e0 b6f124d0 000000a8 004d7e40 004d5250 004d1710 00000000
+ffe0: 000000a8 be8a6ba8 b6d56987 b6cd7be6
+cron            S    0   206      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5714>] (do_nanosleep+0x60/0x190)
+[<c08e5714>] (do_nanosleep) from [<c01705e8>] (hrtimer_nanosleep+0xe4/0x15c)
+[<c01705e8>] (hrtimer_nanosleep) from [<c0178f60>] (sys_clock_nanosleep+0xc4/0xd4)
+[<c0178f60>] (sys_clock_nanosleep) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd3d63fa8 to 0xd3d63ff0)
+3fa0:                   00000000 b6f1e000 00000000 00000000 beafac68 beafac78
+3fc0: 00000000 b6f1e000 beafac68 00000197 beafac78 b6fa96e0 b6fa9220 0050c008
+3fe0: 00000197 beafac18 b6e9aa7d b6e3ebe6
+dbus-daemon     S    0   207      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd3ea3fa8 to 0xd3ea3ff0)
+3fa0:                   b6f7f4f0 00000000 00000004 befdc4f8 00000040 ffffffff
+3fc0: b6f7f4f0 00000000 b6f7f9b0 000000fc 00512fc0 00000001 befdc938 befdc93c
+3fe0: 000000fc befdc4d0 b6d3df25 b6cb7be6
+NetworkManager  S    0   208      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd3ee5fa8 to 0xd3ee5ff0)
+5fa0:                   00012cc3 00000007 006a5b60 00000007 00012cc3 00000000
+5fc0: 00012cc3 00000007 b59c04d0 000000a8 beef5c20 00012cc3 00000001 00000000
+5fe0: 000000a8 beef5bf0 b68ab9ad b682cbe6
+gmain           S    0   320      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd27bffa8 to 0xd27bfff0)
+ffa0:                   00000f9c 00000002 b4b00608 00000002 00000f9c 00000000
+ffc0: 00000f9c 00000002 b547c550 000000a8 b547ba48 00000f9c 00000001 beef59d0
+ffe0: 000000a8 b547ba18 b68ab9ad b682cbe6
+gdbus           S    0   377      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd3d8ffa8 to 0xd3d8fff0)
+ffa0:                   ffffffff 00000002 006bfb50 00000002 ffffffff 00000000
+ffc0: ffffffff 00000002 b4aff550 000000a8 b4afea38 ffffffff 00000001 beef5af8
+ffe0: 000000a8 b4afea08 b68ab9ad b682cbe6
+networkd-dispat S    0   221      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd2441fa8 to 0xd2441ff0)
+1fa0:                   00000003 004cd5d8 004d0e00 00000003 ffffffff 00000000
+1fc0: 00000003 004cd5d8 b6f447d0 000000a8 bee9a340 ffffffff 00000001 bee9a388
+1fe0: 000000a8 bee9a310 b6e9c987 b6e1dbe6
+polkitd         S    0   242      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd2573fa8 to 0xd2573ff0)
+3fa0:                   ffffffff 00000003 b4a07188 00000003 ffffffff 00000000
+3fc0: ffffffff 00000003 b6f896f0 000000a8 bef3ac80 ffffffff 00000001 00000000
+3fe0: 000000a8 bef3ac50 b6b859ad b6b06be6
+gmain           S    0   254      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd251bfa8 to 0xd251bff0)
+bfa0:                   ffffffff 00000002 b5e00608 00000002 ffffffff 00000000
+bfc0: ffffffff 00000002 b6776830 000000a8 b6775d28 ffffffff 00000001 bef3aa18
+bfe0: 000000a8 b6775cf8 b6b859ad b6b06be6
+gdbus           S    0   374      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xdefe1fa8 to 0xdefe1ff0)
+1fa0:                   ffffffff 00000002 b540a420 00000002 ffffffff 00000000
+1fc0: ffffffff 00000002 b53ff830 000000a8 b53fed18 ffffffff 00000001 b5dfec08
+1fe0: 000000a8 b53fece8 b6b859ad b6b06be6
+rsyslogd        S    0   253      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c02361f8>] (do_select+0x250/0x554)
+[<c02361f8>] (do_select) from [<c0236bdc>] (core_sys_select+0x144/0x200)
+[<c0236bdc>] (core_sys_select) from [<c0236d54>] (kern_select+0xbc/0xfc)
+[<c0236d54>] (kern_select) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd2487fa8 to 0xd2487ff0)
+7fa0:                   bebf7b8c b6fc84d0 00000001 00000000 00000000 00000000
+7fc0: bebf7b8c b6fc84d0 00000000 0000008e 00000001 00000000 0053ce1c 00000000
+7fe0: 0000008e bebf7b48 b6e031d1 b6d81be6
+in:imuxsock     S    0   284      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd24e7fa8 to 0xd24e7ff0)
+7fa0:                   ffffffff 00000001 b5700608 00000001 ffffffff 00000000
+7fc0: ffffffff 00000001 b6ab9880 000000a8 b6c2846c 0053d420 00000001 b6c169fc
+7fe0: 000000a8 b6ab8cc8 b6e009ad b6d81be6
+in:imklog       S    0   285      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0159108>] (do_syslog+0x130/0x6a0)
+[<c0159108>] (do_syslog) from [<c0279da4>] (proc_reg_read+0x58/0x6c)
+[<c0279da4>] (proc_reg_read) from [<c02244b4>] (__vfs_read+0x2c/0xe4)
+[<c02244b4>] (__vfs_read) from [<c02245f8>] (vfs_read+0x8c/0xa8)
+[<c02245f8>] (vfs_read) from [<c02247cc>] (ksys_read+0x74/0xc4)
+[<c02247cc>] (ksys_read) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd240dfa8 to 0xd240dff0)
+dfa0:                   00001fa0 b6697cd0 00000005 b6697cd0 00001fa0 00000000
+dfc0: 00001fa0 b6697cd0 b66b8880 00000003 00001fa0 b6697f48 b6bdb394 b6bdb408
+dfe0: 00000003 b66974a8 b6f4d425 b6f4f4d6
+rs:main Q:Reg   S    0   287      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c017f8ec>] (futex_wait_queue_me+0xa8/0x130)
+[<c017f8ec>] (futex_wait_queue_me) from [<c0180630>] (futex_wait+0xb4/0x1d0)
+[<c0180630>] (futex_wait) from [<c0181ce0>] (do_futex+0xf4/0x9b4)
+[<c0181ce0>] (do_futex) from [<c0182830>] (sys_futex_time32+0x124/0x190)
+[<c0182830>] (sys_futex_time32) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd2445fa8 to 0xd2445ff0)
+5fa0:                   00553258 00553230 00553258 00000080 00000000 00000000
+5fc0: 00553258 00553230 00000000 000000f0 00000001 b60fe8d0 00000000 00000000
+5fe0: 000000f0 b60fe8a8 b6f4a1a7 b6f4f4d6
+systemd-logind  S    0   255      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd25effa8 to 0xd25efff0)
+ffa0:                   b6f09260 00000000 00000004 004ec460 00000013 ffffffff
+ffc0: b6f09260 00000000 b6f09720 000000fc 00000000 00000013 00000004 004ec460
+ffe0: 000000fc be9b38f0 b6e6ef25 b6de8be6
+start_pl_server S    0   256      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c017f8ec>] (futex_wait_queue_me+0xa8/0x130)
+[<c017f8ec>] (futex_wait_queue_me) from [<c0180630>] (futex_wait+0xb4/0x1d0)
+[<c0180630>] (futex_wait) from [<c0181ce0>] (do_futex+0xf4/0x9b4)
+[<c0181ce0>] (do_futex) from [<c0182830>] (sys_futex_time32+0x124/0x190)
+[<c0182830>] (sys_futex_time32) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd253dfa8 to 0xd253dff0)
+dfa0:                   00000000 ffffffff b3b005f8 00000189 00000001 00000000
+dfc0: 00000000 ffffffff 00000000 000000f0 a5e353f7 00000000 00000001 00000000
+dfe0: 000000f0 bef902c0 b6e5166f b6e544d6
+start_pl_server S    0   553      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5580>] (schedule_timeout+0x28/0xec)
+[<c08e5580>] (schedule_timeout) from [<c070e130>] (__skb_wait_for_more_packets+0x120/0x168)
+[<c070e130>] (__skb_wait_for_more_packets) from [<c070e698>] (__skb_recv_datagram+0x8c/0xbc)
+[<c070e698>] (__skb_recv_datagram) from [<c070e704>] (skb_recv_datagram+0x3c/0x60)
+[<c070e704>] (skb_recv_datagram) from [<c07f9da0>] (unix_accept+0x60/0x144)
+[<c07f9da0>] (unix_accept) from [<c0700444>] (__sys_accept4+0x108/0x194)
+[<c0700444>] (__sys_accept4) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0b09fa8 to 0xd0b09ff0)
+9fa0:                   00080000 00000000 00000008 b44dd358 b44dd348 00080000
+9fc0: 00080000 00000000 b44de920 0000016e 00000008 b44dd358 00000000 00000000
+9fe0: 0000016e b44dd2b8 b6f0aeb5 b6e83be6
+start_pl_server S    0   554      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5580>] (schedule_timeout+0x28/0xec)
+[<c08e5580>] (schedule_timeout) from [<c070e130>] (__skb_wait_for_more_packets+0x120/0x168)
+[<c070e130>] (__skb_wait_for_more_packets) from [<c070e698>] (__skb_recv_datagram+0x8c/0xbc)
+[<c070e698>] (__skb_recv_datagram) from [<c070e704>] (skb_recv_datagram+0x3c/0x60)
+[<c070e704>] (skb_recv_datagram) from [<c07f9da0>] (unix_accept+0x60/0x144)
+[<c07f9da0>] (unix_accept) from [<c0700444>] (__sys_accept4+0x108/0x194)
+[<c0700444>] (__sys_accept4) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0addfa8 to 0xd0addff0)
+dfa0:                   00080000 00000000 0000000a b3afe358 b3afe348 00080000
+dfc0: 00080000 00000000 b3aff920 0000016e 0000000a b3afe358 00000000 00000000
+dfe0: 0000016e b3afe2b8 b6f0aeb5 b6e83be6
+avahi-daemon    S    0   279    204 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5580>] (schedule_timeout+0x28/0xec)
+[<c08e5580>] (schedule_timeout) from [<c07fc800>] (unix_stream_read_generic+0x27c/0x678)
+[<c07fc800>] (unix_stream_read_generic) from [<c07fcd04>] (unix_stream_recvmsg+0x58/0x80)
+[<c07fcd04>] (unix_stream_recvmsg) from [<c06fde5c>] (sock_read_iter+0x90/0xd4)
+[<c06fde5c>] (sock_read_iter) from [<c0224538>] (__vfs_read+0xb0/0xe4)
+[<c0224538>] (__vfs_read) from [<c02245f8>] (vfs_read+0x8c/0xa8)
+[<c02245f8>] (vfs_read) from [<c02247cc>] (ksys_read+0x74/0xc4)
+[<c02247cc>] (ksys_read) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd24edfa8 to 0xd24edff0)
+dfa0:                   00000001 00000006 00000006 be8a6b86 00000001 00000000
+dfc0: 00000001 00000006 b6f124d0 00000003 004d1800 004be5dc 00000005 00000000
+dfe0: 00000003 be8a6b60 b6dca3ff b6dcc4d6
+kworker/0:4     I    0   385      2 0x00000000
+Workqueue:  0x0 (events_power_efficient)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xd3f4bfb0 to 0xd3f4bff8)
+bfa0:                                     00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+ModemManager    S    0   407      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd3c51fa8 to 0xd3c51ff0)
+1fa0:                   ffffffff 00000002 0061c208 00000002 ffffffff 00000000
+1fc0: ffffffff 00000002 b6f335a0 000000a8 bebbbc30 ffffffff 00000001 00000000
+1fe0: 000000a8 bebbbc00 b68879ad b6808be6
+gmain           S    0   425      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd0889fa8 to 0xd0889ff0)
+9fa0:                   ffffffff 00000001 00619fa8 00000001 ffffffff 00000000
+9fc0: ffffffff 00000001 b645f820 000000a8 b645ed18 ffffffff 00000001 bebbb9f8
+9fe0: 000000a8 b645ece8 b68879ad b6808be6
+gdbus           S    0   428      1 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd0893fa8 to 0xd0893ff0)
+3fa0:                   ffffffff 00000002 b470a420 00000002 ffffffff 00000000
+3fc0: ffffffff 00000002 b46ff820 000000a8 b46fed08 ffffffff 00000001 b5afebf8
+3fe0: 000000a8 b46fecd8 b68879ad b6808be6
+agetty          S    0   408      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c02361f8>] (do_select+0x250/0x554)
+[<c02361f8>] (do_select) from [<c0236bdc>] (core_sys_select+0x144/0x200)
+[<c0236bdc>] (core_sys_select) from [<c0236d54>] (kern_select+0xbc/0xfc)
+[<c0236d54>] (kern_select) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd2485fa8 to 0xd2485ff0)
+5fa0:                   00000000 b6fccc50 00000005 bed7b484 00000000 00000000
+5fc0: 00000000 b6fccc50 00000000 0000008e 0044b008 0044b008 00000004 0044b264
+5fe0: 0000008e bed7b450 b6f251a3 b6ea3be6
+login           S    0   412      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c011e574>] (do_wait+0x16c/0x1d8)
+[<c011e574>] (do_wait) from [<c011f624>] (kernel_wait4+0x8c/0x13c)
+[<c011f624>] (kernel_wait4) from [<c011f6fc>] (sys_wait4+0x28/0x7c)
+[<c011f6fc>] (sys_wait4) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd27c9fa8 to 0xd27c9ff0)
+9fa0:                   b6efe010 00000000 ffffffff 00000000 00000000 00000000
+9fc0: b6efe010 00000000 b6efe4d0 00000072 004282e0 00441090 beeffcd4 b6e562c0
+9fe0: 00000072 beeff7b0 b6dd6ca1 b6d76be6
+sshd            S    0   413      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c02361f8>] (do_select+0x250/0x554)
+[<c02361f8>] (do_select) from [<c0236bdc>] (core_sys_select+0x144/0x200)
+[<c0236bdc>] (core_sys_select) from [<c0236d54>] (kern_select+0xbc/0xfc)
+[<c0236d54>] (kern_select) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd3eb5fa8 to 0xd3eb5ff0)
+5fa0:                   00000000 b6f1f060 00000008 005777d8 00000000 00000000
+5fc0: 00000000 b6f1f060 00000000 0000008e 00000001 00000000 005777d8 be87a408
+5fe0: 0000008e be87a358 b6a561a3 b69d4be6
+unattended-upgr S    0   424      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0871fa8 to 0xd0871ff0)
+1fa0:                   ffffffff 00000003 004c2e98 00000003 ffffffff 00000000
+1fc0: ffffffff 00000003 b6ff37d0 000000a8 be8052f8 ffffffff 00000001 be805340
+1fe0: 000000a8 be8052c8 b6f4b9ad b6eccbe6
+gmain           S    0   476      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0a6ffa8 to 0xd0a6fff0)
+ffa0:                   ffffffff 00000001 004c5298 00000001 ffffffff 00000000
+ffc0: ffffffff 00000001 b5d44920 000000a8 b5d43e18 ffffffff 00000001 be8052a8
+ffe0: 000000a8 b5d43de8 b6f4b9ad b6eccbe6
+nmbd            S    0   466      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0a1ffa8 to 0xd0a1fff0)
+ffa0:                   b552e010 00000000 00000004 bed1b988 00000001 00002710
+ffc0: b552e010 00000000 b552e4d0 000000fc 005472e8 00519ac4 00530b0c 00000006
+ffe0: 000000fc bed1b940 b69d2f25 b694cbe6
+systemd         S    0   468      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0a4bfa8 to 0xd0a4bff0)
+bfa0:                   b6f373a0 00000000 00000004 0057fdc0 0000001c ffffffff
+bfc0: b6f373a0 00000000 b6f37860 000000fc 00000000 0000001c 00000004 0057fdc0
+bfe0: 000000fc becc6840 b6e9cf25 b6e16be6
+(sd-pam)        S    0   478    468 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c01277bc>] (do_sigtimedwait+0x174/0x20c)
+[<c01277bc>] (do_sigtimedwait) from [<c012a384>] (sys_rt_sigtimedwait_time32+0x7c/0xc8)
+[<c012a384>] (sys_rt_sigtimedwait_time32) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0a25fa8 to 0xd0a25ff0)
+5fa0:                   be809404 be80928c be809404 be80928c 00000000 00000008
+5fc0: be809404 be80928c b6fee860 000000b1 00000000 be809368 be809384 00008000
+5fe0: 000000b1 be809268 b6edd5d1 b6ecdbe6
+smbd            S    0   492      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0a3ffa8 to 0xd0a3fff0)
+ffa0:                   b4b9c010 00000000 00000003 be837908 00000001 000607ea
+ffc0: b4b9c010 00000000 b4b9c4d0 000000fc 0045b770 0000008b 0044cc20 00000000
+ffe0: 000000fc be8378c0 b64f1f25 b646bbe6
+pulseaudio      S    0   497    468 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c0237288>] (sys_ppoll+0x94/0xcc)
+[<c0237288>] (sys_ppoll) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd5747fa8 to 0xd5747ff0)
+7fa0:                   00000008 00000000 00497750 0000000d 00000000 00000000
+7fc0: 00000008 00000000 00497750 0000019e 00000000 b6f19360 b6f18ea0 00000000
+7fe0: 0000019e be9b6830 b6b9dad5 b6b1ebe6
+null-sink       S    0   542    468 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c0237288>] (sys_ppoll+0x94/0xcc)
+[<c0237288>] (sys_ppoll) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xd3f0bfa8 to 0xd3f0bff0)
+bfa0:                   00000008 00000000 0046ae18 00000002 00000000 00000000
+bfc0: 00000008 00000000 0046ae18 0000019e 00000000 b1f25870 b1f253b0 00000000
+bfe0: 0000019e b1f24c60 b6b9dad5 b6b1ebe6
+snapd-glib      S    0   543    468 0x00000080
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c01011e0>] (__sys_trace_return+0x0/0x20)
+Exception stack(0xca933fa8 to 0xca933ff0)
+3fa0:                   ffffffff 00000001 ae405030 00000001 ffffffff 00000000
+3fc0: ffffffff 00000001 aed5f870 000000a8 aed5ed28 ffffffff 00000001 be9b5f04
+3fe0: 000000a8 aed5ecf8 b6b9d9ad b6b1ebe6
+bash            S    0   504    412 0x00100000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c02361f8>] (do_select+0x250/0x554)
+[<c02361f8>] (do_select) from [<c0236bdc>] (core_sys_select+0x144/0x200)
+[<c0236bdc>] (core_sys_select) from [<c0236e50>] (do_pselect+0xbc/0xf4)
+[<c0236e50>] (do_pselect) from [<c0237080>] (sys_pselect6_time32+0xf0/0x104)
+[<c0237080>] (sys_pselect6_time32) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0a51fa8 to 0xd0a51ff0)
+1fa0:                   00000000 bef2bf64 00000001 bef2bfac 00000000 00000000
+1fc0: 00000000 bef2bf64 b6f1f4e0 0000014f bef2bfac 00000001 bef2bfac bef2bfa8
+1fe0: 0000014f bef2bf48 b6e37259 b6db5be6
+smbd-notifyd    S    0   520    492 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0b37fa8 to 0xd0b37ff0)
+7fa0:                   b4b9c010 00000000 00000003 be8378b0 00000001 00007530
+7fc0: b4b9c010 00000000 b4b9c4d0 000000fc 00433ba4 be8379e8 0044cc20 00000000
+7fe0: 000000fc be837868 b64f1f25 b646bbe6
+cleanupd        S    0   521    492 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0b9ffa8 to 0xd0b9fff0)
+ffa0:                   b4b9c010 00000000 00000003 be8378b8 00000001 00007530
+ffc0: b4b9c010 00000000 b4b9c4d0 000000fc 00000000 00433ba4 000001ec 00000000
+ffe0: 000000fc be837870 b64f1f25 b646bbe6
+lpqd            S    0   526    492 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd3f9dfa8 to 0xd3f9dff0)
+dfa0:                   b4b9c010 00000000 00000003 be8378b0 00000001 000b7146
+dfc0: b4b9c010 00000000 b4b9c4d0 000000fc b6e6a61c b6e8f59c 0044cc20 00000000
+dfe0: 000000fc be837868 b64f1f25 b646bbe6
+rtkit-daemon    S    0   529      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xca81dfa8 to 0xca81dff0)
+dfa0:                   ffffffff 00000001 bef3abdc 00000001 ffffffff 00000000
+dfc0: ffffffff 00000001 b6fb9fa0 000000a8 bef3abdc 00000004 0000000f 00000000
+dfe0: 000000a8 bef3abb8 b6e119ad b6d92be6
+rtkit-daemon    S    0   534      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xca81ffa8 to 0xca81fff0)
+ffa0:                   00001388 00000001 b6c1adc4 00000001 00001388 00000000
+ffc0: 00001388 00000001 b6c1b8b0 000000a8 00001388 00000000 00091070 00000000
+ffe0: 000000a8 b6c1ad78 b6e119ad b6d92be6
+rtkit-daemon    S    0   535      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xca81bfa8 to 0xca81bff0)
+bfa0:                   00002710 00000002 b6419dbc 00000002 00002710 00000000
+bfc0: 00002710 00000002 b641a8b0 000000a8 00091070 00000000 00002710 00000000
+bfe0: 000000a8 b6419d60 b6e119ad b6d92be6
+dbus-daemon     S    0   544    468 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xca935fa8 to 0xca935ff0)
+5fa0:                   b6efa4f0 00000000 00000004 be897368 00000040 ffffffff
+5fc0: b6efa4f0 00000000 b6efa9b0 000000fc 00511d68 00000001 be8977a8 be8977ac
+5fe0: 000000fc be897340 b6cb8f25 b6c32be6
+jupyter-noteboo S    0   545      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd257bfa8 to 0xd257bff0)
+bfa0:                   b6f04310 00000000 00000005 b3025960 00000002 ffffffff
+bfc0: b6f04310 00000000 b6f047d0 000000fc 003ef560 b3025960 b6f047e0 00000000
+bfe0: 000000fc befccb98 b6e63f25 b6dddbe6
+python3         S    0   621      1 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c025fdb8>] (do_epoll_wait+0x3bc/0x410)
+[<c025fdb8>] (do_epoll_wait) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd57e7fa8 to 0xd57e7ff0)
+7fa0:                   b6f62310 00000000 00000005 b5fa9e00 00000003 ffffffff
+7fc0: b6f62310 00000000 b6f627d0 000000fc 003eef98 b5fa9e00 b6f627e0 00000000
+7fe0: 000000fc bedb21d0 b6ec1f25 b6e3bbe6
+kworker/0:1     R  running task        0   693      2 0x00000000
+Workqueue:  0x0 (mm_percpu_wq)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xd097dfb0 to 0xd097dff8)
+dfa0:                                     00000000 00000000 00000000 00000000
+dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+dfe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/1:2     I    0   715      2 0x00000000
+Workqueue:  0x0 (memcg_kmem_cache)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xd5537fb0 to 0xd5537ff8)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+kworker/0:1H    I    0   716      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xdf4fffb0 to 0xdf4ffff8)
+ffa0:                                     00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000
+sshd            S    0   807    413 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd5445fa8 to 0xd5445ff0)
+5fa0:                   00541958 00000000 bee8b324 00000001 ffffffff 00000000
+5fc0: 00541958 00000000 b6fcb060 000000a8 00000001 bee8b324 00000000 00550ab8
+5fe0: 000000a8 bee8b2f8 b6aff987 b6a80be6
+sshd            S    0   808    413 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c023716c>] (sys_poll+0x6c/0xf4)
+[<c023716c>] (sys_poll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd0845fa8 to 0xd0845ff0)
+5fa0:                   00576170 00000000 be8b4324 00000001 ffffffff 00000000
+5fc0: 00576170 00000000 b6fe4060 000000a8 00000001 be8b4324 00000000 005837b8
+5fe0: 000000a8 be8b42f8 b6b18987 b6a99be6
+kworker/u4:0    I    0   818      2 0x00000000
+Workqueue:  0x0 (events_unbound)
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xd2601fb0 to 0xd2601ff8)
+1fa0:                                     00000000 00000000 00000000 00000000
+1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+sshd            S    0   832    807 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c02361f8>] (do_select+0x250/0x554)
+[<c02361f8>] (do_select) from [<c0236bdc>] (core_sys_select+0x144/0x200)
+[<c0236bdc>] (core_sys_select) from [<c0236d54>] (kern_select+0xbc/0xfc)
+[<c0236d54>] (kern_select) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd3c17fa8 to 0xd3c17ff0)
+7fa0:                   00000000 b6fcb060 0000000f 00559458 00559c88 00000000
+7fc0: 00000000 b6fcb060 00000000 0000008e 00000004 00000004 004e8864 0052ac18
+7fe0: 0000008e bee8b290 b6b021a3 b6a80be6
+sshd            S    0   843    808 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c02361f8>] (do_select+0x250/0x554)
+[<c02361f8>] (do_select) from [<c0236bdc>] (core_sys_select+0x144/0x200)
+[<c0236bdc>] (core_sys_select) from [<c0236d54>] (kern_select+0xbc/0xfc)
+[<c0236d54>] (kern_select) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd3c0dfa8 to 0xd3c0dff0)
+dfa0:                   00000000 b6fe4060 0000000f 0058c340 0058cb70 00000000
+dfc0: 00000000 b6fe4060 00000000 0000008e 00000004 00000004 0051b864 0055dc18
+dfe0: 0000008e be8b4290 b6b1b1a3 b6a99be6
+sh              S    0   853    843 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c011e574>] (do_wait+0x16c/0x1d8)
+[<c011e574>] (do_wait) from [<c011f624>] (kernel_wait4+0x8c/0x13c)
+[<c011f624>] (kernel_wait4) from [<c011f6fc>] (sys_wait4+0x28/0x7c)
+[<c011f6fc>] (sys_wait4) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd09dbfa8 to 0xd09dbff0)
+bfa0:                   b6f85760 00000000 ffffffff be8cc594 00000000 00000000
+bfc0: b6f85760 00000000 b6f85c20 00000072 be8cc598 be8cc594 00000000 0050dd14
+bfe0: 00000072 be8cc560 b6ebcca1 b6e5cbe6
+sudo            S    0   883    853 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5918>] (schedule_hrtimeout_range_clock+0x6c/0x12c)
+[<c08e5918>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c0236710>] (do_sys_poll+0x214/0x424)
+[<c0236710>] (do_sys_poll) from [<c0237288>] (sys_ppoll+0x94/0xcc)
+[<c0237288>] (sys_ppoll) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd5613fa8 to 0xd5613ff0)
+3fa0:                   00000008 00000000 00530aa8 00000002 00000000 00000000
+3fc0: 00000008 00000000 00530aa8 0000019e 00000000 b6f50900 b6f50440 00512464
+3fe0: 0000019e bece2540 b6e15a35 b6d96be6
+python3         S    0   891    883 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e5998>] (schedule_hrtimeout_range_clock+0xec/0x12c)
+[<c08e5998>] (schedule_hrtimeout_range_clock) from [<c08e59f0>] (schedule_hrtimeout_range+0x18/0x20)
+[<c08e59f0>] (schedule_hrtimeout_range) from [<c0235a50>] (poll_schedule_timeout.constprop.0+0x58/0x9c)
+[<c0235a50>] (poll_schedule_timeout.constprop.0) from [<c02361f8>] (do_select+0x250/0x554)
+[<c02361f8>] (do_select) from [<c0236bdc>] (core_sys_select+0x144/0x200)
+[<c0236bdc>] (core_sys_select) from [<c0236d54>] (kern_select+0xbc/0xfc)
+[<c0236d54>] (kern_select) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xd09bffa8 to 0xd09bfff0)
+ffa0:                   beb30650 b6f317d0 00000000 00000000 00000000 00000000
+ffc0: beb30650 b6f317d0 00000000 0000008e 00000000 00000000 beb30650 b67d1d68
+ffe0: 0000008e beb30618 b6e8c1d1 b6e0abe6
+python3         R  running task        0   926    883 0x00000000
+[<c010e39c>] (unwind_backtrace) from [<c010a15c>] (show_stack+0x10/0x14)
+[<c010a15c>] (show_stack) from [<c013fa50>] (show_state_filter+0x90/0xa0)
+[<c013fa50>] (show_state_filter) from [<c011b89c>] (panic+0x14c/0x2dc)
+[<c011b89c>] (panic) from [<c0166098>] (panic_on_rcu_stall+0x1c/0x24)
+[<c0166098>] (panic_on_rcu_stall) from [<c0169918>] (rcu_sched_clock_irq+0x33c/0x810)
+[<c0169918>] (rcu_sched_clock_irq) from [<c016ee2c>] (update_process_times+0x2c/0x54)
+[<c016ee2c>] (update_process_times) from [<c017e57c>] (tick_sched_timer+0x44/0x94)
+[<c017e57c>] (tick_sched_timer) from [<c016f910>] (__hrtimer_run_queues+0xe4/0x13c)
+[<c016f910>] (__hrtimer_run_queues) from [<c0170248>] (hrtimer_interrupt+0xc8/0x21c)
+[<c0170248>] (hrtimer_interrupt) from [<c010dd1c>] (twd_handler+0x2c/0x38)
+[<c010dd1c>] (twd_handler) from [<c015f858>] (handle_percpu_devid_irq+0x4c/0xf4)
+[<c015f858>] (handle_percpu_devid_irq) from [<c015aaac>] (generic_handle_irq+0x18/0x28)
+[<c015aaac>] (generic_handle_irq) from [<c015b058>] (__handle_domain_irq+0x90/0xa0)
+[<c015b058>] (__handle_domain_irq) from [<c0476768>] (gic_handle_irq+0x58/0x90)
+[<c0476768>] (gic_handle_irq) from [<c0101e70>] (__irq_usr+0x50/0x80)
+Exception stack(0xca90ffb0 to 0xca90fff8)
+ffa0:                                     00000147 0094fda0 0095e3f8 000001e0
+ffc0: 05f5e0c2 00000000 b436d000 00000001 b4069730 b43248b8 b4069740 b4069740
+ffe0: 0095e3fc b406972c 0094fda4 b437e5fa 20070030 ffffffff
+python3         S    0   927    883 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c017f8ec>] (futex_wait_queue_me+0xa8/0x130)
+[<c017f8ec>] (futex_wait_queue_me) from [<c0180630>] (futex_wait+0xb4/0x1d0)
+[<c0180630>] (futex_wait) from [<c0181ce0>] (do_futex+0xf4/0x9b4)
+[<c0181ce0>] (do_futex) from [<c0182830>] (sys_futex_time32+0x124/0x190)
+[<c0182830>] (sys_futex_time32) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+Exception stack(0xca8affa8 to 0xca8afff0)
+ffa0:                   00000000 ffffffff b2558ec0 00000189 00000001 b32132d8
+ffc0: 00000000 ffffffff 00000000 000000f0 5672fae4 00000000 00000001 00000000
+ffe0: 000000f0 b3213290 b6dd88f1 b6ddb4d6
+kworker/1:0H    I    0   925      2 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c0131950>] (worker_thread+0x1f0/0x258)
+[<c0131950>] (worker_thread) from [<c0136060>] (kthread+0x100/0x10c)
+[<c0136060>] (kthread) from [<c01010e8>] (ret_from_fork+0x14/0x2c)
+Exception stack(0xd0961fb0 to 0xd0961ff8)
+1fa0:                                     00000000 00000000 00000000 00000000
+1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+sudo            D    0  1169    853 0x00000000
+[<c08e2ef4>] (__schedule) from [<c08e30f8>] (schedule+0xb4/0xec)
+[<c08e30f8>] (schedule) from [<c08e3564>] (io_schedule+0x14/0x24)
+[<c08e3564>] (io_schedule) from [<c01d5134>] (wait_on_page_bit_common+0x184/0x204)
+[<c01d5134>] (wait_on_page_bit_common) from [<c01d5404>] (__lock_page_killable+0x34/0x44)
+[<c01d5404>] (__lock_page_killable) from [<c01d5a04>] (filemap_fault+0x148/0x434)
+[<c01d5a04>] (filemap_fault) from [<c02ad494>] (ext4_filemap_fault+0x28/0x3c)
+[<c02ad494>] (ext4_filemap_fault) from [<c01f5bfc>] (__do_fault+0x54/0x74)
+[<c01f5bfc>] (__do_fault) from [<c01f8da4>] (handle_mm_fault+0x738/0x904)
+[<c01f8da4>] (handle_mm_fault) from [<c01119cc>] (do_page_fault+0x19c/0x33c)
+[<c01119cc>] (do_page_fault) from [<c0111ce0>] (do_DataAbort+0x38/0xb8)
+[<c0111ce0>] (do_DataAbort) from [<c0101e1c>] (__dabt_usr+0x3c/0x40)
+Exception stack(0xcab07fb0 to 0xcab07ff8)
+7fa0:                                     b68c80f0 00000000 00000f08 b68c80f0
+7fc0: 004a1620 bedddf28 b68c9000 bedddfa0 00000003 0001d310 bedddf10 00000002
+7fe0: 00000000 bedddee8 b6fbbb7d b6fcae40 20030010 ffffffff
+Mem-Info:
+active_anon:36400 inactive_anon:289 isolated_anon:0
+ active_file:17680 inactive_file:37938 isolated_file:0
+ unevictable:0 dirty:388 writeback:0 unstable:0
+ slab_reclaimable:3618 slab_unreclaimable:4888
+ mapped:15135 shmem:451 pagetables:541 bounce:0
+ free:23182 free_pcp:29 free_cma:22160
+Node 0 active_anon:145600kB inactive_anon:1156kB active_file:70720kB inactive_file:151752kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:60540kB dirty:1552kB writeback:0kB shmem:1804kB writeback_tmp:0kB unstable:0kB all_unreclaimable? no
+Normal free:92728kB min:2444kB low:3052kB high:3660kB active_anon:145600kB inactive_anon:1156kB active_file:70720kB inactive_file:151752kB unevictable:0kB writepending:1552kB present:524288kB managed:506488kB mlocked:0kB kernel_stack:2768kB pagetables:2164kB bounce:0kB free_pcp:116kB local_pcp:116kB free_cma:88640kB
+lowmem_reserve[]: 0 0 0
+Normal: 184*4kB (UMC) 31*8kB (MC) 14*16kB (UMEC) 9*32kB (UMEC) 1*64kB (C) 2*128kB (UC) 3*256kB (UEC) 2*512kB (UE) 1*1024kB (E) 1*2048kB (C) 21*4096kB (C) = 92696kB
+56068 total pagecache pages
+0 pages in swap cache
+Swap cache stats: add 0, delete 0, find 0/0
+Free swap  = 0kB
+Total swap = 0kB
+131072 pages RAM
+0 pages HighMem/MovableOnly
+4450 pages reserved
+32768 pages cma reserved
+Timer List Version: v0.8
+HRTIMER_MAX_CLOCK_BASES: 8
+now at 603305370515 nsecs
+
+cpu: 0
+ clock 0:
+  .base:       pK-error
+  .index:      0
+  .resolution: 1 nsecs
+  .get_time:   
+ktime_get
+
+  .offset:     0 nsecs
+active timers:
+ #0: 
+<pK-error>
+, 
+sched_rt_period_timer
+, S:01
+
+ # expires at 596030164770-596030164770 nsecs [in -7275205745 to -7275205745 nsecs]
+ #1: 
+<pK-error>
+, 
+hrtimer_wakeup
+, S:01
+
+ # expires at 613650662825-613750662825 nsecs [in 10345292310 to 10445292310 nsecs]
+ #2: 
+<pK-error>
+, 
+timerfd_tmrproc
+, S:01
+
+ # expires at 648856461000-648856461000 nsecs [in 45551090485 to 45551090485 nsecs]
+ #3: 
+<pK-error>
+, 
+hrtimer_wakeup
+, S:01
+
+ # expires at 773011711915-773111711915 nsecs [in 169706341400 to 169806341400 nsecs]
+ #4: 
+<pK-error>
+, 
+hrtimer_wakeup
+, S:01
+
+ # expires at 3630517775029-3630617775029 nsecs [in 3027212404514 to 3027312404514 nsecs]
+ #5: 
+<pK-error>
+, 
+sched_clock_poll
+, S:01
+
+ # expires at 4398046511103-4398046511103 nsecs [in 3794741140588 to 3794741140588 nsecs]
+ clock 1:
+  .base:       pK-error
+  .index:      1
+  .resolution: 1 nsecs
+  .get_time:   
+ktime_get_real
+
+  .offset:     1775773014596200690 nsecs
+active timers:
+ #0: 
+<pK-error>
+, 
+timerfd_tmrproc
+, S:01
+
+ # expires at 1775803908856461000-1775803908856461000 nsecs [in 30290954889795 to 30290954889795 nsecs]
+ #1: 
+<pK-error>
+, 
+timerfd_tmrproc
+, S:01
+
+ # expires at 2147483647000000000-2147483647000000000 nsecs [in 371710029098428795 to 371710029098428795 nsecs]
+ #2: 
+<pK-error>
+, 
+timerfd_tmrproc
+, S:01
+
+ # expires at 2147483647000000000-2147483647000000000 nsecs [in 371710029098428795 to 371710029098428795 nsecs]
+ clock 2:
+  .base:       pK-error
+  .index:      2
+  .resolution: 1 nsecs
+  .get_time:   
+ktime_get_boottime
+
+  .offset:     0 nsecs
+active timers:
+ clock 3:
+  .base:       pK-error
+  .index:      3
+  .resolution: 1 nsecs
+  .get_time:   
+ktime_get_clocktai
+
+  .offset:     1775773014596200690 nsecs
+active timers:
+ clock 4:
+  .base:       pK-error
+  .index:      4
+  .resolution: 1 nsecs
+  .get_time:   
+ktime_get
+
+  .offset:     0 nsecs
+active timers:
+ clock 5:
+  .base:       pK-error
+  .index:      5
+  .resolution: 1 nsecs
+  .get_time:   
+ktime_get_real
+
+  .offset:     1775773014596200690 nsecs
+active timers:
+ clock 6:
+  .base:       pK-error
+  .index:      6
+  .resolution: 1 nsecs
+  .get_time:   
+ktime_get_boottime
+
+  .offset:     0 nsecs
+active timers:
+ clock 7:
+  .base:       pK-error
+  .index:      7
+  .resolution: 1 nsecs
+  .get_time:   
+ktime_get_clocktai
+
+  .offset:     1775773014596200690 nsecs
+active timers:
+  .expires_next   : 9223372036854775807 nsecs
+  .hres_active    : 1
+  .nr_events      : 16903
+  .nr_retries     : 0
+  .nr_hangs       : 0
+  .max_hang_time  : 0
+  .nohz_mode      : 2
+  .last_tick      : 534670000000 nsecs
+  .tick_stopped   : 0
+  .idle_jiffies   : 23467
+  .idle_calls     : 57397
+  .idle_sleeps    : 6682
+  .idle_entrytime : 534664173193 nsecs
+  .idle_waketime  : 534664173193 nsecs
+  .idle_exittime  : 534664176941 nsecs
+  .idle_sleeptime : 492773802491 nsecs
+  .iowait_sleeptime: 2450611887 nsecs
+  .last_jiffies   : 23467
+  .next_timer     : 534790000000
+  .idle_expires   : 534790000000 nsecs
+jiffies: 29593
+
+Tick Device: mode:     1
+Broadcast device
+Clock Event Device: 
+ttc_clockevent
+ max_delta_ns:   1238897610
+ min_delta_ns:   18905
+ mult:           227191
+ shift:          32
+ mode:           1
+ next_event:     9223372036854775807 nsecs
+ set_next_event: 
+ttc_set_next_event
+
+ shutdown: 
+ttc_shutdown
+
+ periodic: 
+ttc_set_periodic
+
+ oneshot:  
+ttc_shutdown
+
+ resume:   
+ttc_resume
+
+ event_handler:  
+tick_handle_oneshot_broadcast
+
+ retries:        0
+
+tick_broadcast_mask: 0
+tick_broadcast_oneshot_mask: 0
+
+Tick Device: mode:     1
+Per CPU device: 0
+Clock Event Device: 
+local_timer
+ max_delta_ns:   13215283978
+ min_delta_ns:   1000
+ mult:           697932186
+ shift:          31
+ mode:           3
+ next_event:     9223372036854775807 nsecs
+ set_next_event: 
+twd_set_next_event
+
+ shutdown: 
+twd_shutdown
+
+ periodic: 
+twd_set_periodic
+
+ oneshot:  
+twd_set_oneshot
+
+ resume:   
+twd_shutdown
+
+ event_handler:  
+hrtimer_interrupt
+
+ retries:        1404
+
+Rebooting in 15 seconds..

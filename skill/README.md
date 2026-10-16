@@ -28,7 +28,7 @@ Two things were deliberately *not* copied:
 ## Contents
 
 - `pitfalls/`: board setup, audio playback, overlays, fixed-point types, HLS simulation,
-  data consistency, and GitHub access.
+  data consistency, board hangs, and GitHub access.
 - `prompts/`: prompts for audio algorithm design and AI-assisted work.
 - `templates/`: HLS testbench and interface-specification templates.
 - `checkers/`: audio-length, board connectivity, Jupyter file, and serial-port utilities.
@@ -40,6 +40,7 @@ Two things were deliberately *not* copied:
 | `pynq-direct-ethernet` | `pitfalls/pynq_direct_ethernet_windows.md` | Board-to-laptop link with no router |
 | `pynq-serial-console` | `pitfalls/pynq_serial_console.md` | Serial console from Windows PowerShell |
 | `pynq-shutdown-and-power` | `pitfalls/pynq_shutdown_and_power.md` | When software shutdown is required |
+| `pynq-board-hang-capture` | `pitfalls/pynq_board_hang_capture.md` | Board stopped answering; hang vs power-off; getting the stack |
 | `pynq-overlay-loading` | `pitfalls/pynq_overlay_loading.md` | `No Devices Found`; building a PS-only overlay |
 | `pynq-audio-playback` | `pitfalls/pynq_audio_playback.md` | Sound out and audio in via the base overlay |
 | `pynq-jupyter-files` | `pitfalls/pynq_jupyter_api.md` | File transfer and headless notebooks over HTTP |
