@@ -139,6 +139,10 @@ CONFIGS = {
     # N_long = 基线(实时开、拖滑杆),量它能撑多久。
     "N_long": "LIVE_SRC=wav LIVE_SCOPE=1 NOBOX=1 DUMP=1 "
               "LIVE_SECONDS=300 NOSIG=1 SELFW=380 TMOUT=450",
+    # N_long600 = N_long 原样拉长到 600 秒。演示若要跑 5~10 分钟,300 秒不够背书。
+    # 参数里唯一变的是时长和两个配套超时(SELFW 要盖过 LIVE_SECONDS,TMOUT 再留余量)。
+    "N_long600": "LIVE_SRC=wav LIVE_SCOPE=1 NOBOX=1 DUMP=1 "
+                 "LIVE_SECONDS=600 NOSIG=1 SELFW=680 TMOUT=750",
     # G_long = 与 N_long **只差一件事:不写旋钮文件**(NOTUNE=1)。
     # 为什么值得单列:round7 两臂都是在"拖滑杆"之后 4~12 秒死的
     # (N_short 10.6 秒时的状态里 `gain_applied_db` 还是 [0,0,0,0],
@@ -486,6 +490,13 @@ def main():
     reps = int(sys.argv[2])
     names = sys.argv[3:] or list(CONFIGS)
     os.makedirs(outdir, exist_ok=True)
+    # 配置名打错时不要静默继续:one_run.sh 不认识未知令牌,会直接按默认值跑,
+    # 结果是一臂二十几秒的"PASS"。2026-10-17 就这样误跑过一次 N_long600。
+    for name in names:
+        if name not in CONFIGS and "=" not in name:
+            print("配置名 %r 不在 CONFIGS 里,也不是环境变量串。加进 CONFIGS 再跑。"
+                  % name)
+            return 1
     log(outdir, "ROUND BEGIN  reps=%d  configs=%s  settle=%d"
         % (reps, names, SETTLE))
 
