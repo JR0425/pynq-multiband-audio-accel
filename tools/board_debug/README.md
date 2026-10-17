@@ -85,3 +85,17 @@ python tools/board_debug/sd_probe.py tools/_tmp/roundN
    抢同一个 COM 句柄。要发命令就先停录制。
 7. **板上判存活的 `kill -0` 要加 `sudo`** —— 板上跑的是 root 进程时，不加会因"没权限"
    返回非零，那条日志就永远报 `alive=n`。
+8. **跑之前先确认 `systemctl is-active ksoftirqd-rt.service` 是 `active`。**
+   2026-10-17 起，实时通路的死机靠这个开机服务压住（把 `ksoftirqd/0`+`/1` 和
+   `kworker/[01]:*` 提到 `SCHED_FIFO 50`，高于搬样线程的 20），另有一个
+   `ksoftirqd-rt-refresh.timer` 每 30 秒重扫运行时新建的 kworker。服务不在时
+   `N_long` 会在 40~60 秒内挂。只提 `ksoftirqd` 的旧版能过 300 秒，但 600 秒会挂
+   （转储点名 `kworker/0:1`）。没装过就 `sudo sh board/scripts/install_ksoftirqd_rt.sh`，
+   重刷 SD 卡后要重装。
+9. **90 秒的臂不能只用 `RESULT=done` 判活。** stall 要连续 60 秒才 panic；饿死发生在
+   第 30 秒之后时，程序会先退出、把 CPU0 还给内核，板子不 panic，但中间网络已经断过。
+   判活要一起看 `.stamp`：有连续超时就是"假 PASS"（round9 `N_short` #2 就是这样）。
+10. **新配置名要先加进 `CONFIGS` 再传。** `one_run.sh` 不认识未知令牌，会直接按默认值
+   跑（二十几秒就结束），而 `next_round.py` 那边看起来仍然是 PASS。2026-10-17 的
+   `N_long600` 就这样误跑过一臂。现在脚本遇到"不在 CONFIGS、又不像环境变量串"的名字
+   会直接报错退出。

@@ -11,8 +11,8 @@ description: >
 license: MIT
 compatibility: PYNQ-Z2 image 2.7.0, kernel 5.4.0-xilinx-v2020.2 (armv7l, PREEMPT)
 metadata:
-  version: "1.0.0"
-  updated: "2026-10-16"
+  version: "1.2.0"
+  updated: "2026-10-17"
 ---
 
 # PYNQ-Z2 死机现场的抓取与判读
@@ -40,6 +40,8 @@ metadata:
 | 版本 | 日期 | 改动 |
 |---|---|---|
 | 1.0.0 | 2026-10-16 | 初版。`panic_print=31` 的路子、断电/死机的判据、A/B 对齐规矩 |
+| 1.1.0 | 2026-10-17 | 补第七节：RCU-stall 的根因（`ksoftirqd` 饿死）与修法（提权到 FIFO 50）；补"假 PASS"判据 |
+| 1.2.0 | 2026-10-17 | 600 秒复测发现只提 `ksoftirqd` 不够：`kworker/0:1` 也会饿死。修法扩展到 `kworker/[01]:*` |
 
 ## 一、先判「断电」还是「死机」
 
@@ -202,6 +204,75 @@ sudo sh -c 'echo 10 > /sys/module/rcupdate/parameters/rcu_cpu_stall_timeout'
 属性，实测武装之后停喂近 380 秒一次不复位。
 要救只能绕开驱动直接写 Zynq-7000 的 SWDT 寄存器（需 `/dev/mem` + 确认 CR/MR/RESTART
 偏移），而且即使做成了也只是"10 秒后自己回来"，缓解不了演示中间反复黑屏这件事。
+
+## 七、RCU stall 的根因与修法（2026-10-17 定案）
+
+### 根因
+
+`fir_live.py` 的搬样线程是 `SCHED_FIFO 20`，`duplex_block()` 里是纯 MMIO 轮询，
+**按设计永不阻塞**。同一个核上的 `ksoftirqd`（以及 `kworker/*`）是普通 CFS 类，
+实时任务可运行时永远排不上 → CPU0 的 RCU 静默态报不上去 → 60 秒后判 stall → panic。
+
+三份转储同型：`python3`（搬样线程）在 CPU0 是 `R running task`，
+`ksoftirqd/0`、`kworker/0:1`、`kworker/0:3H` 也都是 `R` 但没上过 CPU。
+
+### 判据上的坑：90 秒的臂会有"假 PASS"
+
+stall 要连续 60 秒才触发 panic。如果饿死发生在第 30 秒之后，程序在 90 秒先退出、
+把 CPU0 还给内核，stall 计时器就被清零 —— 板子不 panic，`RESULT=done` 也会返回，
+但中间那 60 秒网络已经不通。**判活必须同时看拉取器 `.stamp` 有没有连续超时。**
+round9 `N_short` #2 就是这样：第 37 秒起失联 64 秒，却被记成 PASS。
+
+### 修法
+
+把 `ksoftirqd/0`、`ksoftirqd/1` **和 `kworker/[01]:*`** 提到 `SCHED_FIFO 50`
+（高于搬样线程的 20）：
+
+```sh
+sudo chrt -f -p 50 $(pgrep -f '^ksoftirqd/0$' | head -1)
+sudo chrt -f -p 50 $(pgrep -f '^ksoftirqd/1$' | head -1)
+for pid in $(pgrep -f '^kworker/[01]:'); do sudo chrt -f -p 50 $pid; done
+```
+
+需要时它们能抢占搬样线程处理软中断；不需要时搬样线程仍独占 CPU。
+实测 300 秒实时全开：**活着跑完，丢块 61（0.20 块/秒），实时 0.998x**。
+开 SSH 拉取器的正式轮次（round11，2×300 秒）也全活，丢块 220/226，实时 0.993x ——
+多出来的很可能来自拉取器自己的网络负载；演示时状态文件本地读，不走 SSH。
+
+**只提 `ksoftirqd` 不够（2026-10-17 round12b）。** 600 秒那一臂跑到约 390 秒挂了，
+转储里 `ksoftirqd/0` 已经是 `S`，但 RCU 点名
+`Tasks blocked on level-0 rcu_node (CPUs 0-1): P21`，而 P21 是 `kworker/0:1 R`。
+kworker 也是 CFS，同样会被 FIFO 20 的搬样线程永久饿死；它在一次 RCU
+读端临界区里被抢占后，就再也报不出静默态。所以修法必须同时覆盖 kworker。
+
+对比两种"能活"的路子：
+
+| 配置 | 300 秒 | 丢块/300 秒 |
+|---|---|---|
+| 实时开，不提权 | 挂 | — |
+| 实时关（`LIVE_RT_IO=0 LIVE_RT_DSP=0`） | 活 | 552~567 |
+| **实时开，`ksoftirqd` 提权（手工）** | **活** | **61** |
+| **实时开，`ksoftirqd` 提权（带拉取器）** | **活** | **220~226** |
+
+600 秒：只提 `ksoftirqd` 会挂（round12b，约 390 秒）；同时提 `kworker/[01]:*` 后
+**600 秒全活**（round13：59478 块、丢 539、0.991x，拉取器 212 次全应声）。
+workqueue 运行时会按需新建 kworker，所以开机扫描之外还要一个 30 秒重扫 timer
+（`ksoftirqd-rt-refresh.timer`，同一个脚本）。
+
+已做成开机服务，装一次即可（重刷 SD 卡后要重装）：
+
+```sh
+sudo sh board/scripts/install_ksoftirqd_rt.sh
+systemctl is-active ksoftirqd-rt.service       # active
+```
+
+脚本：`board/scripts/ksoftirqd_rt.sh`、`board/scripts/install_ksoftirqd_rt.sh`。
+完整账本：`data/results/board_hang_evidence_20261017.md`。
+
+### 仍未解释的
+
+第六节那种**静默硬死**没有复现。round7 之后所有"对齐起跑"的关实时臂（4 次）都活着，
+所以它暂时被当成 up=44、开机风暴未过的离群点；但不能断言第二种死法不存在。
 
 ## 相关
 

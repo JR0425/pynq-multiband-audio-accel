@@ -53,6 +53,10 @@ build/hls/*
 # 一律不进仓库：前者是过程垃圾，后者是别人的版权代码。
 build/tmp/
 
+# 板子实验的主机侧原始日志（roundN/ 下的 round_host.log、拉取器 .stamp 等）。
+# 整理后的读数进 data/results/，原始流水账留在本地。
+tools/_tmp/
+
 # 重建 bit 之前留的旧版备份（v18 那版的 bit + 它对应的 IP 仓库）。是本地快照，
 # 不是证据 —— 每一版 bit 的时序/资源报告都在 board/overlay 和 build/hls/reports 里，
 # 没必要把整个 IP 仓库再存一份进公开仓库。
