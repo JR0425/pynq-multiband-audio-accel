@@ -541,10 +541,14 @@ def publish_scope(now, cin, cout):
     记录（小端）：`4i` 魔数、序号、每声道采样数、距开跑的 ms；
     接着 2*N 个 `i2`：先进核 N 个，再出核 N 个。
     """
-    if not SCOPE_ON or now - _scope_t[0] < SCOPE_SEC:
+    if not SCOPE_ON:
         return
-    _scope_t[0] = now
 
+    # 历史**每块都推**，只有"发布"受 SCOPE_SEC 限制。
+    # 以前这里是 `if ... now - _scope_t < SCOPE_SEC: return`，把整块都跳过了：
+    # 窗口里拼的是相隔 90 ms 的两段 10 ms，而 out 那段开头 96 个采样是核的
+    # 群延迟、来自**被跳过的那几块** —— 进/出两边对不上。实测互相关只有
+    # 0.795，逐 bin 的频谱比散布 ±8 dB，连"全 0 dB"都测不平。
     a = np.asarray(cin, dtype=np.int16)
     b = np.asarray(cout, dtype=np.int16)
     k = min(a.size, b.size, L)
@@ -555,6 +559,10 @@ def publish_scope(now, cin, cout):
     _scope_hist_out[:-k] = _scope_hist_out[k:]
     _scope_hist_in[-k:] = a[:k]
     _scope_hist_out[-k:] = b[:k]
+
+    if now - _scope_t[0] < SCOPE_SEC:
+        return
+    _scope_t[0] = now
 
     hdr = np.array([SCOPE_MAGIC, _scope_seq[0], SCOPE_N,
                     int((now - t_start[0]) * 1000.0)], dtype=np.int32).tobytes()
