@@ -1,10 +1,11 @@
 /* 多频段核的 C 仿真测试台（testbench）
  *
- * 它做的四件事：
+ * 它做的五件事：
  *     1. 从文件读入一批浮点采样（默认 data/audio/test_input.txt），量化成 int16/Q1.15
  *     2. 用**实际参数**跑一遍核 -> data/results/hw_output.txt（浮点，给 SNR 比对）
  *     3. 用**压缩比 = 1.0**（等于不做压缩）再跑一遍 -> data/results/hw_transparent_i16.txt
- *     4. 打印直通检验：第 2 遍的输出应当逐位等于延迟 D 拍的输入
+ *     4. 用 attack 5 ms / release 100 ms 再跑一遍 -> data/results/v21_wdrc_output.txt
+ *     5. 打印直通检验：第 3 遍的输出应当逐位等于延迟 D 拍的输入
  *
  * 第 3 步为什么重要：
  *     相减式结构有一条可以**精确验证**的性质 —— 不做压缩时，各段之和恒等于
@@ -39,7 +40,9 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
                    const int16_t drc_ratio[N_BANDS],
                    int reset,
                    int bypass,
-                   const int16_t band_gain[N_BANDS]);
+                   const int16_t band_gain[N_BANDS],
+                   const int16_t drc_attack[N_BANDS],
+                   const int16_t drc_release[N_BANDS]);
 
 #define Q15_MAX 32767
 #define Q15_MIN (-32768)
@@ -58,10 +61,12 @@ int main(int argc, char **argv) {
     const char *in_path  = (argc > 1) ? argv[1] : "data/audio/test_input.txt";
     const char *out_path = (argc > 2) ? argv[2] : "data/results/hw_output.txt";
     const char *tr_path  = (argc > 3) ? argv[3] : "data/results/hw_transparent_i16.txt";
+    const char *wd_path  = (argc > 4) ? argv[4] : "data/results/v21_wdrc_output.txt";
 
     std::cout << "[tb] input      : " << in_path << std::endl;
     std::cout << "[tb] output     : " << out_path << std::endl;
     std::cout << "[tb] transparent: " << tr_path << std::endl;
+    std::cout << "[tb] wdrc       : " << wd_path << std::endl;
     std::cout << "[tb] N_TAPS=" << N_TAPS << " N_BANDS=" << N_BANDS
               << " D=" << FIR_GROUP_DELAY << std::endl;
 
@@ -96,7 +101,12 @@ int main(int argc, char **argv) {
     const int16_t thr[N_BANDS]   = {3277, 3277, 3277, 3277};
     const int16_t ratio[N_BANDS] = {22938, 22938, 22938, 22938};
     const int16_t gain[N_BANDS]  = {256, 256, 256, 256};
-    fir_multiband(x.data(), y.data(), length, thr, ratio, 1 /* reset */, 0 /* bypass */, gain);
+    /* 起停时间给 0 = 走无记忆压缩。这一遍的输出必须和 v20_gain **逐位相同**，
+     * 是加 WDRC 之后唯一的硬回归判据（在 run_csim 之后用 md5/逐字节比）。 */
+    const int16_t atk0[N_BANDS]  = {0, 0, 0, 0};
+    const int16_t rel0[N_BANDS]  = {0, 0, 0, 0};
+    fir_multiband(x.data(), y.data(), length, thr, ratio, 1 /* reset */, 0 /* bypass */,
+                  gain, atk0, rel0);
 
     std::ofstream fout(out_path);
     if (!fout.is_open()) {
@@ -118,7 +128,8 @@ int main(int argc, char **argv) {
     const int16_t ratio_any[N_BANDS] = {22938, 22938, 22938, 22938};
     const int16_t gain_any[N_BANDS]  = {256, 256, 256, 256};
     std::vector<int16_t> t(length, 0);
-    fir_multiband(x.data(), t.data(), length, thr_any, ratio_any, 1 /* reset */, 1 /* bypass */, gain_any);
+    fir_multiband(x.data(), t.data(), length, thr_any, ratio_any, 1 /* reset */, 1 /* bypass */,
+                  gain_any, atk0, rel0);
 
     std::ofstream ftr(tr_path);
     if (!ftr.is_open()) {
@@ -153,7 +164,43 @@ int main(int argc, char **argv) {
               << " (expect D = " << FIR_GROUP_DELAY << "), mismatches = "
               << best_bad << " / " << (win_end - max_lag + 1) << std::endl;
 
-    /* ---- 4. 顺手报几个数，方便肉眼先扫一眼是否离谱 ---- */
+    /* ---- 4. WDRC 跑一遍：attack 5 ms / release 100 ms ----
+     * 寄存器里是 Q1.15 的平滑步进：
+     *     step = round((1 - exp(-1/(tau*fs))) * 32768),  fs = 48000
+     *     5 ms   -> 136
+     *     100 ms -> 7
+     * 阈值/压缩比/增益与第 2 遍完全相同，所以两版输出的差别
+     * 只来自"压缩器看不看包络"这一件事。 */
+    const int16_t atk_w[N_BANDS] = {136, 136, 136, 136};
+    const int16_t rel_w[N_BANDS] = {7, 7, 7, 7};
+    std::vector<int16_t> w(length, 0);
+    fir_multiband(x.data(), w.data(), length, thr, ratio, 1 /* reset */, 0 /* bypass */,
+                  gain, atk_w, rel_w);
+
+    std::ofstream fwd(wd_path);
+    if (!fwd.is_open()) {
+        std::cerr << "[tb] ERROR: cannot open wdrc output for writing." << std::endl;
+        return 1;
+    }
+    for (int i = 0; i < length; i++) {
+        fwd << (int)w[i] << "\n";
+    }
+    fwd.close();
+
+    /* 两版逐点比一下：WDRC 的包络从 0 爬起来，所以开头会比无记忆版"压得少"；
+     * 稳态之后差别应当收敛。这里只报数，判定交给 tools/ref_model_wdrc.py。 */
+    long  ndiff  = 0;
+    long  maxdiff = 0;
+    for (int i = 0; i < length; i++) {
+        long d = (long)w[i] - (long)y[i];
+        if (d < 0) d = -d;
+        if (d > maxdiff) maxdiff = d;
+        if (d != 0) ndiff++;
+    }
+    std::cout << "[tb] wdrc vs memoryless: differing samples = " << ndiff
+              << " / " << length << ", max |diff| = " << maxdiff << std::endl;
+
+    /* ---- 5. 顺手报几个数，方便肉眼先扫一眼是否离谱 ---- */
     int16_t ymax = 0;
     for (int i = 0; i < length; i++) {
         int a = (y[i] < 0) ? -(int)y[i] : (int)y[i];
@@ -165,6 +212,12 @@ int main(int argc, char **argv) {
     }
     std::cout << std::endl;
     std::cout << "[tb] max |output| = " << (int)ymax << " / 32767" << std::endl;
+    int16_t wmax = 0;
+    for (int i = 0; i < length; i++) {
+        int a = (w[i] < 0) ? -(int)w[i] : (int)w[i];
+        if (a > wmax) wmax = (int16_t)a;
+    }
+    std::cout << "[tb] max |wdrc|   = " << (int)wmax << " / 32767" << std::endl;
     std::cout << "[tb] DONE" << std::endl;
     return 0;
 }

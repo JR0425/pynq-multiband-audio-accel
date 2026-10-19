@@ -24,6 +24,8 @@ set in_file    [file join $repo_dir data audio test_input.txt]
 set out_file   [file join $repo_dir data results hw_output.txt]
 # 直通检验的输出（压缩比设成 1.0 跑的那一遍）—— 见 src/hls/fir_tb.cpp 文件头
 set tr_file    [file join $repo_dir data results hw_transparent_i16.txt]
+# WDRC 那一路（attack 5 ms / release 100 ms）—— 见 src/hls/fir_tb.cpp
+set wd_file    [file join $repo_dir data results v21_wdrc_output.txt]
 
 # 输出文件可以被 HLS_OUT 覆盖（相对仓库根），用于位宽扫描时每个组合存一份输出。
 # 例：HLS_OUT=data/results/fixed_dw16_cw18.txt
@@ -37,6 +39,11 @@ if {[info exists ::env(HLS_OUT)] && [string length $::env(HLS_OUT)] > 0} {
 # 例：HLS_TR=data/results/fixed_dw16_cw18_transparent.txt
 if {[info exists ::env(HLS_TR)] && [string length $::env(HLS_TR)] > 0} {
     set tr_file [file join $repo_dir $::env(HLS_TR)]
+}
+
+# WDRC 那一路的覆盖方式同上。
+if {[info exists ::env(HLS_WDRC)] && [string length $::env(HLS_WDRC)] > 0} {
+    set wd_file [file join $repo_dir $::env(HLS_WDRC)]
 }
 
 # C 编译选项（可选）—— 用来切 FIR_PARTIAL / FIR_FIXED / FIR_N_TAPS 这类开关。
@@ -76,7 +83,7 @@ open_solution -reset "solution1" -flow_target vivado
 set_part xc7z020clg400-1
 create_clock -period 10 -name default
 
-csim_design -argv "[unixify $in_file] [unixify $out_file] [unixify $tr_file]"
+csim_design -argv "[unixify $in_file] [unixify $out_file] [unixify $tr_file] [unixify $wd_file]"
 
 puts "==== C simulation finished ===="
 exit

@@ -199,6 +199,64 @@ static drc_t drc(drc_t x, drc_t thr, drc_t ratio) {
     return sign * (thr + (a - thr) * ratio);
 }
 
+/* 带 attack/release 的峰值包络压缩（WDRC）。
+ *
+ * 和 drc() 的区别：drc() 是"无记忆"的 —— 每个采样的增益衰减只看它自己。
+ * 真实助听器必须看**包络**：突然的响音要让增益"慢慢"收下来（attack），
+ * 声音变小之后要"慢慢"放回去（release）。没有这两个时间常数，
+ * 压缩器等于对每个采样独立缩放，波形被压扁，听感是失真而不是压缩。
+ *
+ * 包络用峰值检波（追 |x|），一阶平滑：
+ *     diff = |x| - env
+ *     env += diff * (diff > 0 ? attack : release)
+ *
+ * 增益衰减按静态压缩曲线算，再整段从信号里减掉：
+ *     gr = max(env - thr, 0) * (1 - ratio)
+ *     y  = sign(x) * max(|x| - gr, 0)
+ *
+ * 为什么不直接把 |x| 换成 env 代进 drc() 的式子：
+ *     那样 y = thr + (env - thr) * ratio，输出幅度跟着包络走 ——
+ *     包络比波形慢得多，等于把波形乘上一个缓变包络，**波形被压平**。
+ *     减 gr 只改变这一段的增益，过零点和波形形状都保留。
+ *     稳态（env == |x|）时两式完全相等：
+ *         |x| - (|x|-thr)(1-ratio) = thr + (|x|-thr) * ratio
+ *
+ * ⚠️ 定点下每一步都按 AP_TRN 截断（向负无穷取整），不是四舍五入。
+ *    参考模型 tools/ref_model_wdrc.py 必须用 floor 除法，差一个 LSB 就对不上。 */
+static inline drc_t wdrc(drc_t x, drc_t thr, drc_t ratio,
+                         drc_t atk, drc_t rel, drc_t &env) {
+    drc_t a = x;
+    if (x < (drc_t)0) {
+        a = -x;
+    }
+
+    /* 一阶平滑。diff > 0 是"包络在往上追"（attack），否则往下放（release）。
+     * env 永远非负：step 严格小于 1，所以 env 只会落在 0 和 |x| 之间。 */
+    drc_t diff = a - env;
+    drc_t step = (diff > (drc_t)0) ? atk : rel;
+    env = env + diff * step;
+    if (env < (drc_t)0) {
+        env = (drc_t)0;
+    }
+
+    /* 静态压缩曲线算出来的衰减量。ratio <= 1 时 gr >= 0，只会往下压。 */
+    drc_t gr = (drc_t)0;
+    if (env > thr) {
+        gr = (env - thr) * ((drc_t)1 - ratio);
+    }
+
+    drc_t a2 = a - gr;
+    if (a2 < (drc_t)0) {
+        a2 = (drc_t)0;
+    }
+
+    drc_t y = a2;
+    if (x < (drc_t)0) {
+        y = -a2;
+    }
+    return y;
+}
+
 /* 处理 length 个采样：in -> out。输入输出等长、一对一，没有内部缓冲，所以可以流式做。
  *
  * ⚠️ 抽头延迟线在**块与块之间保持**，不在每次调用时清零。
@@ -222,21 +280,35 @@ static drc_t drc(drc_t x, drc_t thr, drc_t ratio) {
  *     哪一段听不见就单独把哪一段抬起来。压缩（drc）**只会衰减**，
  *     抬不动，所以那一步在核里是缺的，只能靠加这一级补上。
  *
- *  ⚠️ 参数顺序：band_gain 必须**加在最后**。HLS 的 AXI4-Lite 偏移是
+ * `drc_attack` / `drc_release`：压缩器的起停时间，寄存器里是 Q1.15 的
+ *     **平滑步进**，不是毫秒：
+ *         step = round((1 - exp(-1 / (tau * fs))) * 32768)
+ *     tau 是时间常数（秒），fs = 48000。换算放在驱动里（见 fir_core.py 的
+ *     ms_to_coef）—— 核里只做乘加，硬件里没有 exp。
+ *     传 0 表示**不启用**，这一段的压缩退回无记忆的 drc()，
+ *     输出与 v20_gain 逐位相同 —— 老 bitstream 的行为因此可以直接回归。
+ *
+ *  ⚠️ 参数顺序：新参数也必须**加在最后**。HLS 的 AXI4-Lite 偏移是
  *     按签名顺序排的，往中间插一个会把后面所有寄存器（reset / bypass）
  *     的地址整体挪位，已经在板上跑着的 Python 驱动当场失效。
- *     加在末尾，新寄存器落在现有最后一个（bypass @0x48）之后的 0x50，
+ *     band_gain 落在 0x50，attack / release 依次落在 0x58 / 0x60，
  *     老地址一个都不动。 */
 void fir_multiband(const int16_t *in, int16_t *out, int length,
                    const int16_t drc_thr[N_BANDS],
                    const int16_t drc_ratio[N_BANDS],
                    int reset,
                    int bypass,
-                   const int16_t band_gain[N_BANDS]) {
+                   const int16_t band_gain[N_BANDS],
+                   const int16_t drc_attack[N_BANDS],
+                   const int16_t drc_release[N_BANDS]) {
     /* 抽头延迟线：hist[0] 是最新采样，hist[N_TAPS_ALLOC-1] 是最旧的。
      * 长度用 N_TAPS_ALLOC（补齐后的），尾巴上那几格配的是 0 系数，纯占位。
      * static —— 块间保持，理由见上。 */
     static data_t hist[N_TAPS_ALLOC];
+    /* 每段的包络状态。和 hist 一样是 static —— 包络必须跨采样、跨块保持，
+     * 否则每个块开头都会从 0 重新爬，块边界炸出"呼吸"声。 */
+    static drc_t env[N_BANDS];
+#pragma HLS ARRAY_PARTITION variable=env complete dim=1
 #if FIR_PRAGMA
     /* 按 5 路循环拆分（cyclic），与 FIR_PARTIAL 对齐：
      * 第 k 个抽头固定落在第 (k % 5) 路。这样内层 p 循环展开之后，
@@ -264,6 +336,12 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
 #endif
             hist[k] = (data_t)0;
         }
+        for (int i = 0; i < N_BANDS; i++) {
+#if FIR_PRAGMA
+#pragma HLS UNROLL
+#endif
+            env[i] = (drc_t)0;
+        }
     }
 
     /* DRC 参数：寄存器里是 Q1.15 的整数，drc_t 是 Q2.22。
@@ -271,9 +349,13 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
      * 硬件里一根线都不花。增益同理（Q7.8，见 fir_types.h 的 gain_in）。 */
     drc_t  thr[N_BANDS];
     drc_t  ratio[N_BANDS];
+    drc_t  atk[N_BANDS];
+    drc_t  rel[N_BANDS];
     gain_t g[N_BANDS];
 #pragma HLS ARRAY_PARTITION variable=thr complete dim=1
 #pragma HLS ARRAY_PARTITION variable=ratio complete dim=1
+#pragma HLS ARRAY_PARTITION variable=atk complete dim=1
+#pragma HLS ARRAY_PARTITION variable=rel complete dim=1
 #pragma HLS ARRAY_PARTITION variable=g complete dim=1
     for (int i = 0; i < N_BANDS; i++) {
 #if FIR_PRAGMA
@@ -281,6 +363,8 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
 #endif
         thr[i]   = (drc_t)samp_in(drc_thr[i]);
         ratio[i] = (drc_t)samp_in(drc_ratio[i]);
+        atk[i]   = (drc_t)samp_in(drc_attack[i]);
+        rel[i]   = (drc_t)samp_in(drc_release[i]);
         g[i]     = gain_in(band_gain[i]);
     }
 
@@ -435,7 +519,14 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
                 acc += band[i];
             } else {
                 drc_t gb = (drc_t)band[i] * g[i];
-                acc += (acc_t)drc(gb, thr[i], ratio[i]);
+                drc_t yv;
+                if (atk[i] == (drc_t)0 && rel[i] == (drc_t)0) {
+                    /* 起停时间都是 0 = 无记忆压缩，和 v20_gain 逐位相同。 */
+                    yv = drc(gb, thr[i], ratio[i]);
+                } else {
+                    yv = wdrc(gb, thr[i], ratio[i], atk[i], rel[i], env[i]);
+                }
+                acc += (acc_t)yv;
             }
         }
         /* 出参 int16/Q1.15：定点下 (data_t)acc 就是截断到 16 位（带饱和），
