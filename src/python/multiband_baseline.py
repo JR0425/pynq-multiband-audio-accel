@@ -102,10 +102,11 @@ def main():
     # 实测的拍/采样，键是抽头数。见 data/results/impl_metrics.md。
     # 换抽头数就得重新综合，也就得往这里补一行 —— 不给的话宁可不打这个对照，
     # 也不能拿 193 的数去说 65 抽头。
-    # 193 取的是**当前出货那版** `v20_gain`（含每段增益）= **35 拍**。
-    # 别混的三代：v20_gain=35（现在）／v19=31（2026-10-08 那次 19.5 倍对照测的）／
-    # 28（t 系列中间实验）。口径见 impl_metrics.md。
-    CYCLES_MEASURED = {65: 173, 193: 35}
+    # 193 取的是**当前出货那版** `v21_wdrc`（加包络 + attack/release）= **49 拍**。
+    # 别混的四代：v21_wdrc=49（现在）／v20_gain=35（2026-10-09 ~ 10-19）／
+    # v19=31（2026-10-08 那次 19.5 倍对照测的）／28（t 系列中间实验）。
+    # 口径见 impl_metrics.md。
+    CYCLES_MEASURED = {65: 173, 193: 49}
     cycles = args.cycles if args.cycles is not None else CYCLES_MEASURED.get(n)
 
     # ---- 1. 读音频，重采样到硬件用的采样率 ----
