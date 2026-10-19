@@ -65,7 +65,7 @@ CONFIGS = {
     # **对照组**:管线照跑,但板子上**一个黑匣子都不开**,主机只 cat 内核文件。
     # 两次死亡的现场里,黑匣子自己也只跑了 9~35 秒,而 v3 每 6 秒 cp 到 SD、
     # 每 12 秒 sync、每秒还跑一次带 --sort=-pcpu 的 ps(最贵那条);
-    # 成功 4/4 的那次 soak 没有黑匣子。所以"凶手是管线还是监控"必须分开问。
+    # 成功 4/4 的那次 soak 没有黑匣子。所以"问题是管线还是监控"必须分开问。
     "K_clean": "LIVE_SRC=wav LIVE_SCOPE=1 NOBOX=1",
     # K 之上再挂看门狗:万一它就是会挂,至少能自己爬回来,不用人按电源。
     "L_cleanwd": "LIVE_SRC=wav LIVE_SCOPE=1 NOBOX=1 WD=1",
@@ -429,7 +429,7 @@ def one_run(outdir, mon, tag, extra, i):
     pre_probe(outdir, tag, i)
 
     # NOBOX=1:板子上不开黑匣子(连一次 /proc 快照循环都不跑),主机侧只 cat 内核文件。
-    # 这是"凶手是管线还是我的监控"的对照组 —— 别把这条和 A 的结果混着看。
+    # 这是"问题出在管线还是我的监控"的对照组 —— 别把这条和 A 的结果混着看。
     if nobox:
         log(outdir, "  up=%s 黑匣子=按 NOBOX 关掉了" % up0)
         mon.stop()

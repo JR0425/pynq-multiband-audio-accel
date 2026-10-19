@@ -70,7 +70,7 @@ ARP 表里目标地址 `Incomplete`。板子收得到包，但 eth0 上没有 IP
 认口、参数、怎么读：`skill/pitfalls/pynq_serial_console.md`。
 sudo 密码是 `xilinx`：`echo xilinx | sudo -S <命令>`
 
-**5. 真凶：dhclient 把静态地址冲掉**
+**5. 根因：dhclient 把静态地址冲掉**
 `ifconfig eth0` 只有 IPv6、没有 IPv4，但 `RX packets` 在涨。
 出厂配置是 `eth0 = dhcp` + `eth0:1 = static`，dhclient 无限重试 DHCP，每次重配都把静态别名冲掉。
 `journalctl -b | grep -i eth0` 能看到它一直在等一个不存在的 DHCP 服务器。

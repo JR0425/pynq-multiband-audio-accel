@@ -3,7 +3,7 @@
 目的是验证「用 Python 指挥 FPGA 做音频处理」这条路线
 
 【提示词】
-「推。现在板子连接成功了，vivado也能打开，帮我推送.bit,.hwh文件」
+「现在板子连接成功了，vivado也能打开，要在 PYNQ 上验证“Python 控 FPGA 做 FIR/音频加速”路线，参考 overlay 已带硬件，板内加载+DMA+互相关校验怎么铺？」
 「结果没有显示出来是什么问题」
 
 【模型回答】
@@ -17,7 +17,7 @@ AI 给我的主线是：不用 Jupyter 的网页 API（登录返回 403），改
   1. AI 默认「板子上的 python 就是 `/usr/bin/python3`」，我没多想，照它给的命令跑
      → 直接报 `No module named 'pynq'`。
   2. AI 默认「Jupyter 可以用密码登录、调它的 API 传文件」→ 403，带上 xsrf 仍然 403，白试两轮。
-     → 我记下的教训：**先看服务实际是怎么起的（`ps aux` / `systemctl`），别猜了再验。**
+     → 结论：**先看服务实际是怎么起的（`ps aux` / `systemctl`），别猜了再验。**
 
 · **环境的坑**
   3. 板子上有两个 python，PYNQ 那个装在 venv 里、不在系统路径上；`/home/xilinx/pynq`
