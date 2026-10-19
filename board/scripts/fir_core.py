@@ -15,11 +15,14 @@
 #   k  = FirMultiband(ol.fir_multiband_0.mmio)
 #   k.run(in_buf, out_buf, n)
 
+import math
 import time
 
 import numpy as np
 from pynq import allocate
 
+
+FS_HZ = 48000
 
 # Q7.8：1 个符号位 + 7 个整数位 + 8 个小数位。
 #     1.0    = 256（不是 1，不是 32768 —— 写错这一个数，声音差 48 dB）
@@ -47,6 +50,28 @@ def gain_to_db(raw):
     return 20.0 * float(np.log10(raw / float(GAIN_UNITY)))
 
 
+def ms_to_coef(ms, fs=FS_HZ):
+    """attack/release 时间（毫秒）-> 核里的 Q1.15 平滑步进。
+
+        step = 1 - exp(-1 / (tau * fs))
+
+    推导：一阶平滑 env += (|x| - env) * step 的时间常数是
+    tau = -1 / (fs * ln(1 - step))；反解就得到上式。
+    0 或负数表示"不启用"（核里退回无记忆压缩），返回 0。
+    """
+    if ms is None or ms <= 0:
+        return 0
+    v = int(round((1.0 - math.exp(-1.0 / (ms * 1e-3 * fs))) * 32768.0))
+    return max(1, min(32767, v))
+
+
+def coef_to_ms(coef, fs=FS_HZ):
+    """Q1.15 平滑步进 -> 时间常数（毫秒）。0 表示没启用，返回 None。"""
+    if coef <= 0:
+        return None
+    return -1000.0 / (fs * math.log(1.0 - coef / 32768.0))
+
+
 class FirMultiband:
     # ---- 寄存器偏移 ----
     AP_CTRL   = 0x00          # bit0 ap_start(读写) / bit1 ap_done(读后清) /
@@ -71,6 +96,10 @@ class FirMultiband:
                               #    256。核里不做这个兜底（寄存器默认值改不了）。
                               #    现在全仓库只有本文件直接写核的寄存器，这条不会
                               #    踩到别人 —— 上板自检里有一条就是"增益全 0 → 输出全 0"。
+    DRC_ATTACK  = 0x58        # 4 × int16，Q1.15 平滑步进（0 = 不启用）
+    DRC_RELEASE = 0x60        # 同上。毫秒换算见 ms_to_coef()。
+                              # 2026-10-19 加，同样排在签名最后，
+                              # 0x00~0x57 的老地址一个都没动（综合后核对 hw.h）。
 
     AP_START = 1 << 0
     AP_DONE  = 1 << 1
@@ -90,6 +119,10 @@ class FirMultiband:
     # 给 256 时核的行为和加这一级之前逐位相同 —— 所以老脚本不传 gain
     # 也不会变声，csim 已经逐字节验过。
     DEF_GAIN  = (GAIN_UNITY,) * N_BANDS
+    # 起停时间默认 0 = 不启用（走无记忆压缩，行为与 v20 逐位相同）。
+    # 这样老脚本不传 attack/release 也不会变声。
+    DEF_ATTACK  = (0,) * N_BANDS
+    DEF_RELEASE = (0,) * N_BANDS
 
     def __init__(self, mmio):
         self.mmio = mmio
@@ -114,7 +147,8 @@ class FirMultiband:
 
     def run(self, in_buf, out_buf, length,
             thr=None, ratio=None, gain=None,
-            reset=False, bypass=False, timeout=5.0):
+            reset=False, bypass=False, timeout=5.0,
+            attack=None, release=None):
         """处理一块。返回 (耗时秒数, 忙等轮数)。
 
         in_buf / out_buf 必须是 pynq.allocate 出来的 buffer（要有 physical_address）。
@@ -126,6 +160,11 @@ class FirMultiband:
         想按分贝给就先过 db_to_gain()：
             gain=[db_to_gain(12)] * 4        # 每段 +12 dB
             gain=[db_to_gain(-6), 0, 6, 12]  # 逐段不同
+
+        attack / release 是 4 段各自的**毫秒数**（方便传），内部用 ms_to_coef()
+        换成核里的 Q1.15 步进。None 或 0 = 不启用，走无记忆压缩，
+        输出与 v20_gain 逐位相同。给毫秒而不是原始步进，是因为
+        "5 ms / 100 ms" 是人能调的数，"136 / 7" 不是。
         """
         length = int(length)
         if length <= 0 or length > self.MAX_LEN:
@@ -136,6 +175,14 @@ class FirMultiband:
             gain = self.DEF_GAIN
         else:
             gain = tuple(int(g) for g in gain)
+        if attack is None:
+            attack = self.DEF_ATTACK
+        else:
+            attack = tuple(ms_to_coef(a) for a in attack)
+        if release is None:
+            release = self.DEF_RELEASE
+        else:
+            release = tuple(ms_to_coef(r) for r in release)
 
         # 所有参数必须在写 ap_start 之前写完 —— HLS 是在 ap_start 那一刻锁存的
         self._write_addr(self.IN_ADDR, in_buf.physical_address + in_buf.offset)
@@ -151,6 +198,12 @@ class FirMultiband:
         w0, w1 = self._pack4(gain)
         self.mmio.write(self.BAND_GAIN, w0)
         self.mmio.write(self.BAND_GAIN + 4, w1)
+        w0, w1 = self._pack4(attack)
+        self.mmio.write(self.DRC_ATTACK, w0)
+        self.mmio.write(self.DRC_ATTACK + 4, w1)
+        w0, w1 = self._pack4(release)
+        self.mmio.write(self.DRC_RELEASE, w0)
+        self.mmio.write(self.DRC_RELEASE + 4, w1)
 
         self.mmio.write(self.RESET, 1 if reset else 0)
         self.mmio.write(self.BYPASS, 1 if bypass else 0)
@@ -179,7 +232,7 @@ class FirMultiband:
     # ---------------- 方便调用的组合 ----------------
 
     def process(self, x, reset=False, bypass=False, thr=None, ratio=None,
-                out=None, chunk=None, gain=None):
+                out=None, chunk=None, gain=None, attack=None, release=None):
         """整段处理一个 numpy int16 数组，返回 (输出数组, 总耗时, 分块信息)。
 
         比 MAX_LEN 长就自动切块。**切块时只在第一块 reset**，
@@ -203,7 +256,8 @@ class FirMultiband:
                 np.copyto(in_buf[:m], x[pos:pos + m])
                 dt, spins = self.run(in_buf, out_buf, m,
                                      thr=thr, ratio=ratio, gain=gain,
-                                     reset=(reset and first), bypass=bypass)
+                                     reset=(reset and first), bypass=bypass,
+                                     attack=attack, release=release)
                 np.copyto(out[pos:pos + m], out_buf[:m])
                 total += dt
                 blocks.append((m, dt, spins))

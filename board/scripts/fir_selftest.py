@@ -16,7 +16,7 @@ import sys
 import numpy as np
 
 from pynq import Overlay
-from fir_core import FirMultiband
+from fir_core import FirMultiband, ms_to_coef
 
 BITFILE = "fir.bit"
 N = 1000                      # 一块的采样数
@@ -121,6 +121,33 @@ y_bt, _, _ = k.process(x, reset=True, bypass=True, gain=(32767,) * 4)
 mbt = int(np.count_nonzero(y_bt != y))
 check("直通模式下增益不起作用（bypass 不吃增益）", mbt == 0,
       "错配 %d / %d" % (mbt, N))
+
+# ---------------- WDRC：attack / release（0x58 / 0x60）----------------
+# 判据分两条，都是精确的：
+#   · 起停时间给 0 -> 必须**逐位等于**第 4 节那组无记忆压缩的结果。
+#     这条保证新寄存器没接错、也没把老路径改坏。
+#   · 直通模式下给什么起停时间都不该起作用（bypass 连压缩都不进）。
+# 另外一条只是"变了"，用来证明包络真的参与了运算。
+print("\n=== 5b. WDRC（attack / release，寄存器 0x58 / 0x60）===")
+check("ms_to_coef(5 ms) = 136", ms_to_coef(5) == 136, str(ms_to_coef(5)))
+check("ms_to_coef(100 ms) = 7", ms_to_coef(100) == 7, str(ms_to_coef(100)))
+
+y_leg, _, _ = k.process(x, reset=True, bypass=False,
+                        attack=(0,) * 4, release=(0,) * 4)
+mleg = int(np.count_nonzero(y_leg != y2))
+check("起停时间给 0 -> 逐位等于无记忆压缩", mleg == 0,
+      "错配 %d / %d" % (mleg, N))
+
+y_w, _, _ = k.process(x, reset=True, bypass=False,
+                      attack=(5,) * 4, release=(100,) * 4)
+nw = int(np.count_nonzero(y_w != y2))
+check("开了起停时间后输出变了（包络接进来了）", nw > 0,
+      "不同 %d / %d" % (nw, N))
+
+y_bw, _, _ = k.process(x, reset=True, bypass=True,
+                       attack=(5,) * 4, release=(100,) * 4)
+mbw = int(np.count_nonzero(y_bw != y))
+check("直通模式下起停时间不起作用", mbw == 0, "错配 %d / %d" % (mbw, N))
 
 # ---------------- 分块连续性 ----------------
 # 分块时只在第一块 reset，块边界不该炸出咔声 —— 判据是分块结果和整块结果一致

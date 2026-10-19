@@ -4,8 +4,9 @@
 ================================ 为什么现在能做 ================================
 三条都已经在这块板子上实测过，缺一条这件事就做不成：
 
-  ① 核够快       核里 35 拍 @ 100 MHz = **0.35 µs/采样**，48 kHz 的预算 20.83 µs —— 余量约 59 倍
-                 （10/08 上板实测 0.317 µs 是"加每段增益"之前那一版，不是现在这颗 bit）
+  ① 核够快       核里 49 拍 @ 100 MHz = **0.49 µs/采样**，48 kHz 的预算 20.83 µs —— 余量约 42 倍
+                 （10/08 上板实测 0.317 µs 是"加每段增益"之前那一版；v21 加了包络，
+                  拍数从 35 涨到 49，见 data/results/impl_metrics.md）
   ② 延迟线跨块保持 分块跑和整块跑**逐位相同**，0 错配（fir_selftest.py 第 5 节）
   ③ 音频通路能全双工  录 0.2 s ‖ 播 0.2 s 同时跑，墙钟 0.203 s（＝max 不是 sum）
                  （audio_duplex_probe.py）
@@ -320,6 +321,11 @@ gain_dst_db = list(GAIN_DB)                             # 目标（dB，给界�
 ramp_left = [0]                                         # 还要走几块（列表是为了能在函数里改）
 thr_cur = [(THR_Q15,) * 4]
 ratio_cur = [(RATIO_Q15,) * 4]
+# 起停时间（毫秒）。**默认 0 = 不启用**，也就是无记忆压缩 ——
+# 这样新 bitstream 上板后的第一件事可以和老版逐位对比，确认没改坏。
+# 要听 WDRC 就设环境变量，或在旋钮文件里写 attack_ms / release_ms。
+atk_ms = [(float(os.environ.get("LIVE_ATTACK_MS", "0")),) * 4]
+rel_ms = [(float(os.environ.get("LIVE_RELEASE_MS", "0")),) * 4]
 bypass_cur = [BYPASS]
 tune_last = [None]                                      # 上一次读到的旋钮内容
 t_poll = [0.0]
@@ -394,6 +400,8 @@ def poll_tune(now):
         gain_db   [4 个数]  每段增益（dB），低→高
         thr_db    [4 个数]  压缩门限（dBFS）
         ratio     [4 个数]  压缩比 0~1
+        attack_ms [4 个数]  起振时间（毫秒，0 = 不启用）
+        release_ms[4 个数]  释放时间（毫秒，0 = 不启用）
         bypass    0 / 1
 
     数值不合法就**保留当前值**，不抛 —— 界面发来一个 NaN，不该让音频停。
@@ -438,6 +446,22 @@ def poll_tune(now):
             ratio_cur[0] = tuple(max(0, min(32767, int(round(float(x) * 32768.0))))
                                  for x in r)
             what.append("压缩比 " + "/".join("%.2f" % float(x) for x in r))
+        except (TypeError, ValueError):
+            pass
+
+    a = d.get("attack_ms")
+    if isinstance(a, (list, tuple)) and len(a) == 4:
+        try:
+            atk_ms[0] = tuple(max(0.0, min(2000.0, float(x))) for x in a)
+            what.append("起振 " + "/".join("%.1f" % float(x) for x in a) + " ms")
+        except (TypeError, ValueError):
+            pass
+
+    rl = d.get("release_ms")
+    if isinstance(rl, (list, tuple)) and len(rl) == 4:
+        try:
+            rel_ms[0] = tuple(max(0.0, min(2000.0, float(x))) for x in rl)
+            what.append("释放 " + "/".join("%.1f" % float(x) for x in rl) + " ms")
         except (TypeError, ValueError):
             pass
 
@@ -486,6 +510,8 @@ def publish_status(now, running=True, ok=None):
         "gain_applied_db": [gain_to_db(g) for g in
                             (int(round(x)) for x in gain_cur)],
         "bypass": bool(bypass_cur[0]),
+        "attack_ms": list(atk_ms[0]),
+        "release_ms": list(rel_ms[0]),
         "in_rms": _win_rms(in_rms),
         "out_rms": _win_rms(out_rms),
         "rt": (audio_sec / wall) if wall > 0 else 0.0,
@@ -706,9 +732,9 @@ print("   uio=%s iic=%s mmio.length=0x%x" % (UIO, IIC, MMIO_LEN))
 block_sec = L / FS
 print("   每块 %d 个采样 = %.2f ms；%d 个槽位 → 延迟约 %.0f ms"
       % (L, block_sec * 1000, NBUF, NBUF * block_sec * 1000))
-print("   实时预算 %.2f µs/采样；核 35 拍 @ 100 MHz = 0.35 µs/采样（余量 %d 倍，"
+print("   实时预算 %.2f µs/采样；核 49 拍 @ 100 MHz = 0.49 µs/采样（余量 %d 倍，"
       "另加每块约 52 µs 的固定开销）"
-      % (1e6 / FS, int(1e6 / FS / 0.35)))
+      % (1e6 / FS, int(1e6 / FS / 0.49)))
 
 # ---------------- 缓冲 ----------------
 slots = []
@@ -857,7 +883,8 @@ def stage_dsp():
         try:
             dt, _spins = k.run(cin, cout, L, reset=first,
                                thr=thr_cur[0], ratio=ratio_cur[0],
-                               gain=gains_int, bypass=bypass_cur[0])
+                               gain=gains_int, bypass=bypass_cur[0],
+                               attack=atk_ms[0], release=rel_ms[0])
         except Exception as e:                               # noqa: BLE001
             errors.append(("dsp", repr(e)))
             stop.set()
@@ -890,7 +917,8 @@ def stage_dsp():
         # applied_log 也在这里跟着留：**它记的是这一块当时用的那组参数**，
         # 所以"跑的过程中调过旋钮"不会让自检失效。
         if captured[0] < CAPTURE_MAX:
-            applied_log.append((gains_int, thr_cur[0], ratio_cur[0], bypass_cur[0]))
+            applied_log.append((gains_int, thr_cur[0], ratio_cur[0],
+                                bypass_cur[0], atk_ms[0], rel_ms[0]))
             cap_in.append(np.array(cin, dtype=np.int16))
             cap_out.append(np.array(cout, dtype=np.int16))
             captured[0] += L
@@ -1080,10 +1108,10 @@ if len(cap_in) >= 3:
     ob = allocate(shape=(L,), dtype=np.int16)
     try:
         for j in range(nb):
-            gj, thj, raj, byj = applied_log[j]
+            gj, thj, raj, byj, atj, rej = applied_log[j]
             np.copyto(ib, x_cat[j * L:(j + 1) * L])
             k.run(ib, ob, L, reset=(j == 0), thr=thj, ratio=raj,
-                  gain=gj, bypass=byj)
+                  gain=gj, bypass=byj, attack=atj, release=rej)
             np.copyto(ref[j * L:(j + 1) * L], ob)
     finally:
         del ib, ob
