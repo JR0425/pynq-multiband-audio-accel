@@ -14,8 +14,6 @@ A/B 工作包：
 
 交付图表的核对过程（三张图的实际缺陷 + 一处 1 个最低位的量纲假警报）见 `2026-10-02_figures_and_one_lsb.md`。
 
-技能包改用官方 Agent Skill 写法的判断依据、以及"能不能用官方工具链"的落地条件见 `2026-10-02_skill_package_official_format.md`。
-
 板载音频输入的固定、压缩器输入-输出电平曲线的测量、以及"压窄了多少 dB"的口径见 `2026-10-06_fixed_input_and_drc_level_curve.md`。
 
 核的循环拍数从 450 压到 28 的过程（延迟线的环依赖写法 + 一处"新 bit 没传上板但功能检查分辨不出来"）见 `2026-10-07_hls_loop_carried_dependency.md`。
