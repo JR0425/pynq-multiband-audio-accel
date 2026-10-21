@@ -32,4 +32,6 @@ A/B 工作包：
 
 验配界面的表针滞后（音频那条从来没慢过：48 次调整中位 32 ms；钉 CPU 亲和性是真问题但不是这次的答案；真正的堵点是一个 10 Hz × 240 点的波形控件把浏览器消息队列压住了，判据是单独停掉波形表针就实时；以及"块号每帧涨 10"为什么证明不了新鲜）见 `2026-10-18_tuning_ui_latency.md`。
 
+实时通路的丢块（不是 CPU 不够：`queue.Queue` 的锁在 Python 层，每块之间停 196 µs，L=480 时吃掉 1.25% 的音频；换成 `SimpleQueue` 后 81 µs、60 秒丢 0；以及每 30.24 秒一次的 journal 写 SD 卡如何借 FIFO 50 的 `kworker` 抢走 CPU0，最后把 systemd timer 换成常驻静默进程）见 `2026-10-21_realtime_dropout_root_cause.md`。
+
 抽头数参数调整见 `2026-09-30_python_baseline_193_taps.md`。更早的开发过程仍按各自任务文件记录。

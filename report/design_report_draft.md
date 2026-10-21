@@ -8,7 +8,7 @@
 
 The project explores a multiband dynamic-range-compression (DRC) audio pipeline on a PYNQ-Z2 board. DRC reduces the level of signals above a threshold. The algorithm divides audio into frequency bands, applies the same compression rule to each band, and sums the results.
 
-The planned comparison uses a Python reference, an HLS implementation, and an RTL implementation. At this snapshot the repository contains the Python reference, the HLS source, and low-pass RTL (`src/rtl/fir_lp.v`, three low-pass filters only — no subtractive band, DRC, or AXI shell), checked bit-for-bit against the C simulation in xsim. The three-way comparison is not yet present.
+The comparison uses a Python reference, an HLS implementation, and an RTL implementation. All three exist and are compared at one load in section 4.1: the Python reference, the HLS source, and a custom RTL front end (`src/rtl/fir_mb_fe.v`: three low-pass filters, the subtractive band split and the four-band sum — no DRC, gain or AXI shell), verified bit for bit in xsim.
 
 ## 2. Current algorithm
 
@@ -74,6 +74,34 @@ At 100 MHz, the 31 cycles behind the 2026-10-08 measurement correspond to a theo
 The core's cost was dominated by data movement, not arithmetic: the synthesis loop table attributed 398 of the original 450 cycles to shifting the 193-entry delay line, with the three low-pass filters together taking 11 cycles. That movement is now removed by the compile-time switch `-DFIR_SHIFT_CHAIN=1`, which cuts the schedule from 450 to 31 cycles per sample in v19 — 49 in the delivered v21, after the per-band gain and the envelope were added — without changing the algorithm; the switch defaults off and the default build path is byte-for-byte unchanged. The change is implemented and verified on the board, not left as future work.
 
 The implementation history and measurement limitations are documented in `data/results/impl_metrics.md`. Do not compare the out-of-context rows with rows measured using a different flow without accounting for the methodology change.
+
+### 4.1 Three-way comparison at one load (Python / HLS / RTL)
+
+All three rows compute the same front end: three 193-tap low-pass filters (allocated as 195 taps, six of them zero), pairwise subtraction into four bands, and the band sum. None of them contains a compressor, a per-band gain or an AXI shell. The ARM row performs 579 multiplications per sample; the two hardware rows perform 585 (579 effective, the remainder zero taps). The sample period at 48 kHz is 20.83 µs.
+
+| | ARM Cortex-A9 (software) | HLS core, `v19_shift_chain` | RTL front end, `fir_mb_fe.v` |
+| --- | ---: | ---: | ---: |
+| Arithmetic | float64, `scipy.signal.lfilter` | Q1.15, 18-bit Q1.17 coefficients | Q1.15, same fixed-point contract |
+| Cycles per sample | — | 31 | **3** (3,000 cycles over 1,000 samples, xsim) |
+| Time per sample at 100 MHz | 6.199 µs (measured) | 0.310 µs theoretical / 0.317 µs measured | 0.030 µs (projection from simulated cycles) |
+| Real-time headroom at 48 kHz | 3.36× | 65.7× (measured) | ≈694× (projection) |
+| Speedup against the ARM | 1× | **19.5× (measured)** | ≈207× (projection) |
+| LUT | n/a (uses 1 of 2 cores) | 3,670 (6.90%) | 4,559 (8.57%) |
+| Flip-flops | n/a | 5,547 (5.21%) | 3,138 (2.95%) |
+| DSP48 | n/a | 200 (90.91%) | 189 (85.91%) |
+| BRAM | n/a | 49 (35.00%) | 0 |
+| WNS at the 10 ns constraint, post-route | n/a | +1.832 ns | +0.585 ns |
+| Failing endpoints | n/a | 0 | 0 |
+
+The HLS column is `v19_shift_chain` because it is the only HLS build with the same function. The delivered `v21_wdrc` adds per-band gain and the peak envelope and schedules at 49 cycles per sample; putting the 3-cycle front end next to 49 cycles would overstate the RTL advantage, so it is not used here.
+
+Both hardware columns are post-place-and-route, out of context, on the same device with the same 10 ns constraint. Against HLS, the RTL uses 889 more LUTs (+24%) and has 1.247 ns less slack, but 2,409 fewer flip-flops (−43%), 11 fewer DSPs and no BRAM. The cycle advantage comes from keeping all 195 multipliers busy every cycle with three coefficient phases per sample, where the HLS schedule feeds the same multipliers five partial sums at a time.
+
+Only the ARM and the HLS core were measured on hardware. The RTL column is simulation plus out-of-context place-and-route: it has no AXI shell and has never run on the board, so its 0.030 µs excludes the PS-side cost that the HLS board measurement includes (register writes, cache maintenance and DONE polling, about 52–56 µs per 8,000-sample block, some 2% at that block size). The ≈207× ratio is therefore a projection, not a same-chip measurement; **the measured same-chip figure is 19.5×**.
+
+The two fixed-point implementations agree with their references numerically: the RTL front end is bit-identical to the integer reference model on all nine observed signals — three accumulator taps, four bands, the band sum and the final int16 output, 1,000/1,000 samples each — and the HLS core's C simulation matches the Python golden reference of the full algorithm at 75.4 dB SNR with the best lag at zero (section 6). The ARM and the hardware are not bit-comparable because of precision (float64 against Q1.15); their agreement was checked at output RMS and peak (0.10659 against 0.10706, and 0.28627 against 0.28625).
+
+Sources: `data/results/accel_cpu_vs_fpga.md`, `impl_metrics.md`, `rtl_vs_hls.md`; raw logs `compare_cpu_fpga_run_20261008.txt`, `sim/rtl_sim/xsim_work_mb/xsim_mb.log`, and reports `build/hls/reports/win_shiftchain_impl/` and `data/results/rtl_fe_impl_{util,timing}.rpt`.
 
 ## 5. Board evidence
 
@@ -182,11 +210,11 @@ The same-board speedup comparison, re-measured on 2026-10-08, is discussed there
 | Custom-core board audio through the real capture path | Complete: 144,000 samples in 18 blocks, 0 mismatches |
 | Custom-core board audio through the fixed input | Complete on 2026-10-06: bypass 0 mismatches over 288,000 samples; compressed output differs at 287,910 of 288,000 |
 | Compressor input-output level curve | Measured on 2026-10-06: 40.0 dB in against 31.3 dB out, narrowed 8.7 dB; figure in `data/figures/drc_transfer_curve.png`, raw run in `data/results/fir_audio_loop_run_20261006.txt` |
-| Same-chip ARM against PL core timing | Measured on 2026-10-08 against the 31-cycle `v19` bit: ARM 6.199 µs/sample (3.36× real time) against the PL core 0.317 µs/sample (65.69× real time), a 19.5× ratio; raw run in `data/results/compare_cpu_fpga_run_20261008.txt`, conditions and caveats in `data/results/accel_cpu_vs_fpga.md`. The delivered 35-cycle bit has not been re-measured against the ARM; scaling by cycle count puts it near 17×, which is a projection. |
+| Same-chip ARM against PL core timing | Measured on 2026-10-08 against the 31-cycle `v19` bit: ARM 6.199 µs/sample (3.36× real time) against the PL core 0.317 µs/sample (65.69× real time), a 19.5× ratio; raw run in `data/results/compare_cpu_fpga_run_20261008.txt`, conditions and caveats in `data/results/accel_cpu_vs_fpga.md`. The delivered 49-cycle `v21_wdrc` bit has not been re-measured against the ARM; scaling by cycle count puts it near 12–13×, which is a projection. |
 | Real-time microphone → core → headphone duplex path | Complete on 2026-10-15: 40 s at 1.00× (4,000 blocks, 40.00 s of audio in 40.19 s of wall clock) with a bit-exact self-check of 960,000/960,000; the operator heard their own processed voice. Raw run in `data/results/fir_live_run_20261015.txt`. All four band gains were at 0.0 dB, so this establishes the path, not the per-band effect. |
 | Per-band gain, runtime writes | Complete on 2026-10-15: six live writes to the four `band_gain` registers inside one continuous 66 s run, all applied, bit-exact self-check still 960,000/960,000 across eight gain changes, rate held at 1.00×. Raw run in `data/results/fir_gain_ab_run_20261015.txt`; reproduce with `board/scripts/gain_ab_live.sh`. |
 | Per-band gain, audible effect | Complete on 2026-10-15: the same 66 s run alternated one band between 0.0 dB and −41.9 dB (the Q7.8 floor), and the operator reported several distinct audible changes. A symmetric +6/0/0/−6 setting was tried first and was inaudible — the gain applied (level ratio 1.00 → 1.23) but total loudness barely moved — so the demonstration uses a large single-band change. |
-| RTL implementation and Python/HLS/RTL comparison | Low-pass RTL present (`src/rtl/fir_lp.v`, three low-pass filters only — no subtractive band, DRC, or AXI shell), verified bit for bit against the C simulation in xsim; the three-way comparison remains pending |
+| RTL implementation and Python/HLS/RTL comparison | Complete. RTL front end `src/rtl/fir_mb_fe.v` (three low-pass filters, subtractive band split, four-band sum; no DRC, gain or AXI shell) verified bit for bit in xsim on nine signals × 1,000 samples at 3,000 cycles per 1,000. Three-way table in section 4.1: 3 cycles/sample against 31 for the same-function HLS build; 4,559 LUT / 3,138 FF / 189 DSP / 0 BRAM, +0.585 ns post-route. The RTL has not run on the board. |
 
 The current stored HLS output passes comparison against the newly generated 193-tap Python golden file — 75.4 dB SNR at best lag 0 — and the stored transparent output matches the input delayed by the expected 96 samples bit for bit. The C simulation behind those outputs was rebuilt from source on 2026-09-30 with Vitis HLS 2020.2, so the producing toolchain and flags are on record rather than inferred from filenames: `build/hls/run_csim.tcl` drives the build and the coefficient-width sweep outputs are kept in `data/results/fixed_dw16_cw12/16/18/20.txt`.
 
@@ -264,7 +292,7 @@ The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the READ
 
 1. The target environment is settled: PYNQ 2.7 with Vivado/Vitis HLS 2020.2 is the project's declared toolchain, and it is what all board evidence in this repository was produced with.
 2. The 193-tap C simulation was rebuilt from source on 2026-09-30 with the documented toolchain and compared against the regenerated Python golden data; the record is in section 6 and the raw outputs are in `data/results/`.
-3. Produce the same-input Python/HLS/RTL comparison. Low-pass RTL now exists (`src/rtl/fir_lp.v`); the subtractive band, DRC, and AXI shell do not yet.
+3. ~~Produce the same-input Python/HLS/RTL comparison.~~ **Done in section 4.1.** The scope is the front end only; the RTL has no DRC, per-band gain or AXI shell, and has not run on the board.
 4. Choose the final compressor parameter set. The measurements bound the choice — set 1 narrows the frame-level dynamic range by 1.9 dB, set 6 by 6.5 dB — but which one ships is a design preference (a heavier setting makes the effect visible at the cost of a larger change to the timbre), not something the measurements decide. The same setting must be written back into the board script and used for the video and the poster.
 5. Record the demonstration video from the board evidence, review the English poster, and run a clean-machine reproduction.
 6. ~~Verify the per-band gain by ear.~~ **Done on 2026-10-15.** The register path was already verified numerically; the ear check was then made with the gains set away from flat inside one continuous 66 s live run (six live writes, one band alternating 0.0 ↔ −41.9 dB), with the self-check still bit-exact across eight gain changes and the operator reporting several audible changes. See section 5.4; raw output in `data/results/fir_gain_ab_run_20261015.txt`.
