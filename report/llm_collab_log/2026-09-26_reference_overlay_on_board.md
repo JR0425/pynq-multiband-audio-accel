@@ -7,9 +7,7 @@
 「结果没有显示出来是什么问题」
 
 【模型回答】
-AI 给我的主线是：不用 Jupyter 的网页 API（登录返回 403），改走 SSH/SFTP 把 `.bit` 和 `.hwh`
-传上板子，再用板上 venv 里的 python 加载 overlay，最后做端到端验证。
-但其中两个判断是它自己拍的，都错了；后面又撞上三个环境坑。
+AI 给我的主线是：不用 Jupyter 的网页 API（登录返回 403），改走 SSH/SFTP 把 `.bit` 和 `.hwh`传上板子，再用板上 venv 里的 python 加载 overlay，最后做端到端验证。但其中两个判断是它自己拍的，都错了；后面又撞上三个环境坑。
 
 【哪里错了】
 
@@ -20,17 +18,14 @@ AI 给我的主线是：不用 Jupyter 的网页 API（登录返回 403），改
      → 结论：**先看服务实际是怎么起的（`ps aux` / `systemctl`），别猜了再验。**
 
 · **环境的坑**
-  3. 板子上有两个 python，PYNQ 那个装在 venv 里、不在系统路径上；`/home/xilinx/pynq`
-     只是指向它的软链。
-  4. `Overlay()` 依赖环境变量 `XILINX_XRT`，而它只由 `/etc/profile.d/xrt_setup.sh`
-     在**登录 shell** 里设置。SSH 直连跑命令属于非登录 shell，拿不到 → 报 `No Devices Found`。
+  3. 板子上有两个 python，PYNQ 那个装在 venv 里、不在系统路径上；`/home/xilinx/pynq`只是指向它的软链。
+  4. `Overlay()` 依赖环境变量 `XILINX_XRT`，而它只由 `/etc/profile.d/xrt_setup.sh`在**登录 shell** 里设置。SSH 直连跑命令属于非登录 shell，拿不到 
+    → 报 `No Devices Found`。
      我加 `sudo` 也没用。
-  5. 笔记本处于 **Not Trusted** 状态时，`%matplotlib notebook` 的图不会渲染，输出只剩一串 JS 对象。
-     所以我「跑完了看不到结果」不是代码错，是笔记本没被信任。
+  5. 笔记本处于 **Not Trusted** 状态时，`%matplotlib notebook` 的图不会渲染，输出只剩一串 JS 对象。所以我「跑完了看不到结果」不是代码错，是笔记本没被信任。
 
 【怎么修正】
-1. 我换成 venv 的 python，并补上 `XILINX_XRT=/usr` → **overlay 一次加载成功**，
-   连版本不匹配的告警都没触发。
+1. 我换成 venv 的 python，并补上 `XILINX_XRT=/usr` → **overlay 一次加载成功**，连版本不匹配的告警都没触发。
 
 2. 光「能加载」不算数，我又做了端到端验证：造 20 万点输入 → DMA 传输 **3.1 ms**
    → 拿硬件输出和软件参考做互相关，扫位移 −30..+30

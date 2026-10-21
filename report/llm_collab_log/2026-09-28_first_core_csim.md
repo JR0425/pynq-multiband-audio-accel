@@ -9,11 +9,7 @@
 「测试的音频文件确定是48khz吗？」
 
 【模型回答】
-按 Python 基线逐行对应着写：`signal.lfilter` → FIR 抽头延迟线，
-`np.where(...)` → 压缩函数 `drc()`，`output += compressed` → 逐频段累加。
-系数不重新设计，直接用 `sim/hls_csim/fir_coeffs_{1..4}.txt` 同一批文件。
-
-写完 csim 一次通过（`CSim done with 0 errors`），相关系数 **1.000000000**。
+按 Python 基线逐行对应着写：`signal.lfilter` → FIR 抽头延迟线，`np.where(...)` → 压缩函数 `drc()`，`output += compressed` → 逐频段累加。系数不重新设计，直接用 `sim/hls_csim/fir_coeffs_{1..4}.txt` 同一批文件。写完 csim 一次通过（`CSim done with 0 errors`），相关系数 **1.000000000**。
 
 【哪里错了】
 跑通的过程里翻出三件事，其中一件会**打出假绿灯**。
@@ -23,8 +19,7 @@
   `src/python/compare_results.py` 拿 `data/audio/test_input.txt`（**输入**）
   当成"Python 基准"，去和 `hw_output.txt`（**输出**）比。
 
-  而当时 `hw_output.txt` 里装的是 `generate_mock_hw_output.py` 生成的假数据
-  （输入 + 一点点噪声）。这两样一比，相关系数当然高，脚本会照样打出：
+  而当时 `hw_output.txt` 里装的是 `generate_mock_hw_output.py` 生成的假数据（输入 + 一点点噪声）。这两样一比，相关系数当然高，脚本会照样打出：
 
   > ✅ 结论：硬件输出与 Python 基准高度一致
 
@@ -37,15 +32,12 @@
   AI 之前一路按 48 kHz 说下来，从没去核过那个 wav 到底是什么采样率。
   被这一问才回去查，一查就露了：
 
-  `export_coefficients.py` 按 `fs = 48000` 设计系数，
-  而 `multiband_baseline.py` 用的 `fs` 是从 `real_voice.wav` 读出来的 ——
-  实测那个文件是 **44100**。
+  `export_coefficients.py` 按 `fs = 48000` 设计系数，而 `multiband_baseline.py` 用的 `fs` 是从 `real_voice.wav` 读出来的 ——实测那个文件是 **44100**。
 
   同一个 `firwin` 调用，`fs` 不同，算出来的 65 个抽头就不是同一组数。
   直接拿去对撞没有意义。
 
-  哪边是对的：板载 codec 是 48 kHz（RTL 里写死），
-  所以**给硬件的那组（48k）才是对的**。
+  哪边是对的：板载 codec 是 48 kHz（RTL 里写死），所以**给硬件的那组（48k）才是对的**。
 
 · **环境的坑**
 
@@ -57,8 +49,7 @@
 
 【怎么修正】
 1. **黄金参考改用和硬件完全相同的那组系数去算。**
-   新写 `src/python/export_golden.py`：读 `sim/hls_csim/fir_coeffs_{1..4}.txt`
-   （也就是导出成 `fir_coeffs.h` 给硬件用的那几份），对同一段输入做卷积。
+   新写 `src/python/export_golden.py`：读 `sim/hls_csim/fir_coeffs_{1..4}.txt`（也就是导出成 `fir_coeffs.h` 给硬件用的那几份），对同一段输入做卷积。
 2. **比对脚本改成比"真参考"和"真硬件输出"。**
    新写 `src/python/compare_golden_vs_hw.py`：相关系数 ≥ 0.999、
    最大单点误差 ≤ 1e-3，并且要扫描 ±16 个采样的位移之后再比。
@@ -67,10 +58,8 @@
 5. 写 C 的时候先拿本机 g++ **3 秒**编一遍验语法，再上 HLS（9 秒以上），省掉来回等。
 
 【沉淀】
-→ `skill/pitfalls/hls_csim_setup.md`（新）—— open_project 传路径报错 / csim 工作目录 /
-  `-argv` 传绝对路径 / 本机 g++ 先验一遍的省时做法
-→ `skill/pitfalls/audio_data_consistency.md`（新）—— **系数与数据的采样率必须对上**，
-  否则"软硬件对撞"是假的；顺带：比对脚本的两端必须是**同一套系数**下的输出与参考
+→ `skill/pitfalls/hls_csim_setup.md`（新）—— open_project 传路径报错 / csim 工作目录 / `-argv` 传绝对路径 / 本机 g++ 先验一遍的省时做法
+→ `skill/pitfalls/audio_data_consistency.md`（新）—— **系数与数据的采样率必须对上**，否则"软硬件对撞"是假的；顺带：比对脚本的两端必须是**同一套系数**下的输出与参考
 → `src/python/export_golden.py` / `src/python/compare_golden_vs_hw.py`
 
 **实测数据**（2026-09-28，第一版核，`FIR_PARTIAL=1`）：
@@ -82,6 +71,4 @@
 | 最佳位移 | +0 |
 | 最大单点误差 | 1.554e-07 |
 
-位移是 0，说明两边的**因果延迟结构一致**——
-不像 9/26 那次参考 overlay 要先扫到 +13（那是别人的开源项目，延迟结构不同）。
-1.554e-07 正是 float32 的舍入量级，与"核用 float、参考用 float64"的预期一致。
+位移是 0，说明两边的**因果延迟结构一致**——不像 9/26 那次参考 overlay 要先扫到 +13（那是别人的开源项目，延迟结构不同）。1.554e-07 正是 float32 的舍入量级，与"核用 float、参考用 float64"的预期一致。

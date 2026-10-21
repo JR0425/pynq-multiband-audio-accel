@@ -6,8 +6,7 @@
 「需要提前准备什么来测试硬件加速核？」
 
 【模型回答】
-AI 给了方向性参考：在 board/notebooks/（或对应目录）下准备 Jupyter Notebook 模板，覆盖
-Overlay 加载、音频去直流/预处理、DMA 内存分配与数据搬运、耗时测量等逻辑。
+AI 给了方向性参考：在 board/notebooks/（或对应目录）下准备 Jupyter Notebook 模板，覆盖Overlay 加载、音频去直流/预处理、DMA 内存分配与数据搬运、耗时测量等逻辑。
 
 【哪里错了】
 （无报错，属提前准备工作/模板搭建阶段。）
