@@ -186,10 +186,17 @@
 import fcntl
 import os
 import queue
+import signal
 import sys
 import threading
 import time
 import wave
+
+# 后台（nohup/setsid 或 `cmd &`）起进程时，shell 会把 SIGINT 设成忽略，
+# Python 启动时尊重这个继承值 —— 结果就是界面上的「停止」发了信号没人接，
+# 看起来像停不下来。必须放在 numpy / pynq 这些重导入之前：导入期间就挨
+# 那一下的话，这一行还没执行到。
+signal.signal(signal.SIGINT, signal.default_int_handler)
 
 import numpy as np
 from pynq import Overlay, allocate
@@ -271,6 +278,17 @@ STATUS_SEC = float(os.environ.get("LIVE_STATUS", "0.1"))     # 多久写一次�
 RAMP_BLOCKS = max(1, int(os.environ.get("LIVE_RAMP", "4")))  # 新增益几块走到位
 
 CAPTURE_MAX = int(FS * 20)      # 自检最多留 20 秒的样本，别把内存吃光
+
+# 丢块探针用：每块记一行 (墙钟, perf_counter 起点, 耗时, 槽位)，跑完写到
+# DROP_TRACE 指定的文件。默认关；开着时也只多一次 time.time() 和一次 list
+# append（约 0.2 µs），对 10 ms 的块预算可以忽略。
+TRACE_PATH = os.environ.get("DROP_TRACE", "")
+trace_io = [] if TRACE_PATH else None
+
+# 两块之间那 ~180 µs 花在哪：把 (进入 qget, qget 返回, C 调用返回,
+# qput 返回) 四个时刻记下来。和 DROP_TRACE 一样默认关，只给调参用。
+GAP_PATH = os.environ.get("GAP_TRACE", "")
+gap_io = [] if GAP_PATH else None
 
 # ---------------- 实时波形（给 w5_tuning_ui.ipynb 画时域/频谱） ----------------
 # 默认**关**。这一路是给演示新加的，不该改变已经量过的那些数字；演示那趟
@@ -504,6 +522,7 @@ def publish_status(now, running=True, ok=None):
     write_status({
         "t": now,
         "n": n,
+        "pid": os.getpid(),
         "running": bool(running),
         "ok": ok,
         "gain_db": list(gain_dst_db),
@@ -751,8 +770,15 @@ for _ in range(NBUF):
 # slots[i] = (aptr_in, aptr_out, abuf_in, abuf_out, cin, cout)
 print("   %d 个槽位，共 %d KB DDR（核那两份）" % (NBUF, NBUF * 2 * L * 2 // 1024))
 
-q1 = queue.Queue()      # io → dsp
-q2 = queue.Queue()      # dsp → io
+# io→dsp、dsp→io 两条队列。`queue.Queue` 是 Python 写的（锁 + Condition 都在
+# Python 层），在搬样那条线程上每次 get/put 要花掉一百多微秒 —— 那已经超过
+# I2S FIFO 能吸收的空档，于是每块丢几个采样。`queue.SimpleQueue` 的锁和
+# 等待都在 C 里（`_queue`），同一条路径便宜一个数量级。
+# 默认用 SimpleQueue；LIVE_QUEUE=queue 可以退回旧的做对照。
+_QK = os.environ.get("LIVE_QUEUE", "simple")
+_Q = queue.SimpleQueue if _QK == "simple" else queue.Queue
+q1 = _Q()               # io → dsp
+q2 = _Q()               # dsp → io
 for i in range(NBUF):
     q2.put(i)           # 预填：开头这几块放的是静音（cout 初始为 0）
 
@@ -801,12 +827,17 @@ def stage_io():
     """
     _pin(0, RT_IO)
     while not stop.is_set():
+        tg = time.perf_counter() if gap_io is not None else 0.0
         i = qget(q2)                      # 一个**已经算好、也已经摆成 24 位**的槽
+        tg1 = time.perf_counter() if gap_io is not None else 0.0
         p_in, p_out = slots[i][0], slots[i][1]
         try:
             t0 = time.perf_counter()
             got = lib.duplex_block(h, p_in, p_out, L)
-            t_io.append(time.perf_counter() - t0)
+            d = time.perf_counter() - t0
+            t_io.append(d)
+            if trace_io is not None:
+                trace_io.append((time.time(), t0, d, i))
             if got != L:
                 raise RuntimeError(
                     "duplex 只搬了 %d/%d 个采样（I2S 那边等超时了）" % (got, L))
@@ -817,6 +848,8 @@ def stage_io():
             stop.set()
             return
         q1.put(i)
+        if gap_io is not None:
+            gap_io.append((tg, tg1, t0, t0 + d, time.perf_counter(), i))
 
 
 def stage_dsp():
@@ -1009,6 +1042,23 @@ for _e in events:
 # 不能算进"墙钟"。所以先把时刻冻住，最后那一帧状态用它。
 t_end = time.time()
 wall = t_end - t_start[0]
+
+if trace_io:
+    import json
+    try:
+        with open(TRACE_PATH, "w") as _f:
+            json.dump({"t_start": t_start[0], "t_end": t_end, "wall": wall,
+                       "L": L, "NBUF": NBUF, "trace": trace_io}, _f)
+    except OSError:
+        pass
+
+if gap_io:
+    import json
+    try:
+        with open(GAP_PATH, "w") as _f:
+            json.dump({"L": L, "NBUF": NBUF, "gap": gap_io}, _f)
+    except OSError:
+        pass
 
 # ---------------- 2. 结果 ----------------
 hr("2. 跑得怎么样")

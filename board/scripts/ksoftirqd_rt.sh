@@ -25,9 +25,8 @@ for p in 0 1; do
     pid=$(pgrep -f "^ksoftirqd/$p$" | head -1)
     if [ -n "$pid" ] && chrt -f -p 50 "$pid" 2>/dev/null; then
         ok=$((ok + 1))
-        logger -t ksoftirqd-rt "cpu$p pid=$pid -> SCHED_FIFO 50"
     else
-        logger -t ksoftirqd-rt "cpu$p 失败（pid=$pid）"
+        logger -t ksoftirqd-rt -p warning "cpu$p 失败（pid=$pid）"
     fi
 done
 
@@ -39,6 +38,9 @@ for pid in $(pgrep -f "^kworker/[01]:"); do
         kwerr=$((kwerr + 1))
     fi
 done
-logger -t ksoftirqd-rt "kworker: 提权 $kw 个，失败 $kwerr 个"
+# 成功一次都不记：这个脚本 30 秒跑一趟，日志写的是 SD 卡，而刷卡的 kworker
+# 是 FIFO 50、在 CPU0 上会直接打断搬样线程（实测每次 5~90 ms）。只有失败
+# 才值得留一条警告。
+[ "$kwerr" -gt 0 ] && logger -t ksoftirqd-rt -p warning "kworker 提权失败 $kwerr 个"
 
 exit $([ "$ok" -ge 2 ] && echo 0 || echo 1)
