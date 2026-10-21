@@ -47,7 +47,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-from fir_tune import read_tune, write_tune, read_status, TUNE_PATH
+from fir_tune import read_tune, write_tune, read_status, clear_status, TUNE_PATH
 
 try:                                    # 频谱要 numpy；没有就只画时域
     import numpy as np
@@ -58,13 +58,84 @@ SCOPE_PATH = os.environ.get("FIR_SCOPE", "/dev/shm/fir_scope.bin")
 SCOPE_N    = int(os.environ.get("LIVE_SCOPE_N", "960"))
 SCOPE_MAGIC = 0x504F4353                # b"SCOP" 小端，和 fir_live.py 一致
 LIVE_LOG   = "/dev/shm/fir_webui_live.log"
+LAST_PATH  = "/dev/shm/fir_webui_last.json"
 FS         = 48000.0
 GD         = 96                          # 核的群延迟，画图时先补掉
 
 LOCK    = threading.Lock()
-PROC    = {"p": None, "log": None, "stopping": False,
-           "stop_msg": "", "started_at": 0.0}
+PROC    = {"p": None, "log": None, "stopping": False, "starting": False,
+           "stop_msg": "", "started_at": 0.0, "last": None}
 SEQ     = [0]
+
+
+def _load_last():
+    """上一次跑完的自检结论。存在 /dev/shm，重启页面服务不丢，重启板子会丢。"""
+    try:
+        with open(LAST_PATH, "r", encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if isinstance(d, dict) and isinstance(d.get("ok"), bool):
+        return {"ok": d["ok"], "t": float(d.get("t") or 0)}
+    return None
+
+
+def _save_last(ok, t=None):
+    d = {"ok": bool(ok), "t": float(t or time.time())}
+    with LOCK:
+        PROC["last"] = d
+    try:
+        tmp = LAST_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(d, f)
+        os.replace(tmp, LAST_PATH)
+    except OSError:
+        pass
+
+
+def _clear_last():
+    """新的一趟起跑就作废旧结论 —— 否则中途被杀会留着上一趟的“自检通过”。"""
+    with LOCK:
+        PROC["last"] = None
+    try:
+        os.unlink(LAST_PATH)
+    except OSError:
+        pass
+
+
+def _remember(st):
+    """状态文件里出现 running=false + ok 时，记下这次的自检结论。"""
+    if not st or st.get("running") is not False or st.get("ok") is None:
+        return
+    t = float(st.get("t") or 0)
+    with LOCK:
+        last = PROC["last"]
+    if last is not None and t <= float(last.get("t") or 0):
+        return
+    _save_last(st["ok"], t)
+
+
+def _selfcheck_result(st, pid, since=0.0):
+    """这一趟自己的收尾结论。
+
+    状态文件可能是上一趟留下的 —— 尤其在这一趟刚起、还没跑到写状态时就被
+    停掉的情况下。pid 对不上（或时间早于起跑）就当没有结论，不能把上一趟的
+    “自检通过”安到这一趟头上。
+    """
+    if not st or st.get("running") is not False or st.get("ok") is None:
+        return None
+    try:
+        if int(st.get("pid") or 0) != int(pid):
+            return None
+        if float(st.get("t") or 0) < float(since or 0):
+            return None
+    except (TypeError, ValueError):
+        return None
+    return st.get("ok")
+
+
+PROC["last"] = _load_last()
+
 
 PAGE_FILE = os.path.join(HERE, "page.html")
 
@@ -119,13 +190,16 @@ def _log_tail(n=2000):
 
 def _state():
     st = read_status()
+    _remember(st)
     with LOCK:
         p = PROC["p"]
         run = p is not None and p.poll() is None
         pid = p.pid if p is not None else None
         stopping = PROC["stopping"]
+        starting = PROC["starting"]
         stop_msg = PROC["stop_msg"]
         started = PROC["started_at"]
+        last = PROC["last"]
     age = None
     try:
         if st and st.get("t"):
@@ -133,9 +207,11 @@ def _state():
     except (TypeError, ValueError):
         pass
     return {"status": st,
-            "proc": {"running": run, "pid": pid, "stopping": stopping,
-                     "stop_msg": stop_msg, "started_at": started,
+            "proc": {"running": run, "pid": pid, "starting": starting,
+                     "stopping": stopping, "stop_msg": stop_msg,
+                     "started_at": started,
                      "log": "" if run else _log_tail()},
+            "last": last,
             "age": age}
 
 
@@ -297,65 +373,82 @@ def _start(src):
             return False, "已经在跑了（pid %d）" % p.pid, ""
         if PROC["stopping"]:
             return False, "上一条还在收尾自检，等它停下来再起", ""
+        if PROC["starting"]:
+            return False, "正在起，等这条起来再操作", ""
+        PROC["starting"] = True
 
-    # 也可能是 run_live.sh / notebook 起的：fir_live.py 自己有文件锁，
-    # 这里先看一眼状态文件，省得用户对着一句"起跑就退了"猜。
-    st = read_status()
-    if st and st.get("running"):
-        try:
-            age = time.time() - float(st.get("t") or 0)
-        except (TypeError, ValueError):
-            age = 99.0
-        if age < 1.5:
-            return False, "已经有一条实时在跑（状态文件 %.1f 秒前还在更新），先把它停掉" % age, ""
-
-    ok, why = _hang_fix_state()
-    if not ok:
-        return (False,
-                "死机防护没生效（%s）。先在板子上跑一次\n"
-                "  sudo sh %s/install_ksoftirqd_rt.sh\n"
-                "然后重启板子（这个服务开机时生效）。" % (why, HERE), "")
-
-    t = read_tune() or {}
-    gains = t.get("gain_db") or [0, 0, 0, 0]
     try:
-        gtxt = ",".join("%.2f" % float(x) for x in gains)
-    except (TypeError, ValueError):
-        gtxt = "0,0,0,0"
-
-    env = dict(os.environ)
-    env.update({"XILINX_XRT": "/usr", "PYTHONUNBUFFERED": "1",
-                "LIVE_SRC": src, "LIVE_SECONDS": "0",
-                "LIVE_GAIN_DB": gtxt, "LIVE_SCOPE": "1"})
-    try:
-        lg = open(LIVE_LOG, "wb")
-    except OSError as e:
-        return False, "打不开日志 %s：%s" % (LIVE_LOG, e), ""
-
-    with LOCK:
-        if PROC["log"] is not None:
+        # 也可能是 run_live.sh / notebook 起的：fir_live.py 自己有文件锁，
+        # 这里先看一眼状态文件，省得用户对着一句"起跑就退了"猜。
+        st = read_status()
+        if st and st.get("running"):
             try:
-                PROC["log"].close()
-            except OSError:
-                pass
-        PROC["log"] = lg
-        PROC["stop_msg"] = ""
-        try:
-            PROC["p"] = subprocess.Popen(
-                [sys.executable, os.path.join(HERE, "fir_live.py")],
-                cwd=HERE, env=env, stdout=lg, stderr=subprocess.STDOUT,
-                start_new_session=True)
-        except OSError as e:
-            return False, "起不来：%s" % e, ""
-        PROC["started_at"] = time.time()
-        p = PROC["p"]
+                age = time.time() - float(st.get("t") or 0)
+            except (TypeError, ValueError):
+                age = 99.0
+            if age < 1.5:
+                return False, "已经有一条实时在跑（状态文件 %.1f 秒前还在更新），先把它停掉" % age, ""
 
-    # 起跑检查：最常见的两种失败（已经有一条在跑、加载 overlay 失败）
-    # 都发生在一两秒内，它自己会退出，原因写在日志里。
-    time.sleep(2.0)
-    if p.poll() is not None:
-        return False, "它起跑就退了（退出码 %s）" % p.returncode, _log_tail(1600)
-    return True, "起来了，pid %d，音源 %s" % (p.pid, src), ""
+        ok, why = _hang_fix_state()
+        if not ok:
+            return (False,
+                    "死机防护没生效（%s）。先在板子上跑一次\n"
+                    "  sudo sh %s/install_ksoftirqd_rt.sh\n"
+                    "然后重启板子（这个服务开机时生效）。" % (why, HERE), "")
+
+        t = read_tune() or {}
+        gains = t.get("gain_db") or [0, 0, 0, 0]
+        try:
+            gtxt = ",".join("%.2f" % float(x) for x in gains)
+        except (TypeError, ValueError):
+            gtxt = "0,0,0,0"
+
+        env = dict(os.environ)
+        env.update({"XILINX_XRT": "/usr", "PYTHONUNBUFFERED": "1",
+                    "LIVE_SRC": src, "LIVE_SECONDS": "0",
+                    "LIVE_GAIN_DB": gtxt, "LIVE_SCOPE": "1"})
+        try:
+            lg = open(LIVE_LOG, "wb")
+        except OSError as e:
+            return False, "打不开日志 %s：%s" % (LIVE_LOG, e), ""
+
+        with LOCK:
+            if PROC["log"] is not None:
+                try:
+                    PROC["log"].close()
+                except OSError:
+                    pass
+            PROC["log"] = lg
+            PROC["stop_msg"] = ""
+            try:
+                # 经一层 sh 把 SIGINT 恢复成默认再 exec：这个页面自己是后台起的
+                # （nohup/setsid），SIGINT 被继承成“忽略”，直接 Popen 的话
+                # fir_live 在 interpreter 起来之前收到停止信号会被丢掉。
+                PROC["p"] = subprocess.Popen(
+                    ["/bin/sh", "-c", 'trap - INT; exec "$0" "$@"',
+                     sys.executable, os.path.join(HERE, "fir_live.py")],
+                    cwd=HERE, env=env, stdout=lg, stderr=subprocess.STDOUT,
+                    start_new_session=True)
+            except OSError as e:
+                return False, "起不来：%s" % e, ""
+            PROC["started_at"] = time.time()
+            p = PROC["p"]
+
+        # 新的一趟开始了，上一趟的自检结论作废
+        _clear_last()
+        # 状态文件也要立刻删：fir_live 自己会删，但它要几秒才走到那一步；
+        # 这期间若被停掉，旧状态会被误当成本趟的自检结论。
+        clear_status()
+
+        # 起跑检查：最常见的两种失败（已经有一条在跑、加载 overlay 失败）
+        # 都发生在一两秒内，它自己会退出，原因写在日志里。
+        time.sleep(2.0)
+        if p.poll() is not None:
+            return False, "它起跑就退了（退出码 %s）" % p.returncode, _log_tail(1600)
+        return True, "起来了，pid %d，音源 %s" % (p.pid, src), ""
+    finally:
+        with LOCK:
+            PROC["starting"] = False
 
 
 def _stop_wait(p):
@@ -371,6 +464,94 @@ def _stop_wait(p):
         msg = "60 秒还没收完，强杀了 —— 报告会缺最后一段"
     except Exception as e:               # noqa: BLE001
         msg = "停的时候出错：%s" % e
+    st = read_status()
+    _remember(st)
+    ok = _selfcheck_result(st, p.pid, PROC["started_at"])
+    if ok is True:
+        msg += "，自检通过"
+    elif ok is False:
+        msg += "，自检没过"
+    with LOCK:
+        PROC["stopping"] = False
+        PROC["stop_msg"] = msg
+
+
+def _pid_alive(pid):
+    """僵尸进程不算活着 —— 没被 poll() 收掉的已退进程还挂在 /proc 里，
+    拿它当"在跑"会让停止按钮白等 60 秒。"""
+    try:
+        with open("/proc/%d/stat" % pid) as f:
+            state = f.read().rsplit(")", 1)[1].split()[0]
+        return state != "Z"
+    except OSError:
+        return False
+
+
+def _is_fir_live(pid):
+    """只认真正的 fir_live 进程，不认命令行里恰好带这个文件名的 shell。
+
+    `pgrep -f fir_live.py` 会连 `bash -c "... fir_live.py"`、编辑器、grep 一起
+    返回；给它们发 SIGINT 就是误杀别人的终端。
+    """
+    try:
+        with open("/proc/%d/cmdline" % pid, "rb") as f:
+            raw = f.read()
+    except OSError:
+        return False
+    args = [a.decode("utf-8", "replace") for a in raw.split(b"\0") if a]
+    if not args:
+        return False
+    head = os.path.basename(args[0])
+    if head == "fir_live.py":
+        return True
+    if "python" not in head:
+        return False
+    return any(a.endswith("fir_live.py") for a in args[1:])
+
+
+def _find_fir_live_pids():
+    """板上所有 fir_live.py 进程，本进程（以及本进程起的那个）除外。"""
+    try:
+        r = subprocess.run(["pgrep", "-f", r"fir_live\.py"],
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                           universal_newlines=True)
+    except OSError:
+        return []
+    me = os.getpid()
+    pids = []
+    for s in r.stdout.split():
+        try:
+            pid = int(s)
+        except ValueError:
+            continue
+        if pid != me and _pid_alive(pid) and _is_fir_live(pid):
+            pids.append(pid)
+    return pids
+
+
+def _fresh(st, sec=1.5):
+    try:
+        return st is not None and (time.time() - float(st.get("t") or 0)) < sec
+    except (TypeError, ValueError):
+        return False
+
+
+def _wait_external(pids):
+    deadline = time.time() + 60
+    while time.time() < deadline and any(_pid_alive(p) for p in pids):
+        time.sleep(0.5)
+    left = [p for p in pids if _pid_alive(p)]
+    st = read_status()
+    _remember(st)
+    if left:
+        msg = "60 秒还没退：%s" % ", ".join(str(x) for x in left)
+    else:
+        msg = "停了（pid %s，不是本页起的）" % ", ".join(str(x) for x in pids)
+        res = [_selfcheck_result(st, x) for x in pids]
+        if True in res:
+            msg += "，自检通过"
+        elif False in res:
+            msg += "，自检没过"
     with LOCK:
         PROC["stopping"] = False
         PROC["stop_msg"] = msg
@@ -379,13 +560,58 @@ def _stop_wait(p):
 def _stop_async():
     with LOCK:
         p = PROC["p"]
-        if p is None or p.poll() is not None:
-            return False, "没在跑"
         if PROC["stopping"]:
             return False, "已经在停了"
+        mine = p is not None and p.poll() is None
+        if PROC["starting"] and not mine:
+            return False, "还在起，等它起来再停"
+        if mine:
+            PROC["stopping"] = True
+            PROC["stop_msg"] = "已发停止信号，等它做完逐位自检（十几秒）"
+    if mine:
+        threading.Thread(target=_stop_wait, args=(p,), daemon=True).start()
+        return True, "已发停止信号，等它做完逐位自检（十几秒）"
+
+    # 不是本页起的（run_live.sh / notebook）：状态文件是同一份，停止也得管用。
+    # 优先用状态文件里 fir_live 自己写的 pid —— 进程改名或跑在 Jupyter 内核里时，
+    # pgrep 找不到，但 pid 仍然是对的。
+    st = read_status()
+    pids = []
+    if _fresh(st) and st.get("running"):
+        try:
+            spid = int(st.get("pid") or 0)
+        except (TypeError, ValueError):
+            spid = 0
+        if spid and spid != os.getpid() and _pid_alive(spid):
+            pids = [spid]
+    if not pids:
+        pids = _find_fir_live_pids()
+
+    if not pids:
+        if _fresh(st) and st.get("running"):
+            return False, ("状态文件说还在跑，但板上找不到可停的 fir_live 进程"
+                           "（可能是 notebook 里 %run 的）。请到启动它的那个内核里停。")
+        return True, "它已经停了"
+
+    killed = []
+    errors = []
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGINT)
+            killed.append(pid)
+        except ProcessLookupError:
+            pass                        # 查完到发信号之间刚好退了
+        except OSError as e:
+            errors.append("pid %d：%s" % (pid, e))
+    if not killed:
+        if errors:
+            return False, "给实时进程发信号失败：" + "；".join(errors)
+        return True, "它已经停了"
+    with LOCK:
         PROC["stopping"] = True
-        PROC["stop_msg"] = "已发停止信号，等它做完逐位自检（十几秒）"
-    threading.Thread(target=_stop_wait, args=(p,), daemon=True).start()
+        PROC["stop_msg"] = "已给板子上已有的实时进程发停止信号（pid %s）" % \
+                           ", ".join(str(x) for x in killed)
+    threading.Thread(target=_wait_external, args=(killed,), daemon=True).start()
     return True, "已发停止信号，等它做完逐位自检（十几秒）"
 
 
