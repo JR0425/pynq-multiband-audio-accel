@@ -257,6 +257,28 @@ static inline drc_t wdrc(drc_t x, drc_t thr, drc_t ratio,
     return y;
 }
 
+/* 单段的完整处理链：先乘验配增益，再压缩。
+ *
+ * ⚠️ 写成**宏**，不是函数。一开始写成 `static inline drc_t band_proc(...)`，
+ *    HLS 并没有把它内联进那一圈：csynth 里多出一个 `grp_band_proc_fu`（延迟 12、II=1），
+ *    变成每圈调一次的共享单元，四段循环的 II 从 4 掉到 **14**，整核 49 → 69 拍
+ *    （`build/hls/reports/v23_drc_u0/`）。宏是文本替换，一定展开。
+ *
+ * 宏里的下标 `i` 由调用方给：默认路径给变量（与 v21 逐字相同），
+ * 展开路径给字面量 0..3 —— 字面量才能让 HLS 看出四次写入落在不同的 env 元素上。 */
+#define BAND_STEP(i)                                                        \
+    do {                                                                    \
+        drc_t gb_ = (drc_t)band[i] * g[i];                                  \
+        drc_t yv_;                                                          \
+        if (atk[i] == (drc_t)0 && rel[i] == (drc_t)0) {                     \
+            /* 起停时间都是 0 = 无记忆压缩，和 v20_gain 逐位相同。 */       \
+            yv_ = drc(gb_, thr[i], ratio[i]);                               \
+        } else {                                                            \
+            yv_ = wdrc(gb_, thr[i], ratio[i], atk[i], rel[i], env[i]);      \
+        }                                                                   \
+        acc += (acc_t)yv_;                                                  \
+    } while (0)
+
 /* 处理 length 个采样：in -> out。输入输出等长、一对一，没有内部缓冲，所以可以流式做。
  *
  * ⚠️ 抽头延迟线在**块与块之间保持**，不在每次调用时清零。
@@ -514,14 +536,56 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
          * 增益给 1.0（原始 256）时乘积**逐位等于**原来的 (drc_t)band[i]，
          * 所以这一步加进来不影响任何已有结果（csim 的硬判据）。 */
         acc_t acc = (acc_t)0;
+/* 是否把四段压缩显式展开。
+ *   0 = v21 出货的原文，**逐字不动**（`v24_drc_u0` 复核过拍数 = 49）。
+ *   1 = 展开成 4 条独立链，下标变编译期常量。
+ *
+ * ⚠️ 1 这条路**没走通，别当成可用选项**：`v24_drc_u1` 实测延迟区间 18~71 拍，
+ *    最坏比不展开的 49 还差（16 份乘法实例在 drc/wdrc 两条分支间被复用，分支路径拉长）。
+ *    真正出货的是下面的 `FIR_ENV_INDEP`，不动结构。
+ *
+ * ⚠️ 为什么默认分支必须保持原文、而不是"抽个函数两边共用"：
+ *    `v23_drc_u0` 把这段抽成 `static inline` 函数、逻辑一字没改，
+ *    HLS 却给了 69 拍 / II=14（多出 grp_band_proc_fu，延迟 12）。
+ *    "结构上等价"在 HLS 里不等于"综合结果等价"。所以默认分支保留 v21 的原文，
+ *    展开分支才用 BAND_STEP 宏。 */
+#ifndef FIR_DRC_UNROLL
+#define FIR_DRC_UNROLL 0
+#endif
+/* 告诉 HLS「env 跨迭代不重叠」，解掉 HLS 200-880 那条假携带依赖。
+ * 默认 0 = 与 v21 出货版逐字相同；出货版打开（`-DFIR_ENV_INDEP=1`，v25）：
+ * 合段循环 II 4 -> 1，每采样 49 -> 36 拍，DSP 不变。 */
+#ifndef FIR_ENV_INDEP
+#define FIR_ENV_INDEP 0
+#endif
+#if FIR_DRC_UNROLL
+        /* 四段显式展开：每段一条独立的乘加链，下标是编译期常量。
+         * 实测最坏 71 拍（`v24_drc_u1`），不比不展开好，见上面的说明。 */
+        if (bypass) {
+            acc = band[0] + band[1] + band[2] + band[3];
+        } else {
+            BAND_STEP(0);
+            BAND_STEP(1);
+            BAND_STEP(2);
+            BAND_STEP(3);
+        }
+#else
         for (int i = 0; i < N_BANDS; i++) {
+#if FIR_ENV_INDEP
+            /* 这条 pragma 直接对着 csynth 的 HLS 200-880：
+             *   "Unable to enforce a carried dependence constraint (II = 1,
+             *    distance = 1) between store env_V_0_write_ln527 and load env_V_0"
+             * 循环体每次只读写 env[i] 这一格，i 是循环变量 —— 跨迭代**不重叠**，
+             * 依赖是假的。但变量下标 + 不展开时 HLS 证不出来，只好把 II 抬到 4。
+             * inter false 就是替它做这个证明。*/
+#pragma HLS DEPENDENCE variable=env inter false
+#endif
             if (bypass) {
                 acc += band[i];
             } else {
                 drc_t gb = (drc_t)band[i] * g[i];
                 drc_t yv;
                 if (atk[i] == (drc_t)0 && rel[i] == (drc_t)0) {
-                    /* 起停时间都是 0 = 无记忆压缩，和 v20_gain 逐位相同。 */
                     yv = drc(gb, thr[i], ratio[i]);
                 } else {
                     yv = wdrc(gb, thr[i], ratio[i], atk[i], rel[i], env[i]);
@@ -529,6 +593,7 @@ void fir_multiband(const int16_t *in, int16_t *out, int length,
                 acc += (acc_t)yv;
             }
         }
+#endif
         /* 出参 int16/Q1.15：定点下 (data_t)acc 就是截断到 16 位（带饱和），
          * samp_out 只是把那串比特当整数交出去。 */
         out[n] = samp_out((data_t)acc);
