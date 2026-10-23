@@ -183,6 +183,24 @@ input[type=range]:focus-visible{outline:1px solid var(--acc-dim);outline-offset:
 .preset.on{color:var(--acc);border-color:var(--acc-dim);background:#241c10}
 .preset-row .note{color:var(--faint);font-size:11px;align-self:center}
 
+/* 测听 → 自动配增益 */
+.hear{margin-top:9px;padding-top:8px;border-top:1px solid var(--line)}
+.hear summary{cursor:pointer;color:var(--dim);font-size:12.5px;user-select:none}
+.hear summary:hover{color:var(--text)}
+.hear summary .sub{color:var(--faint);font-size:11.5px;margin-left:6px}
+.hear-body{margin-top:8px}
+.hear-body .hint{color:var(--faint);font-size:11.5px;line-height:1.55}
+.hear-body .hint b{color:var(--dim);font-weight:400}
+.hear-cur{display:flex;gap:14px;align-items:baseline;margin:9px 0 4px;font-size:13px}
+.hear-cur b{color:var(--text);font-weight:400}
+.hear-cur .num{color:var(--dim);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hear-btns{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.hear-tab{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0}
+.hear-tab th,.hear-tab td{padding:4px 6px;border-bottom:1px solid var(--line);
+  text-align:left;font-weight:400}
+.hear-tab th{color:var(--faint)}
+.hear-tab td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--dim)}
+
 /* 压缩区：在右栏里 2×2 */
 #comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .comp-cell{background:var(--panel2);border:1px solid var(--line);border-radius:3px;
@@ -307,6 +325,43 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
     <h3>四段增益 <span class="sub">±24 dB · 步进 0.5</span></h3>
     <div id="gains"></div>
     <div class="preset-row" id="gain-presets"></div>
+
+    <details class="hear" id="hear-box">
+      <summary>测听 → 自动配增益 <span class="sub">每个频段一个测试音，约 1 分钟</span></summary>
+      <div class="hear-body">
+        <p class="hint">测试音从板子的耳机口放出，<b>先把实时停掉</b>。量的是
+          <b>相对听阈</b>：以你听得最好的那一段为 0 dB，不做绝对声压校准
+          （真实测听的 dB HL 也是相对值）。</p>
+        <div id="hear-idle">
+          <button class="btn go" id="hear-start">开始测听</button>
+        </div>
+        <div id="hear-run" style="display:none">
+          <div class="hear-cur">
+            <b id="hear-band">① 0–500 Hz</b>
+            <span class="num" id="hear-freq">250 Hz</span>
+            <span class="num" id="hear-lvl">-20.0 dBFS</span>
+          </div>
+          <div class="hear-btns">
+            <button class="btn go" id="hear-yes">听到了</button>
+            <button class="btn halt" id="hear-no">没听到</button>
+            <button class="btn" id="hear-quit">退出</button>
+          </div>
+          <div class="hint" id="hear-msg"></div>
+        </div>
+        <div id="hear-done" style="display:none">
+          <table class="hear-tab">
+            <thead><tr><th>频段</th><th>听阈</th><th>建议增益</th></tr></thead>
+            <tbody id="hear-tbody"></tbody>
+          </table>
+          <div class="hint">补偿量 = 相对损失的一半（半增益规则），上限 +20 dB。</div>
+          <div class="hear-btns">
+            <button class="btn go" id="hear-apply">应用为四段增益</button>
+            <button class="btn" id="hear-again">重测</button>
+          </div>
+          <div class="hint" id="hear-done-msg"></div>
+        </div>
+      </div>
+    </details>
   </section>
 
   <!-- 压缩（右栏） -->
@@ -548,6 +603,107 @@ function resetAB(){
   const btn = $("#btn-ab");
   btn.textContent = "A/B 对照"; btn.classList.remove("on");
 }
+
+/* =====================================================================
+ * 测听 → 自动配增益
+ * 每个频段一个测试音（250 / 750 / 1500 / 3000 Hz，各自落在 ①②③④ 段中间），
+ * 从 -20 dBFS 往下每档 5 dB，用户点"听到了"就一直降，点"没听到"就收工。
+ * 记录的是"最低听得见的电平"，再按半增益规则换成四段增益。
+ * ===================================================================== */
+const HEAR_BANDS = [
+  {hz:250,  name:"① 0–500 Hz"},
+  {hz:750,  name:"② 500 Hz–1 kHz"},
+  {hz:1500, name:"③ 1–2 kHz"},
+  {hz:3000, name:"④ 2–24 kHz"},
+];
+const HEAR_START_DB = -20, HEAR_STEP = 5, HEAR_FLOOR = -60;
+let H = null;
+
+function hearMsg(t){ $("#hear-msg").textContent = t || ""; }
+function hearShow(which){
+  $("#hear-idle").style.display = which === "idle" ? "" : "none";
+  $("#hear-run").style.display  = which === "run"  ? "" : "none";
+  $("#hear-done").style.display = which === "done" ? "" : "none";
+}
+function hearPaint(){
+  $("#hear-band").textContent = HEAR_BANDS[H.i].name;
+  $("#hear-freq").textContent = H.hz + " Hz";
+  $("#hear-lvl").textContent  = H.level.toFixed(1) + " dBFS";
+}
+async function hearPlay(){
+  H.hz = HEAR_BANDS[H.i].hz;
+  hearPaint();
+  $("#hear-yes").disabled = $("#hear-no").disabled = true;
+  hearMsg("正在放…");
+  try {
+    const r = await postJSON("/api/hearing/tone",
+      {freq_hz: H.hz, level_db: H.level, sec: 1.2});
+    hearMsg(r.ok ? "" : ("放音失败：" + (r.msg || "未知原因")));
+  } catch(e){
+    hearMsg("请求没发出去：板子可能不在线");
+  }
+  $("#hear-yes").disabled = $("#hear-no").disabled = false;
+}
+function hearStart(){
+  if (S.audioOn || S.starting || S.stopping){
+    hearMsg("实时通路在跑，先点顶上的「停止」再测听。");
+    $("#hear-box").open = true;
+    return;
+  }
+  H = {i:0, level:HEAR_START_DB, last:null, thr:[], gains:null, hz:HEAR_BANDS[0].hz};
+  hearShow("run");
+  $("#hear-done-msg").textContent = "";
+  hearPlay();
+}
+async function hearHeard(){
+  if (!H) return;
+  H.last = H.level;
+  if (H.level <= HEAR_FLOOR){ H.thr[H.i] = HEAR_FLOOR; return hearNext(); }
+  H.level -= HEAR_STEP;
+  await hearPlay();
+}
+function hearMissed(){
+  if (!H) return;
+  if (H.last != null){ H.thr[H.i] = H.last; return hearNext(); }
+  /* 第一声就没听到：往上抬，直到 0 dBFS 还听不到就记为 0（量程到头）。 */
+  if (H.level < 0){ H.level = Math.min(0, H.level + 10); return hearPlay(); }
+  H.thr[H.i] = 0;
+  return hearNext();
+}
+function hearNext(){
+  H.i++; H.last = null; H.level = HEAR_START_DB;
+  if (H.i >= HEAR_BANDS.length){ hearFinish(); return; }
+  hearPlay();
+}
+function hearFinish(){
+  const ref = Math.min.apply(null, H.thr);
+  H.gains = H.thr.map(v => clamp(Math.round((v - ref) * 0.5 * 2) / 2, 0, 20));
+  $("#hear-tbody").innerHTML = H.thr.map((v, i) =>
+    `<tr><td>${HEAR_BANDS[i].name}</td>`
+    + `<td class="num">${v.toFixed(0)} dBFS</td>`
+    + `<td class="num">${f1(H.gains[i])} dB</td></tr>`).join("");
+  hearShow("done");
+}
+function hearQuit(){
+  H = null;
+  hearShow("idle");
+  hearMsg("");
+  postJSON("/api/hearing/end", {}).catch(() => {});
+}
+$("#hear-start").addEventListener("click", hearStart);
+$("#hear-yes").addEventListener("click", hearHeard);
+$("#hear-no").addEventListener("click", hearMissed);
+$("#hear-quit").addEventListener("click", hearQuit);
+$("#hear-again").addEventListener("click", () => { hearStart(); });
+$("#hear-apply").addEventListener("click", () => {
+  if (!H || !H.gains) return;
+  S.tune.gain_db = [...H.gains];
+  gainEls.forEach((el, i) => { el.slider.value = S.tune.gain_db[i]; });
+  paintAllGains(); drawFR(); markPreset(); flushTune();
+  if (S.ab) resetAB();
+  $("#hear-done-msg").textContent =
+    "已应用。启动实时后听到的就是这组补偿，可以随时拖滑杆微调。";
+});
 
 /* =====================================================================
  * 压缩区

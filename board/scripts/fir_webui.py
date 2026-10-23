@@ -31,6 +31,7 @@
 """
 
 import argparse
+import atexit
 import json
 import os
 import re
@@ -79,6 +80,115 @@ LOCK    = threading.Lock()
 PROC    = {"p": None, "log": None, "stopping": False, "starting": False,
            "stop_msg": "", "started_at": 0.0, "last": None}
 SEQ     = [0]
+
+# ---------------------------------------------------------------------------
+# 测听的放音助手
+# ---------------------------------------------------------------------------
+# 放音单独起进程，不在这个进程里 import pynq：Overlay() 会一直握着
+# /dev/uio，fir_live.py 起跑时也要 Overlay(BIT)，两个进程抢同一个 UIO
+# 会让位流加载失败。详见 hearing_tone.py 的文件头。
+HEAR_HELPER = os.path.join(HERE, "hearing_tone.py")
+HEAR_LOG    = "/dev/shm/fir_hearing.log"
+HEAR_FREQS  = (250.0, 750.0, 1500.0, 3000.0)   # 每个频段一个，避开 500/1k/2k 边界
+HEAR_IDLE_S = 60.0                             # 这么久没放音就自己退，别一直占着 UIO
+
+
+class _ToneHelper:
+    def __init__(self):
+        self.p = None
+        self.log = None
+        self.timer = None
+        self.lock = threading.Lock()
+
+    def _alive(self):
+        return self.p is not None and self.p.poll() is None
+
+    def _readline(self, timeout):
+        try:
+            import select
+            r, _, _ = select.select([self.p.stdout], [], [], timeout)
+            if not r:
+                raise RuntimeError("等放音助手超时（%.0f 秒）" % timeout)
+        except ImportError:                 # Windows 上 select 不收管道；板上不会走到这
+            pass
+        line = self.p.stdout.readline()
+        if not line:
+            raise RuntimeError("放音助手没回话（进程退了吗？看 %s）" % HEAR_LOG)
+        return json.loads(line.decode("utf-8", "replace"))
+
+    def _kill_locked(self):
+        p, self.p = self.p, None
+        if p is not None and p.poll() is None:
+            try:
+                p.stdin.write(b"quit\n")
+                p.stdin.flush()
+            except Exception:               # noqa: BLE001
+                pass
+            try:
+                p.wait(timeout=2.0)
+            except subprocess.TimeoutExpired:
+                try:
+                    p.kill()
+                except Exception:           # noqa: BLE001
+                    pass
+                try:
+                    p.wait(timeout=2.0)
+                except Exception:           # noqa: BLE001
+                    pass
+        if self.log is not None:
+            try:
+                self.log.close()
+            except Exception:               # noqa: BLE001
+                pass
+            self.log = None
+
+    def _touch_locked(self):
+        if self.timer is not None:
+            self.timer.cancel()
+        self.timer = threading.Timer(HEAR_IDLE_S, self.stop)
+        self.timer.daemon = True
+        self.timer.start()
+
+    def _spawn(self):
+        env = dict(os.environ)
+        env.update({"XILINX_XRT": "/usr", "PYTHONUNBUFFERED": "1"})
+        self.log = open(HEAR_LOG, "wb")
+        self.p = subprocess.Popen([sys.executable, HEAR_HELPER], cwd=HERE, env=env,
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  stderr=self.log, start_new_session=True)
+        d = self._readline(25.0)           # 加载 overlay 可能要几秒
+        if not d.get("ok"):
+            raise RuntimeError(d.get("msg") or "放音助手起不来")
+
+    def play(self, hz, level_db, sec):
+        with self.lock:
+            try:
+                if not self._alive():
+                    self._kill_locked()
+                    self._spawn()
+                cmd = ("%.1f %.2f %.2f\n" % (hz, level_db, sec)).encode("ascii")
+                self.p.stdin.write(cmd)
+                self.p.stdin.flush()
+                d = self._readline(sec + 20.0)
+            except Exception:
+                self._kill_locked()
+                raise
+            if not d.get("ok"):
+                raise RuntimeError(d.get("msg") or "放音失败")
+            self._touch_locked()
+            return d
+
+    def stop(self):
+        with self.lock:
+            if self.timer is not None:
+                self.timer.cancel()
+                self.timer = None
+            self._kill_locked()
+
+
+TONE = _ToneHelper()
+atexit.register(TONE.stop)
+
 
 
 def _load_last():
@@ -394,6 +504,27 @@ def _hang_fix_state():
     return True, " / ".join(notes)
 
 
+def _hearing_guard():
+    """测听之前要确认音频没人在用 —— 两边的 codec / UIO 是同一份。"""
+    with LOCK:
+        p = PROC["p"]
+        if p is not None and p.poll() is None:
+            return "实时通路在跑（pid %d），先点「停止」再测听" % p.pid
+        if PROC["starting"]:
+            return "正在起实时，等它起来或者停掉再测听"
+        if PROC["stopping"]:
+            return "实时还在收尾自检，等它停下来再测听"
+    st = read_status()
+    if st and st.get("running"):
+        try:
+            age = time.time() - float(st.get("t") or 0)
+        except (TypeError, ValueError):
+            age = 99.0
+        if age < 1.5:
+            return "已经有一条实时在跑（状态文件 %.1f 秒前还在更新），先停掉" % age
+    return None
+
+
 def _start(src, l=None, nbuf=None, rec=None, cap_sec=None):
     with LOCK:
         p = PROC["p"]
@@ -423,6 +554,10 @@ def _start(src, l=None, nbuf=None, rec=None, cap_sec=None):
                     "死机防护没生效（%s）。先在板子上跑一次\n"
                     "  sudo sh %s/install_ksoftirqd_rt.sh\n"
                     "然后重启板子（这个服务开机时生效）。" % (why, HERE), "")
+
+        # 测听的放音助手握着 /dev/uio；不先放掉，fir_live.py 的 Overlay(BIT)
+        # 会被内核拒（Device or resource busy）。
+        TONE.stop()
 
         t = read_tune() or {}
         gains = t.get("gain_db") or [0, 0, 0, 0]
@@ -756,6 +891,37 @@ class Handler(BaseHTTPRequestHandler):
                     return
             ok, msg, tail = _start(src, l, nbuf, rec, cap_sec)
             self._json({"ok": ok, "msg": msg, "log": tail})
+        elif p == "/api/hearing/tone":
+            why = _hearing_guard()
+            if why:
+                self._json({"ok": False, "msg": why}, 409)
+                return
+            try:
+                hz = float(d.get("freq_hz"))
+                lv = float(d.get("level_db"))
+                sec = float(d.get("sec") or 1.2)
+            except (TypeError, ValueError):
+                self._json({"ok": False, "msg": "freq_hz / level_db 要是数字"}, 400)
+                return
+            if hz not in HEAR_FREQS:
+                self._json({"ok": False, "msg": "不认识的测试频率"}, 400)
+                return
+            if not (-60.0 <= lv <= 0.0):
+                self._json({"ok": False, "msg": "电平要在 -60~0 dBFS"}, 400)
+                return
+            if not (0.4 <= sec <= 3.0):
+                self._json({"ok": False, "msg": "时长要在 0.4~3 秒"}, 400)
+                return
+            try:
+                r = TONE.play(hz, lv, sec)
+            except Exception as e:          # noqa: BLE001
+                self._json({"ok": False, "msg": "%s" % (e,)}, 500)
+                return
+            self._json({"ok": True, "freq_hz": r["freq_hz"],
+                        "level_db": r["level_db"]})
+        elif p == "/api/hearing/end":
+            TONE.stop()
+            self._json({"ok": True, "msg": "放音助手已停"})
         elif p == "/api/stop":
             ok, msg = _stop_async()
             self._json({"ok": ok, "msg": msg})
