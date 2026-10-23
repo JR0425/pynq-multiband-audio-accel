@@ -177,10 +177,12 @@
     LIVE_STATUS=0.1   多久写一次状态文件（秒）。界面靠它画电平表。
                       10 Hz 对一根电平条够了；**这是整条循环里唯一花钱的动作**
                       （一次 23 µs），所以宁可少写几帧也不要写贵了。
-    LIVE_SRC=wav      不从麦克风录，改放 board_input_48k.wav（循环）——
+    LIVE_SRC=wav      不从麦克风录，改放一段 wav（循环）——
                       人在外面、没插麦的时候也能验流水线。
                       注意它仍然走真的 duplex_block（放音那一半是真的），
                       只是"收到什么"这一半被 wav 顶掉了。
+    LIVE_WAV=路径     LIVE_SRC=wav 时放哪个文件，默认 board_input_48k.wav；
+                      也可以是 /tmp/take_in.wav（界面录下来的那一段）。
     LAT_TRACE=路径    记音频链路延迟：每块"被采到的时刻"和"交给 codec 的时刻"，
                       跑完写 JSON。默认关（开着时 io 线程多几个赋值）。
 
@@ -813,12 +815,16 @@ slot_out_seq[:] = [-1] * NBUF       # -1 = 这一槽还没被核处理过（开�
 # ---------------- 音源 ----------------
 src_wav = None
 if SRC == "wav":
-    p = _find("board_input_48k.wav")
+    _wav_name = os.environ.get("LIVE_WAV") or "board_input_48k.wav"
+    p = _find(_wav_name)
     if p is None:
-        raise SystemExit("LIVE_SRC=wav 但找不到 board_input_48k.wav")
+        raise SystemExit("LIVE_SRC=wav 但找不到 %s" % _wav_name)
     with wave.open(p, "rb") as f:
         nch = f.getnchannels()
+        wid = f.getsampwidth()
         raw = f.readframes(f.getnframes())
+    if wid != 2:
+        raise SystemExit("音源 wav 要是 16 bit（%s 是 %d bit）" % (p, wid * 8))
     a = np.frombuffer(raw, dtype="<i2").astype(np.int16)
     src_wav = a[::nch] if nch > 1 else a
     audio.deselect_inputs()

@@ -525,7 +525,7 @@ def _hearing_guard():
     return None
 
 
-def _start(src, l=None, nbuf=None, rec=None, cap_sec=None):
+def _start(src, l=None, nbuf=None, rec=None, cap_sec=None, wav=None):
     with LOCK:
         p = PROC["p"]
         if p is not None and p.poll() is None:
@@ -577,6 +577,9 @@ def _start(src, l=None, nbuf=None, rec=None, cap_sec=None):
         if rec:
             env["LIVE_REC"] = rec
             env["LIVE_CAP_SEC"] = str(cap_sec or 20)
+        if wav:
+            env["LIVE_SRC"] = "wav"
+            env["LIVE_WAV"] = wav
         try:
             lg = open(LIVE_LOG, "wb")
         except OSError as e:
@@ -889,7 +892,23 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"ok": False,
                                 "msg": "rec 只能放在 /dev/shm/ 或 /tmp/ 下"}, 400)
                     return
-            ok, msg, tail = _start(src, l, nbuf, rec, cap_sec)
+            wav = d.get("wav")
+            if wav is not None:
+                wav = str(wav)
+                if not wav.endswith(".wav"):
+                    self._json({"ok": False, "msg": "音源文件要是 .wav"}, 400)
+                    return
+                if not (wav == "board_input_48k.wav"
+                        or wav.startswith("/dev/shm/") or wav.startswith("/tmp/")):
+                    self._json({"ok": False,
+                                "msg": "音源 wav 只能从板子目录、/dev/shm/ 或 /tmp/ 里取"}, 400)
+                    return
+                path = wav if wav.startswith("/") else os.path.join(HERE, wav)
+                if not os.path.isfile(path):
+                    self._json({"ok": False,
+                                "msg": "找不到 %s —— 先勾上「录音」跑一趟，录下来才能放" % wav}, 400)
+                    return
+            ok, msg, tail = _start(src, l, nbuf, rec, cap_sec, wav)
             self._json({"ok": ok, "msg": msg, "log": tail})
         elif p == "/api/hearing/tone":
             why = _hearing_guard()

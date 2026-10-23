@@ -256,7 +256,7 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
 
 <header>
   <span class="ttl"><i class="mark"></i>四段听力补偿<span class="em">调参台</span></span>
-  <span class="src">来源：麦克风</span>
+  <span class="src" id="src-chip">来源：麦克风</span>
   <span class="badge" id="badge"><i class="dot"></i><span id="badge-txt">未运行</span></span>
   <span class="chips">
     <span>已处理<b id="chip-elapsed">--:--</b></span>
@@ -268,10 +268,15 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
   </span>
   <span class="sp"></span>
   <span id="netstate" style="display:none;color:var(--faint);font-size:11.5px">与板子失去联系，重试中…</span>
+  <select class="lat" id="src-sel" title="音源：板载录音不进麦克风，不会啸叫">
+    <option value="mic">音源 麦克风</option>
+    <option value="wav:/tmp/take_in.wav">音源 本机录音</option>
+    <option value="wav:board_input_48k.wav">音源 板载样例</option>
+  </select>
   <select class="lat" id="lat-sel" title="缓冲档位（嘴到耳，含耳机段约 1.2 ms）">
     <option value="360,2">低延迟 16 ms</option>
-    <option value="480,3">稳定 31 ms</option>
-    <option value="1920,4">反例 160 ms</option>
+    <option value="480,3">常规 31 ms</option>
+    <option value="1920,4">对照 160 ms</option>
   </select>
   <label class="reclab" id="rec-lab" title="这一趟进核/出核各存一个 wav，停止后可以下载">
     <input type="checkbox" id="rec-chk">录音
@@ -1002,6 +1007,7 @@ function renderStatus(p){
   const busy = starting || S.stopping;
   $("#btn-start").disabled = busy || audioOn || procRunning;
   $("#lat-sel").disabled  = busy || audioOn || procRunning;
+  $("#src-sel").disabled  = busy || audioOn || procRunning;
   $("#btn-stop").disabled  = S.stopping || !(audioOn || procRunning);
   const recDis = busy || audioOn || procRunning;
   $("#rec-chk").disabled = recDis;
@@ -1084,6 +1090,11 @@ async function pollScope(){
 /* =====================================================================
  * 起停
  * ===================================================================== */
+$("#src-sel").addEventListener("change", () => {
+  const [k, w] = $("#src-sel").value.split(":");
+  $("#src-chip").textContent = "来源：" + (k === "mic" ? "麦克风" :
+    (w === "board_input_48k.wav" ? "板载样例" : "本机录音"));
+});
 $("#btn-start").addEventListener("click", async () => {
   S.starting = true; S.startT0 = Date.now(); S.everStarted = true;
   hideError(); $("#errlog").style.display = "none"; $("#recbar").style.display = "none";
@@ -1091,7 +1102,9 @@ $("#btn-start").addEventListener("click", async () => {
   $("#btn-start").disabled = true; $("#btn-stop").disabled = true;
   try {
     const [latL, latN] = $("#lat-sel").value.split(",").map(Number);
-    const body = {src:"mic", l:latL, nbuf:latN};
+    const [srcKind, srcWav] = $("#src-sel").value.split(":");
+    const body = {src: srcKind, l: latL, nbuf: latN};
+    if (srcKind === "wav") body.wav = srcWav;
     const wantRec = $("#rec-chk").checked;
     if (wantRec){ body.rec = "/tmp/take"; body.cap_sec = 120; }
     const r = await postJSON("/api/start", body);
