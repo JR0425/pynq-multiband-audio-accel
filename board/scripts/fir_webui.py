@@ -290,7 +290,9 @@ def _apply_tune(d):
     thr = _four(d.get("thr_db"), -60.0, 0.0, -10.0)
     rat = _four(d.get("ratio"), 0.0, 0.95, 0.0)
     atk = _four(d.get("attack_ms"), 0.0, 200.0, 0.0)
-    rel = _four(d.get("release_ms"), 0.0, 1000.0, 0.0)
+    # 680 是核里 Q1.15 平滑步进真正能到的最慢值（step=1 → 682.66 ms）。
+    # 界面给到 1000 的话，拖过 680 之后声音就不再变，等于界面骗人。
+    rel = _four(d.get("release_ms"), 0.0, 680.0, 0.0)
     with LOCK:
         SEQ[0] += 1
         seqno = SEQ[0]
