@@ -97,44 +97,34 @@ def wdrc(x, thr, ratio, atk, rel, env):
     return (-a2 if x < 0 else a2), env
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=("legacy", "wdrc"), required=True)
-    ap.add_argument("--taps", type=int, default=193)
-    ap.add_argument("--in", dest="inp", default="data/audio/test_input.txt")
-    ap.add_argument("--ref", default=None,
-                    help="要对比的 csim 输出（默认按 mode 选）")
-    ap.add_argument("--thr", type=int, default=3277)
-    ap.add_argument("--ratio", type=int, default=22938)
-    ap.add_argument("--gain", type=int, default=256)
-    ap.add_argument("--attack", type=int, default=136)
-    ap.add_argument("--release", type=int, default=7)
-    args = ap.parse_args()
-
-    n, na = args.taps, nalloc(args.taps)
-    ref_path = args.ref or (
-        "data/results/v20_baseline_output.txt" if args.mode == "legacy"
-        else "data/results/v21_wdrc_output.txt")
-
-    with open(os.path.join(REPO, args.inp)) as f:
-        xraw = [float(s) for s in f if s.strip()]
-    x = [to_q15(v) for v in xraw]
-    L = len(x)
-
-    # 系数表：Q1.17，尾部补 0 到 nalloc（和 HLS 的表逐行对齐）
+def load_coeffs(taps):
+    """Q1.17 系数表，尾部补 0 到 nalloc（和 HLS 的表逐行对齐）。"""
+    na = nalloc(taps)
     coeffs = []
     for e in EDGES:
-        c = [q17(v) for v in read_coeffs(e, n)]
-        coeffs.append(c + [0] * (na - n))
+        c = [q17(v) for v in read_coeffs(e, taps)]
+        coeffs.append(c + [0] * (na - taps))
+    return coeffs, na
 
-    atk = args.attack << 7 if args.mode == "wdrc" else 0
-    rel = args.release << 7 if args.mode == "wdrc" else 0
-    thr = args.thr << 7
-    ratio = args.ratio << 7
+
+def process(x, coeffs, na, mode="wdrc", thr=3277, ratio=22938, gain=256,
+            attack=136, release=7):
+    """逐点跑一遍整数核模型。
+
+    x 是 int16/Q1.15 列表；其余参数是**寄存器原值**（和 fir_core.py 写进 MMIO
+    的数一致），内部再按 HLS 的小数位展开。返回 int16 列表。
+
+    这个函数是 THD / 频响那些测量脚本的唯一入口 —— 它们必须走同一条模型，
+    否则"和核逐位相同"这句话就不成立。
+    """
+    atk = attack << 7 if mode == "wdrc" else 0
+    rel = release << 7 if mode == "wdrc" else 0
+    thr = thr << 7
+    ratio = ratio << 7
     env = [0] * N_BANDS
 
     out = []
-    for i in range(L):
+    for i in range(len(x)):
         # ---- 3 个低通，Q8.32 原始整数 ----
         ylp = [0, 0, 0]
         for b in range(N_LP):
@@ -153,14 +143,44 @@ def main():
         acc = 0
         for b in range(N_BANDS):
             gb = sat24(band[b] >> 10)                  # acc_t -> drc_t
-            gb = sat24((gb * args.gain) >> 8)          # * gain_t -> drc_t
-            if args.mode == "legacy":
+            gb = sat24((gb * gain) >> 8)               # * gain_t -> drc_t
+            if mode == "legacy":
                 yv = drc_legacy(gb, thr, ratio)
             else:
                 yv, env[b] = wdrc(gb, thr, ratio, atk, rel, env[b])
             acc += yv << 10                            # drc_t -> acc_t
 
         out.append(sat16(acc >> 17))                   # acc_t -> data_t
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--mode", choices=("legacy", "wdrc"), required=True)
+    ap.add_argument("--taps", type=int, default=193)
+    ap.add_argument("--in", dest="inp", default="data/audio/test_input.txt")
+    ap.add_argument("--ref", default=None,
+                    help="要对比的 csim 输出（默认按 mode 选）")
+    ap.add_argument("--thr", type=int, default=3277)
+    ap.add_argument("--ratio", type=int, default=22938)
+    ap.add_argument("--gain", type=int, default=256)
+    ap.add_argument("--attack", type=int, default=136)
+    ap.add_argument("--release", type=int, default=7)
+    args = ap.parse_args()
+
+    ref_path = args.ref or (
+        "data/results/v20_baseline_output.txt" if args.mode == "legacy"
+        else "data/results/v21_wdrc_output.txt")
+
+    with open(os.path.join(REPO, args.inp)) as f:
+        xraw = [float(s) for s in f if s.strip()]
+    x = [to_q15(v) for v in xraw]
+    L = len(x)
+
+    coeffs, na = load_coeffs(args.taps)
+    out = process(x, coeffs, na, mode=args.mode, thr=args.thr,
+                  ratio=args.ratio, gain=args.gain,
+                  attack=args.attack, release=args.release)
 
     with open(os.path.join(REPO, ref_path)) as f:
         raw = [s.strip() for s in f if s.strip()]

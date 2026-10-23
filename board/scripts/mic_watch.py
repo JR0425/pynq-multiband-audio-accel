@@ -1,105 +1,95 @@
 # -*- coding: utf-8 -*-
-"""拔插耳机，盯着麦克风电平看有没有反应。
+"""拔插耳机时盯着麦克风电平,判断 U41 的插入检测有没有锁上。
 
 为什么要这么测
 --------------
-板子的 `HP + MIC` 口里有一颗自动耳机开关（U41，TI TS3A226AE）。
-它负责判断插头是 CTIA 还是 OMTP，然后把麦克风接到正确的触点上。
-**它只在"插头插入"那一下做一次检测，然后记住结果。**
+板子的 `HP + MIC` 口里有一颗自动耳机开关(U41,TI TS3A226AE)。
+它负责判断插头是 CTIA 还是 OMTP,然后把麦克风接到正确的触点上。
+**它只在"插头插入"那一下做一次检测,然后记住结果。**
 
-如果板子上电时插头已经插在里面，这"一下"就没发生，
-开关可能停在"麦克风没接上"的状态 —— 录出来只剩本底噪声，
-两个声道都纹丝不动。这正是之前看到的：有效值 7.7、峰值 33，
-说话、敲麦都不动。
+如果板子上电时插头已经插在里面,这"一下"就没发生,开关可能停在
+"麦克风没接上"的状态 —— 录出来只剩本底噪声(实测 2~8 LSB)。
+实测插到底之后要等 18 秒左右(有时 35 秒)电平才会跳起来。
 
-所以这个脚本不测"能不能录"，只测**插入那一下有没有反应**。
+所以这个脚本不测"能不能录",只测**插入那一下有没有反应**:
+每 0.5 秒打一行电平,什么时候拔插由人自己决定。
+判据和 mic_level.py 一致:**int16 域 rms 大于约 200 才算有信号**。
 
-用法（板上 Jupyter，和 fir_audio_loop.py 放同一个目录）：
+用法(板上)
+==========
+    cd /home/xilinx/jupyter_notebooks
+    echo xilinx | sudo -S env XILINX_XRT=/usr \
+        /usr/local/share/pynq-venv/bin/python3 -u mic_watch.py 60
 
-    %run mic_watch.py
-
-跑起来后按屏幕提示做，前后约 17 秒。
+参数是秒数。音量固定 0,板子不出声。也可以 `%run mic_watch.py`。
 """
 
+import os
+import sys
 import time
 
 import numpy as np
 from pynq import Overlay
 
-CHUNK_S = 0.5           # 每段 0.5 秒
+FS = 48000
+L = 480
 HALF = 1 << 23          # 无符号 24 位的零点
 FULL = 1 << 24
-BIG = 40.0              # 有效值超过这个数就算"有响应"（本底只有 7~8）
-
-# (从第几段开始, 这一段的提示语)
-PLAN = [
-    (0,  "什么都别动，保持现在这样"),
-    (6,  ">>> 把耳机拔出来 <<<"),
-    (12, ">>> 插回去，使劲插到底 <<<"),
-    (18, ">>> 对着麦克风说话，或用指甲轻敲麦上的小孔 <<<"),
-]
-TOTAL = 34
-
-ol = Overlay("fir.bit")
-audio = ol.audio_codec_ctrl_0
-audio.configure()
-audio.select_microphone()       # 只看麦克风这一路
-time.sleep(0.3)
+BIG = 200.0             # int16 域,rms 超过这个就算话筒通了
+HERE = os.path.dirname(os.path.abspath(__file__))
+SECONDS = float(sys.argv[1]) if len(sys.argv) > 1 else 30.0
 
 
-def to_signed(u):
-    """无符号 24 位 → 有符号 24 位。静音时缓冲区里是 2^23 附近，不是 0。"""
-    u = u.astype(np.int64)
-    return np.where(u >= HALF, u - FULL, u)
+def adc_i16(buf, ch=0):
+    """无符号 24 位 → int16。静音时缓冲区里是 2^23 附近,不是 0。"""
+    u = buf.reshape(-1, 2)[:, ch].astype(np.int64) & 0xFFFFFF
+    s = np.where(u >= HALF, u - FULL, u)
+    return np.clip(np.rint(s.astype(np.float64) / 256.0),
+                   -32768.0, 32767.0).astype(np.int16)
 
 
-def level():
-    """返回 [(左 rms, 左 峰), (右 rms, 右 峰)]，单位是 int16 域。"""
-    st = np.asarray(audio.buffer).reshape(-1).astype(np.int64).reshape(-1, 2)
-    out = []
-    for ch in (0, 1):
-        v = to_signed(st[:, ch]).astype(np.float64)
-        out.append((float(np.sqrt(np.mean(v ** 2))) / 256.0,
-                    float(np.max(np.abs(v))) / 256.0))
-    return out
+def main():
+    ol = Overlay(os.path.join(HERE, "fir.bit"))
+    audio = ol.audio_codec_ctrl_0
+    audio.configure()
+    audio.select_microphone()   # 不切这一下,ADC 抓的是线路输入,读数恒为 0.7 LSB
+    audio.set_volume(0)
+
+    ffi = audio._ffi
+    ffi.cdef("""
+        void* stream_begin(unsigned int mmap_size, unsigned int volume,
+                           int uio_index, int iic_index);
+        int   duplex_block(void* h, unsigned int* in_buf,
+                           unsigned int* out_buf, unsigned int nsamples);
+        void  stream_end(void* h);
+    """)
+    lib = ffi.dlopen(os.path.join(HERE, "libaudio_stream.so"))
+    h = lib.stream_begin(audio.mmio.length, 0, audio.uio_index, audio.iic_index)
+    if h == ffi.NULL:
+        raise SystemExit("stream_begin 失败")
+
+    abuf_in = np.zeros(L * 2, dtype=np.int32)
+    abuf_out = np.zeros(L * 2, dtype=np.int32)
+    pin = ffi.cast("unsigned int*", ffi.from_buffer(abuf_in))
+    pout = ffi.cast("unsigned int*", ffi.from_buffer(abuf_out))
+
+    print("每 0.5 秒一行。个位数 = 话筒没通;大于 %.0f = 通了。" % BIG,
+          flush=True)
+    t0 = time.time()
+    while time.time() - t0 < SECONDS:
+        acc = []
+        for _ in range(25):                   # 25 × 10 ms = 0.5 s
+            abuf_out[:] = 0
+            lib.duplex_block(h, pin, pout, L)
+            acc.append(adc_i16(abuf_in).astype(np.float64))
+        x = np.concatenate(acc)
+        rms = float(np.sqrt(np.mean(x * x)))
+        print("%5.1fs  rms = %7.1f  peak = %6d  %s"
+              % (time.time() - t0, rms, int(np.max(np.abs(x))),
+                 "<<< 通了" if rms >= BIG else ""), flush=True)
+
+    lib.stream_end(h)
 
 
-def tip(i):
-    note = PLAN[0][1]
-    for start, text in PLAN:
-        if i >= start:
-            note = text
-    return note
-
-
-print("")
-
-# 先录一段空的，把本底测出来
-audio.record(CHUNK_S)
-base = max(level()[0][0], level()[1][0])
-
-print("本底（没信号时的有效值）：%.1f" % base)
-print("下面只要哪个数明显超过 %.1f，就是有东西进 codec 了\n" % BIG)
-print("  秒   左 rms    左 峰  |  右 rms    右 峰  | 现在做什么")
-print("  " + "-" * 70)
-
-t0 = time.time()
-peaks = []
-for i in range(TOTAL):
-    audio.record(CHUNK_S)
-    (lr, lp), (rr, rp) = level()
-    peaks.append(max(lr, rr))
-    flag = "  <<< 有响应！" if max(lr, rr) >= BIG else ""
-    print("  %4.1f  %8.1f %8.1f  | %8.1f %8.1f  | %s%s"
-          % (time.time() - t0, lr, lp, rr, rp, tip(i), flag))
-
-print("""
-怎么判读
---------
-· 全程都在 7~8 附近不动 → 插入那一下板子也没认出耳机。
-  这不是脚本的问题，是这颗自动开关没工作，或者插座触点接触不良。
-· "插回去"那几行跳起来了 → 就是它。以后每次跑录音脚本前，
-  先把耳机拔掉再插回去就行。
-· 只有一路跳 → 麦克风只接在那一路上，fir_audio_loop.py 挑声道挑错了
-  （它用无符号域的能量挑，静音时被 2^23 的零点淹没，等于抛硬币）。
-""")
+if __name__ == "__main__":
+    main()

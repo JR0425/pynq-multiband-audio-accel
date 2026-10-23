@@ -52,12 +52,13 @@ SECONDS = 3.0
 REPEAT = 3
 FPGA_MHZ = 100.0
 # 拍/采样,见 data/results/impl_metrics.md。
-# **现在是三代,别混**:当前出货的 `v21_wdrc`(加包络 + attack/release)是 **49 拍**;
-# 2026-10-09 ~ 10-19 出货的 `v20_gain`(含 band_gain、无包络)= **35 拍**;
-# 2026-10-08 那次对照测的是 `v19`(无 band_gain)= **31 拍**;
-# t 系列中间实验才是 28 拍。这个脚本量的是**板上当前那颗**核,所以默认 49。
-# 要复现 19.5 倍那次(CYCLES_MEASURED=31)或 450 拍那版(=450)就显式给。
-CYCLES_MEASURED = int(os.environ.get("CYCLES_MEASURED", "49"))
+# **现在是四代,别混**:当前出货的 `v25_env_indep`（v21 加一条 DEPENDENCE inter false）
+# 是 **36 拍**;2026-10-19 ~ 10-23 出货的 `v21_wdrc`（包络 + attack/release）= **49 拍**;
+# 2026-10-09 ~ 10-19 出货的 `v20_gain`（含 band_gain、无包络）= **35 拍**;
+# 2026-10-08 那次对照测的是 `v19`（无 band_gain）= **31 拍**;
+# t 系列中间实验才是 28 拍。这个脚本量的是**板上当前那颗**核,所以默认 36。
+# 要复现旧数（49 拍那版的 12.5 倍、31 拍那版的 19.5 倍、450 拍那版）就显式给。
+CYCLES_MEASURED = int(os.environ.get("CYCLES_MEASURED", "36"))
 # 每块多少采样。核的 m_axi 缓冲深度是 8192，8000 是留了余量。
 # **这个值以前硬编码 8000，是错的** —— 上面那个 4.5 µs 里 Python 开销只占 0.2%，
 # 是因为核本身慢（450 拍），Python 那点开销被摊掉了。核快 16 倍之后

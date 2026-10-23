@@ -4,9 +4,9 @@
 ================================ 为什么现在能做 ================================
 三条都已经在这块板子上实测过，缺一条这件事就做不成：
 
-  ① 核够快       核里 49 拍 @ 100 MHz = **0.49 µs/采样**，48 kHz 的预算 20.83 µs —— 余量约 42 倍
-                 （10/08 上板实测 0.317 µs 是"加每段增益"之前那一版；v21 加了包络，
-                  拍数从 35 涨到 49，见 data/results/impl_metrics.md）
+  ① 核够快       核里 36 拍 @ 100 MHz = **0.36 µs/采样**，48 kHz 的预算 20.83 µs —— 余量约 57 倍
+                 （10/08 上板实测 0.317 µs 是"加每段增益"之前那一版；之后拍数走到 35 → 49 →
+                  36，见 data/results/impl_metrics.md）
   ② 延迟线跨块保持 分块跑和整块跑**逐位相同**，0 错配（fir_selftest.py 第 5 节）
   ③ 音频通路能全双工  录 0.2 s ‖ 播 0.2 s 同时跑，墙钟 0.203 s（＝max 不是 sum）
                  （audio_duplex_probe.py）
@@ -177,6 +177,8 @@
                       人在外面、没插麦的时候也能验流水线。
                       注意它仍然走真的 duplex_block（放音那一半是真的），
                       只是"收到什么"这一半被 wav 顶掉了。
+    LAT_TRACE=路径    记音频链路延迟：每块"被采到的时刻"和"交给 codec 的时刻"，
+                      跑完写 JSON。默认关（开着时 io 线程多几个赋值）。
 
 跑完会做一次**逐位自检**：把这次真跑出来的每块输入和每块输出拼起来，
 再用离线那条路（`process(chunk=L)`）重算一遍，两边**逐位比对**。
@@ -289,6 +291,18 @@ trace_io = [] if TRACE_PATH else None
 # qput 返回) 四个时刻记下来。和 DROP_TRACE 一样默认关，只给调参用。
 GAP_PATH = os.environ.get("GAP_TRACE", "")
 gap_io = [] if GAP_PATH else None
+
+# 音频链路延迟：给每一块打两个时刻 —— **它被采到的时刻**和**它被交给 codec
+# 的时刻**。两个都是同一个 `duplex_block` 调用的起点，所以差值就是这一块每个
+# 采样真正经过的延迟（块内第 j 个采样进、第 j 个采样出，差一样）。
+# 默认关；开着时 io 线程每块多三四个赋值（µs 级），只用于测量。
+LAT_PATH = os.environ.get("LAT_TRACE", "")
+lat_on = bool(LAT_PATH)
+lat_cap = []          # [采到的时刻]，下标 = 块序号
+lat_out = []          # (块序号, 交给 codec 的时刻)，按播放顺序
+lat_seq = [0]         # 下一个块序号（列表是为了在闭包里改）
+slot_in_seq = []      # 槽位里那一块是第几块（io 写）
+slot_out_seq = []     # 槽位里那一块是第几块（dsp 写，经过核之后）
 
 # ---------------- 实时波形（给 w5_tuning_ui.ipynb 画时域/频谱） ----------------
 # 默认**关**。这一路是给演示新加的，不该改变已经量过的那些数字；演示那趟
@@ -751,9 +765,9 @@ print("   uio=%s iic=%s mmio.length=0x%x" % (UIO, IIC, MMIO_LEN))
 block_sec = L / FS
 print("   每块 %d 个采样 = %.2f ms；%d 个槽位 → 延迟约 %.0f ms"
       % (L, block_sec * 1000, NBUF, NBUF * block_sec * 1000))
-print("   实时预算 %.2f µs/采样；核 49 拍 @ 100 MHz = 0.49 µs/采样（余量 %d 倍，"
+print("   实时预算 %.2f µs/采样；核 36 拍 @ 100 MHz = 0.36 µs/采样（余量 %d 倍，"
       "另加每块约 52 µs 的固定开销）"
-      % (1e6 / FS, int(1e6 / FS / 0.49)))
+      % (1e6 / FS, int(1e6 / FS / 0.36)))
 
 # ---------------- 缓冲 ----------------
 slots = []
@@ -781,6 +795,8 @@ q1 = _Q()               # io → dsp
 q2 = _Q()               # dsp → io
 for i in range(NBUF):
     q2.put(i)           # 预填：开头这几块放的是静音（cout 初始为 0）
+slot_in_seq[:] = [0] * NBUF
+slot_out_seq[:] = [-1] * NBUF       # -1 = 这一槽还没被核处理过（开头的静音）
 
 # ---------------- 音源 ----------------
 src_wav = None
@@ -812,6 +828,22 @@ else:
 
 
 # ---------------- 两条线程 ----------------
+def _name_thread(name):
+    """把线程名写进内核的 comm，cpu_watch 才能分线程统计。
+    Python 的 threading name 只在 Python 层，/proc 里看到的还是 python3。
+    只在循环前调用一次，不占实时通路的预算。
+
+    用 prctl(PR_SET_NAME) 而不用 pthread_setname_np：板上的 libc 没导出后者。"""
+    try:
+        import ctypes
+        libc = ctypes.CDLL("libc.so.6", use_errno=True)
+        libc.prctl.argtypes = [ctypes.c_int, ctypes.c_char_p,
+                               ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+        libc.prctl(15, name.encode()[:15], 0, 0, 0)
+    except Exception:
+        pass
+
+
 def stage_io():
     """搬样。**这个函数体里除了那次 C 调用，什么都没有。**
 
@@ -825,10 +857,12 @@ def stage_io():
 
     换句话说：**别往这个函数里加东西，要加就加到 stage_dsp。**
     """
+    _name_thread("io")
     _pin(0, RT_IO)
     while not stop.is_set():
         tg = time.perf_counter() if gap_io is not None else 0.0
         i = qget(q2)                      # 一个**已经算好、也已经摆成 24 位**的槽
+        played = slot_out_seq[i] if lat_on else -1
         tg1 = time.perf_counter() if gap_io is not None else 0.0
         p_in, p_out = slots[i][0], slots[i][1]
         try:
@@ -847,6 +881,14 @@ def stage_io():
             errors.append(("io", repr(e)))
             stop.set()
             return
+        if lat_on:
+            # t0 同时是"这一块被采到的时刻"和"槽里那一块交给 codec 的时刻"
+            seq = lat_seq[0]
+            lat_seq[0] = seq + 1
+            slot_in_seq[i] = seq
+            lat_cap.append(t0)
+            if played >= 0:
+                lat_out.append((played, t0))
         q1.put(i)
         if gap_io is not None:
             gap_io.append((tg, tg1, t0, t0 + d, time.perf_counter(), i))
@@ -858,6 +900,7 @@ def stage_dsp():
     这块每块花 2.4 ms（过核 1.0 + 转换 1.4），块长 10 ms —— 用了 24%。
     所以这里多干点活是免费的，而 io 那边多干一点就是丢音。
     """
+    _name_thread("dsp")
     _pin(1, RT_DSP)
     first = True
     pos = 0
@@ -867,6 +910,7 @@ def stage_dsp():
         except _Stop:
             return
         _pi, _po, abuf_in, b_out, cin, cout = slots[i]
+        blk_seq = slot_in_seq[i] if lat_on else -1
 
         # 这一轮收到的（24 位交织）转成核要的 int16。
         # 原来在 io 线程上，0.08 ms/块 —— 就是它让 8 秒丢了 8 块。
@@ -955,6 +999,8 @@ def stage_dsp():
             cap_in.append(np.array(cin, dtype=np.int16))
             cap_out.append(np.array(cout, dtype=np.int16))
             captured[0] += L
+        if lat_on:
+            slot_out_seq[i] = blk_seq
         q2.put(i)
 
         # 写状态文件放在 q2.put 之**后** —— io 那边等着要这个槽，
@@ -1059,6 +1105,17 @@ if gap_io:
             json.dump({"L": L, "NBUF": NBUF, "gap": gap_io}, _f)
     except OSError:
         pass
+
+if lat_on:
+    import json
+    try:
+        with open(LAT_PATH, "w") as _f:
+            json.dump({"L": L, "NBUF": NBUF, "SRC": SRC, "wall": wall,
+                       "cap": lat_cap, "out": lat_out}, _f)
+    except OSError:
+        pass
+    print("   延迟轨迹 -> %s（%d 块采到、%d 块交给 codec）"
+          % (LAT_PATH, len(lat_cap), len(lat_out)))
 
 # ---------------- 2. 结果 ----------------
 hr("2. 跑得怎么样")

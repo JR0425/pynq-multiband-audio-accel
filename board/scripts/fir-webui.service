@@ -1,0 +1,16 @@
+[Unit]
+Description=PYNQ audio tuning web UI (port 8080)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/xilinx/jupyter_notebooks
+Environment=PYTHONIOENCODING=utf-8
+Environment=XILINX_XRT=/usr
+ExecStart=/usr/local/share/pynq-venv/bin/python3 /home/xilinx/jupyter_notebooks/fir_webui.py --port 8080
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
