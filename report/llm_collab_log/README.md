@@ -32,4 +32,8 @@ A/B 工作包：
 
 实时通路的丢块（不是 CPU 不够：`queue.Queue` 的锁在 Python 层，每块之间停 196 µs，L=480 时吃掉 1.25% 的音频；换成 `SimpleQueue` 后 81 µs、60 秒丢 0；以及每 30.24 秒一次的 journal 写 SD 卡如何借 FIFO 50 的 `kworker` 抢走 CPU0，最后把 systemd timer 换成常驻静默进程）见 `2026-10-21_realtime_dropout_root_cause.md`。
 
+块长能压到多短（文档里一直写的"10 ms 是下限"被七档扫描推翻，真实下限 7.5 ms；原先"每块固定开销来自 Python"的机制句也是先写结论后做实验，被分项计时否掉；以及 20 秒窗口的旧数据为什么偏乐观、跨块长为什么不能直接比丢块数）见 `2026-10-22_block_length_floor.md`。
+
+四段压缩循环的 II（把"II=4 是乘法器不够"这个先编出来的机制读日志推翻——真因是 `env` 的假携带依赖；`#pragma HLS UNROLL` 两次贴错循环，一次没生效、一次把整个 FIR 复制两遍；以及把这段抽成 `static inline` 函数、逻辑一字没改却把 II 从 4 推到 14）见 `2026-10-22_drc_loop_ii.md`。
+
 抽头数参数调整见 `2026-09-30_python_baseline_193_taps.md`。更早的开发过程仍按各自任务文件记录。

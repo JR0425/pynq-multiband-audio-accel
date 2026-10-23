@@ -2,7 +2,7 @@
 
 ## Design report draft
 
-**Status as of 2026-10-15:** the Python reference path and the custom HLS core are present. The core is integrated into a board overlay together with the PYNQ audio codec (`board/overlay/fir.bit`), has processed real captured audio on the board, and now runs a real-time microphone → core → headphone duplex path (section 5.4); a 40 s live run on 2026-10-15 held 1.00× with a bit-exact self-check and was audible in the headphones (raw run in `data/results/fir_live_run_20261015.txt`). That run used the default flat per-band gains, so it demonstrates the path rather than per-band tuning; the per-band tuning itself was then demonstrated in a second 2026-10-15 run that changed the gains live while audio was flowing, with the operator confirming the change by ear (section 5.4). Out-of-context and integrated-in-overlay figures are reported separately and labelled; the reference-overlay measurements are a different experiment and are kept apart from the custom core. The same-chip ARM comparison was measured on the board on 2026-10-08: 19.5× at 6.199 µs per sample for the ARM against 0.317 µs for the core (raw run in `data/results/compare_cpu_fpga_run_20261008.txt`; that run used the 31-cycle `v19` bit, before the per-band gain — the delivered bit schedules at 35 cycles and has not been re-measured against the ARM, see section 4). Section 7 states the novelty claim and the prior work it is measured against, including the one difference that runs against the project.
+**Status as of 2026-10-15:** the Python reference path and the custom HLS core are present. The core is integrated into a board overlay together with the PYNQ audio codec (`board/overlay/fir.bit`), has processed real captured audio on the board, and now runs a real-time microphone → core → headphone duplex path (section 5.4); a 40 s live run on 2026-10-15 held 1.00× with a bit-exact self-check and was audible in the headphones (raw run in `data/results/fir_live_run_20261015.txt`). That run used the default flat per-band gains, so it demonstrates the path rather than per-band tuning; the per-band tuning itself was then demonstrated in a second 2026-10-15 run that changed the gains live while audio was flowing, with the operator confirming the change by ear (section 5.4). Out-of-context and integrated-in-overlay figures are reported separately and labelled; the reference-overlay measurements are a different experiment and are kept apart from the custom core. The same-chip ARM comparison was re-measured on the board on 2026-10-23 against the delivered 36-cycle core: 16.7× at 6.117 µs per sample for the ARM against 0.367 µs for the core (raw run in `data/results/compare_cpu_fpga_run_20261023.txt`). The earlier 12.5× figure belongs to the 49-cycle `v21_wdrc` bit and the 19.5× figure to the 31-cycle `v19` bit used for the three-way comparison in section 4.1. Section 7 states the novelty claim and the prior work it is measured against, including the one difference that runs against the project.
 
 ## 1. Project goal
 
@@ -45,7 +45,7 @@ The diagram separates the project's custom HLS core from the open-source referen
 
 The current local run used Python 3.9.12, NumPy 2.0.2, SciPy 1.13.1, Matplotlib 3.9.4, and SoundFile 0.13.1. The latest best-of-five processing run took 89.5 ms for 10.58 s of audio, or 0.176 µs per sample and 118.3× host real time. The host CPU model was unavailable, so this is a local reference measurement, not a portable benchmark, and it must not be divided by the board-side figures — a 3 GHz desktop x86 and a 100 MHz FPGA differ by orders of magnitude by construction.
 
-The comparison that carries the speedup claim is measured on the board itself, on the same chip, with the same algorithm on both sides: the Zynq ARM in software against the PL core. The latest run (2026-10-08, raw output in `data/results/compare_cpu_fpga_run_20261008.txt`) gives 6.199 µs per sample for the ARM (float64 + `scipy.signal.lfilter`, 3.36× real time) against 0.317 µs per sample for the core (Q1.15 fixed point, AXI4-Master, 65.69× real time) — a ratio of 19.5×. `data/results/accel_cpu_vs_fpga.md` records the conditions and caveats that must travel with any such number: CPU float64 versus core Q1.15, and scipy's optimized C implementation (but no hand-written NEON comparison). Both sides compute the same number of effective multiplications (579 per sample); the earlier claim that the core halved its multiplication count via filter symmetry was wrong (`FIR_FOLD` is off). The PL time includes software register/cache handling — about 52 µs per 8000-sample block, some 2% of the measured per-sample time at this block size, and proportionally more for shorter blocks.
+The comparison that carries the speedup claim is measured on the board itself, on the same chip, with the same algorithm on both sides: the Zynq ARM in software against the PL core. The latest run (2026-10-23, raw output in `data/results/compare_cpu_fpga_run_20261023.txt`) gives 6.117 µs per sample for the ARM (float64 + `scipy.signal.lfilter`, 3.41× real time) against 0.367 µs per sample for the delivered core (Q1.15 fixed point, AXI4-Master, 56.77× real time) — a ratio of 16.7×. The same measurement on the 49-cycle `v21_wdrc` bit gave 0.497 µs and 12.5×, and on the earlier 31-cycle `v19` bit 0.317 µs and 19.5×; the differences track the cycle count and the arithmetic the newer cores perform, not a change in methodology. `data/results/accel_cpu_vs_fpga.md` records the conditions and caveats that must travel with any such number: CPU float64 versus core Q1.15, and scipy's optimized C implementation (but no hand-written NEON comparison). Both sides compute the same number of effective multiplications (579 per sample); the earlier claim that the core halved its multiplication count via filter symmetry was wrong (`FIR_FOLD` is off). The PL time includes software register/cache handling — about 56 µs per 8000-sample block, under 10% of the measured per-sample time at this block size, and proportionally more for shorter blocks.
 
 The current run reported a maximum coefficient-sum reconstruction error of `3.469e-18` before DRC. Its output artifacts are `data/audio/multiband_output.wav` and `data/figures/multiband_comparison.png`. The independent 1,000-sample test vector used by the HLS testbench is in `data/audio/test_input.txt`; the corresponding Python golden output is `data/results/python_golden.txt`.
 
@@ -69,7 +69,7 @@ The integrated slack fell from +1.283 ns (v19 overlay) to +0.251 ns with the env
 
 A note on the cycle count, because four values appear in the records and they belong to four different builds. The 2026-10-07 out-of-context run records 28 cycles/sample; re-running that same flow, and back-solving from the 2026-10-08 board measurement, both give 31. That 31 belongs to the bitstream measured on 2026-10-08, which did **not** yet contain the per-band gain. Adding `band_gain` on 2026-10-09 costs four more cycles — one multiply per band — and that build (`v20_gain`) schedules at **35 cycles/sample** (`build/hls/reports/v20_gain/`). Adding the peak envelope and attack/release smoothing on 2026-10-19 (`v21_wdrc`) costs another 14 cycles, so the delivered `board/overlay/fir.bit` is **49 cycles/sample**. The resource columns above are the v21 record; earlier builds had lower area and larger slack and are listed in `data/results/impl_metrics.md`. Quote **49** for the delivered core; 35 describes the 2026-10-09 to 2026-10-19 bit; 31 describes the bit that the ARM comparison in section 3 was measured on; 28 belongs only to the intermediate t-series experiments.
 
-At 100 MHz, the 31 cycles behind the 2026-10-08 measurement correspond to a theoretical 0.310 µs per sample against the 20.83 µs sample period at 48 kHz, and the board measurement of that same bitstream is 0.317 µs per sample over 8000-sample blocks (65.69× real time). The 0.007 µs per sample gap is the per-block software overhead — register writes, cache maintenance and DONE polling — some 52–56 µs per 8000-sample block, about 2% of the measured time at this block size. The delivered 49-cycle bitstream works out to a theoretical 0.490 µs per sample, a 42.5× real-time margin, and it has **not** been re-measured against the ARM: the 19.5× ratio in section 3 describes the 31-cycle bit, and scaling by cycle count puts the delivered bit near 12–13×, which is a projection rather than a measurement. Both figures sit far above the 30% improvement the rubric asks for. (An earlier version of this paragraph paired a 0.037 µs figure, computed against the superseded 28-cycle count, with a 52 µs figure computed against 31; the two did not belong together. See the 2026-10-15 note in `data/results/accel_cpu_vs_fpga.md`.)
+At 100 MHz, the 31 cycles behind the 2026-10-08 measurement correspond to a theoretical 0.310 µs per sample against the 20.83 µs sample period at 48 kHz, and the board measurement of that same bitstream is 0.317 µs per sample over 8000-sample blocks (65.69× real time). The 0.007 µs per sample gap is the per-block software overhead — register writes, cache maintenance and DONE polling — some 52–56 µs per 8000-sample block, about 2% of the measured time at this block size. The 49-cycle `v21_wdrc` bitstream was measured on 2026-10-22 at 0.497 µs per sample, and the delivered 36-cycle `v25_env_indep` bitstream on 2026-10-23 at 0.367 µs per sample — a 56.8× real-time margin and a 16.7× ratio against the ARM, so the projection that used to stand here (12–13× by cycle count) is no longer needed. The 19.5× ratio in section 3 describes the 31-cycle bit. Both figures sit far above the 30% improvement the rubric asks for. (An earlier version of this paragraph paired a 0.037 µs figure, computed against the superseded 28-cycle count, with a 52 µs figure computed against 31; the two did not belong together. See the 2026-10-15 note in `data/results/accel_cpu_vs_fpga.md`.)
 
 The core's cost was dominated by data movement, not arithmetic: the synthesis loop table attributed 398 of the original 450 cycles to shifting the 193-entry delay line, with the three low-pass filters together taking 11 cycles. That movement is now removed by the compile-time switch `-DFIR_SHIFT_CHAIN=1`, which cuts the schedule from 450 to 31 cycles per sample in v19 — 49 in the delivered v21, after the per-band gain and the envelope were added — without changing the algorithm; the switch defaults off and the default build path is byte-for-byte unchanged. The change is implemented and verified on the board, not left as future work.
 
@@ -97,7 +97,7 @@ The HLS column is `v19_shift_chain` because it is the only HLS build with the sa
 
 Both hardware columns are post-place-and-route, out of context, on the same device with the same 10 ns constraint. Against HLS, the RTL uses 889 more LUTs (+24%) and has 1.247 ns less slack, but 2,409 fewer flip-flops (−43%), 11 fewer DSPs and no BRAM. The cycle advantage comes from keeping all 195 multipliers busy every cycle with three coefficient phases per sample, where the HLS schedule feeds the same multipliers five partial sums at a time.
 
-Only the ARM and the HLS core were measured on hardware. The RTL column is simulation plus out-of-context place-and-route: it has no AXI shell and has never run on the board, so its 0.030 µs excludes the PS-side cost that the HLS board measurement includes (register writes, cache maintenance and DONE polling, about 52–56 µs per 8,000-sample block, some 2% at that block size). The ≈207× ratio is therefore a projection, not a same-chip measurement; **the measured same-chip figure is 19.5×**.
+Only the ARM and the HLS core were measured on hardware. The RTL column is simulation plus out-of-context place-and-route: it has no AXI shell and has never run on the board, so its 0.030 µs excludes the PS-side cost that the HLS board measurement includes (register writes, cache maintenance and DONE polling, about 52–60 µs per 8,000-sample block, under 10% at that block size). The ≈207× ratio is therefore a projection, not a same-chip measurement; the measured same-chip figures are 19.5× for the 31-cycle front end in this table and **12.5× for the delivered 49-cycle core**.
 
 The two fixed-point implementations agree with their references numerically: the RTL front end is bit-identical to the integer reference model on all nine observed signals — three accumulator taps, four bands, the band sum and the final int16 output, 1,000/1,000 samples each — and the HLS core's C simulation matches the Python golden reference of the full algorithm at 75.4 dB SNR with the best lag at zero (section 6). The ARM and the hardware are not bit-comparable because of precision (float64 against Q1.15); their agreement was checked at output RMS and peak (0.10659 against 0.10706, and 0.28627 against 0.28625).
 
@@ -195,6 +195,77 @@ The same-board speedup comparison, re-measured on 2026-10-08, is discussed there
 
 *Scope of this result.* All four band gains were at 0.0 dB in that 40 s run (the `LIVE_GAIN_DB` default), so by itself it demonstrates that the real-time path carries audio end to end. The audible effect of the four-band controls was measured separately, in the same session, with a 66 s run that rewrote the per-band gains six times while audio was flowing: one band alternated between 0.0 dB and −41.9 dB (the Q7.8 floor, `GAIN_LIMIT_DB` in `fir_live.py`) at 12 s intervals, an earlier symmetric +6/0/0/−6 setting having proved inaudible. The board reported all six changes applied, the per-block self-check still passed 960,000/960,000 with eight gain changes inside the run, the rate held at 1.00×, and the operator reported hearing several distinct changes. As an in-run comparison there is no dependence on memory or on reloading the overlay between trials. Raw output in `data/results/fir_gain_ab_run_20261015.txt`; reproduce with `board/scripts/gain_ab_live.sh`. Finally, the 40 s run overran its 40.00 s of audio by 0.19 s, i.e. about 18 dropped blocks, heard as intermittent stutter: the sample-mover thread occupies 99% of its 10 ms per-block budget (median 9.88 ms, max 15.5 ms). That is a structural limit of the current audio IP, which has no DMA and is driven by spin-polling from the CPU — not a parameter that can be tuned away.
 
+### 5.5 End-to-end latency (measured 2026-10-22)
+
+Two measurements, one for each half of the path. Full data and method are in
+`data/results/performance_profile_20261022.md`.
+
+**Digital half.** Instead of a click stimulus, `fir_live.py` timestamps every block at
+the two ends of `duplex_block()`: the instant the block's samples were captured, and the
+instant the same block was handed to the codec. Both timestamps are taken at the start of
+the same call, so the in-block offset cancels and the difference is the digital latency of
+the pipeline. Median over four configurations:
+
+| Config | Median digital latency |
+| --- | --- |
+| NBUF=3, L=480 (stable) | 29.80 ms |
+| NBUF=2, L=480 | 19.86 ms |
+| NBUF=2, L=360 (low-latency) | 14.96 ms |
+| NBUF=2, L=240 | 9.99 ms |
+| NBUF=2, L=120 | 5.78 ms |
+
+The last two do not hold real time (0.83× and 0.42× over 25–30 s; 1,053 and 5,843 dropped
+blocks), so they are measurements of what the buffering would cost, not usable
+configurations. The 29.80 ms figure is what `NBUF × L / 48000` predicts (30 ms), i.e. the
+latency is buffering, not compute: the core consumes 2.35% of the block period.
+
+*Repeatability of the 19.86 ms figure.* The NBUF=2 configuration was re-run for 120 s with
+the same instrumentation: 12,071 blocks, 120.71 s of audio in 120.24 s of wall clock
+(1.00×), median 19.89 ms, p99 20.56 ms, maximum 28.92 ms, 8 blocks (0.07%) above 25 ms,
+per-block self-check 960,000/960,000. The distribution matches the 20 s run, so the figure
+is not one lucky capture. Those eight outliers are blocks where the sample-mover thread
+overran its 10 ms budget (12.62 ms maximum in the same run); they delay a block rather than
+dropping it. No 600 s run exists for this configuration; its stability evidence is 120 s.
+
+*Where the block-length floor actually is.* A sweep over seven block lengths (25–30 s each)
+moved the usable floor from 10 ms to 7.5 ms: L=360 holds 1.00× over 120 s with median
+14.96 ms, p99 15.30 ms and no block above 25 ms, whereas L=300 (6.25 ms) already loses 1.6%
+of its blocks and L=264 (5.5 ms) loses 8%. Instrumenting the four instants inside the
+sample-mover loop rules out the software side: waiting for a processed buffer takes 23 µs,
+queueing 19 µs, the DSP thread uses 18–25% of the block period, and raising the sample
+mover's `SCHED_FIFO` priority above that of every kernel thread (20 → 60, with eight
+`FIFO 50` kernel workers on the same core) changed nothing (5.92 vs 5.93 ms). The failing
+part is the per-sample I2S handshake inside `duplex_block`, which cannot sustain the 48 kHz
+cadence once the block falls below about 6 ms. Lower latency therefore needs a change to
+the audio IP — a deeper FIFO or DMA — not to the Python side.
+
+**Acoustic half.** `board/scripts/acoustic_lat.py` holds the earpiece against the on-board
+microphone, plays a 500–6000 Hz linear sweep six times per amplitude setting, averages the
+six captures synchronously (coherent echo adds, random room noise falls as √6) and
+cross-correlates the average against the sweep template. All three amplitude settings
+return the peak at the same sample: **R = 1.23 ms**, which is the DAC reconstruction,
+headphone, air, microphone and ADC anti-alias path combined. The 1.23 ms figure was checked
+against the sweep's own autocorrelation sidelobes (±0.29 ms, 32%); there is no independent
+peak earlier than 1 ms (0.15 ms holds 2% of the main peak), so it is not electrical
+crosstalk.
+
+| Configuration | Digital | + analog/air | Mouth to ear |
+| --- | --- | --- | --- |
+| L=480, NBUF=3 (stable) | 29.80 ms | 1.23 ms | **31.0 ms** |
+| L=480, NBUF=2 | 19.86 ms | 1.23 ms | **21.1 ms** |
+| L=360, NBUF=2 (low-latency) | 14.96 ms | 1.23 ms | **16.2 ms** |
+Scope: the low-latency configuration reaches 16.2 ms and the stable configuration 31.0 ms.
+Both are well below Bluetooth audio (100–200 ms) but above the ≤10 ms target for hearing
+aids, and the report should say so rather than claim hearing-aid-grade latency. The
+remaining gap to 10 ms is the per-sample I2S handshake, which limits the block to about
+6 ms; closing it requires a deeper FIFO or DMA in the audio IP, not a software change.
+
+Two measurement errors were found and fixed while taking these numbers, both recorded
+because they would mislead anyone repeating the work: the two new scripts initially called
+`configure()` without `select_microphone()`, so the ADC sampled the unconnected line input
+and read a constant 0.7 LSB; and the first run, made while the web UI service was also
+running, left the board unresponsive and required a power cycle.
+
 ## 6. Validation status
 
 | Check | Status at this snapshot |
@@ -271,7 +342,7 @@ Neither migration is implemented. Both are argued from the same mechanism; the a
 
 ### 7.4 What this is worth on the rubric
 
-The rubric splits novelty into three tiers: original work; a significant measured improvement in a key metric (≥30%, with measurements); or routine optimisation. This project does not claim the first tier. It sits in the second: the same-chip ARM-versus-PL speedup was re-measured on the board on 2026-10-08 at **19.5×** — 6.199 µs per sample for the ARM against 0.317 µs for the core (section 3). That measurement is on the 31-cycle bit, before the per-band gain was added; the delivered 35-cycle bit is projected near 17×, and both numbers are far past 30%. The measurement is on the target chip rather than projected. The empty cell in the table above supports that claim; it is not the claim itself.
+The rubric splits novelty into three tiers: original work; a significant measured improvement in a key metric (≥30%, with measurements); or routine optimisation. This project does not claim the first tier. It sits in the second: the same-chip ARM-versus-PL speedup was re-measured on the board on 2026-10-23 at **16.7×** against the delivered 36-cycle core — 6.117 µs per sample for the ARM against 0.367 µs for the core (section 3). The earlier 49-cycle bit measured 12.5× and the 31-cycle bit 19.5×. Both numbers are far past 30%. The measurement is on the target chip rather than projected. The empty cell in the table above supports that claim; it is not the claim itself.
 
 ## 8. Reproduction
 
@@ -290,7 +361,18 @@ The HLS C-simulation flow is documented in `build/hls/run_csim.tcl` and the READ
 
 ## 9. Remaining work before submission
 
-1. The target environment is settled: PYNQ 2.7 with Vivado/Vitis HLS 2020.2 is the project's declared toolchain, and it is what all board evidence in this repository was produced with.
+1. **Toolchain version, and why it is not the recommended one.** The competition guide
+   recommends Vivado/Vitis 2026.1 or 2025.2 and permits other versions provided the report
+   states the reason and the scripts remain reproducible. This project uses **PYNQ image
+   2.7.0 with Vivado and Vitis HLS 2020.2**, and every board measurement and synthesis
+   record in the repository was produced with that pair. The reason is that the PYNQ 2.7.0
+   image, its overlay-loading flow and the board's `audio_codec_ctrl` IP all belong to that
+   tool generation; moving to 2025.2 would require a PYNQ image that has not been validated
+   on this board, plus a regeneration of the audio IP and a re-verification of timing,
+   bitstream and the 600 s real-time run. Reproducibility does not depend on where the
+   tools are installed: `rebuild.sh` takes `VIVADO_BIN` and `VITIS_HLS_BIN`, and the only
+   version-specific configuration is `HLS_CFLAGS` together with
+   `build/hls/directives/`. See `BUILD_GUIDE.md`.
 2. The 193-tap C simulation was rebuilt from source on 2026-09-30 with the documented toolchain and compared against the regenerated Python golden data; the record is in section 6 and the raw outputs are in `data/results/`.
 3. ~~Produce the same-input Python/HLS/RTL comparison.~~ **Done in section 4.1.** The scope is the front end only; the RTL has no DRC, per-band gain or AXI shell, and has not run on the board.
 4. Choose the final compressor parameter set. The measurements bound the choice — set 1 narrows the frame-level dynamic range by 1.9 dB, set 6 by 6.5 dB — but which one ships is a design preference (a heavier setting makes the effect visible at the cost of a larger change to the timbre), not something the measurements decide. The same setting must be written back into the board script and used for the video and the poster.
