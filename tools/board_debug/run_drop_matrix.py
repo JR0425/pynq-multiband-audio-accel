@@ -269,6 +269,8 @@ DEFAULT_ARMS = [
      "page": 1, "queue": "simple"},
     {"tag": "page_nopin_3_480_qold", "nbuf": 3, "l": 480, "pin": 0,
      "page": 1, "queue": "queue"},
+    # 低延迟档（10-22 七档扫描的实测下限，120 秒跑满 1.00×）。演示的备选配置。
+    {"tag": "page_nopin_2_360", "nbuf": 2, "l": 360, "pin": 0, "page": 1},
 ]
 
 
