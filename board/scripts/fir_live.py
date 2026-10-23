@@ -147,6 +147,10 @@
     LIVE_L=480        每块采样数（默认 480 = 10 ms）
     LIVE_NBUF=3       槽位数 = **端到端延迟有几个块**（默认 3）
     LIVE_SECONDS=20   跑多少秒（默认 20；给 0 表示一直跑到 Ctrl-C）
+    LIVE_REC=前缀     把这一趟**真跑过的**进核/出核各写一个 wav（前缀_in.wav、
+                      前缀_out.wav，48 kHz 单声道 16 位）。数据就是逐位自检留的
+                      那一对，不另采集，对实时通路零影响。默认关。
+                      想录更长配 LIVE_CAP_SEC（默认 20 秒）。
     LIVE_BYPASS=1     直通（不压缩）—— 想做 A/B 对照时用
     LIVE_GAIN_DB="0,0,0,0"  **开机那一刻**四段增益，低→高，单位 dB，逗号分隔。
                       例：-6,0,6,12 = 低频压 6 dB、1~2 kHz 不动、高频抬 12 dB。
@@ -279,7 +283,9 @@ POLL_SEC = float(os.environ.get("LIVE_POLL", "0.05"))        # 多久看一次�
 STATUS_SEC = float(os.environ.get("LIVE_STATUS", "0.1"))     # 多久写一次状态
 RAMP_BLOCKS = max(1, int(os.environ.get("LIVE_RAMP", "4")))  # 新增益几块走到位
 
-CAPTURE_MAX = int(FS * 20)      # 自检最多留 20 秒的样本，别把内存吃光
+CAPTURE_MAX = int(FS * float(os.environ.get("LIVE_CAP_SEC", "20")))
+#                       自检最多留多少秒的样本，别把内存吃光。
+#                       LIVE_REC 要录更长的话把它一起调大（60 秒约 5.8 MB）。
 
 # 丢块探针用：每块记一行 (墙钟, perf_counter 起点, 耗时, 槽位)，跑完写到
 # DROP_TRACE 指定的文件。默认关；开着时也只多一次 time.time() 和一次 list
@@ -549,6 +555,12 @@ def publish_status(now, running=True, ok=None):
         "out_rms": _win_rms(out_rms),
         "rt": (audio_sec / wall) if wall > 0 else 0.0,
         "lost_blocks": lost,
+        # 当前跑的是哪一档。演示要分辨"16.2 ms 那档"和"回退的稳定档"，
+        # 不看这两行就只能靠猜。lat_ms 是块缓冲那一部分（≈ 实测数字延迟，
+        # 不含声学段的 1.23 ms）。
+        "l": L,
+        "nbuf": NBUF,
+        "lat_ms": round(NBUF * L / FS * 1000.0, 2),
         "io_ms": _median_ms(t_io),
         "dsp_ms": _median_ms(t_dsp_wall),
         "error": errors[0][1] if errors else None,
@@ -1235,6 +1247,31 @@ if len(cap_in) >= 3:
                  first_bad // L, first_bad % L))
 else:
     print("   跑的块数太少（%d），跳过自检。" % len(cap_in))
+
+# 录这一趟的「进核 / 出核」两个 wav。演示用：台上放"处理前 / 处理后"。
+# 数据直接取 cap_in / cap_out —— 它们本来就是逐位自检用的那一对，不另开采集，
+# 所以打开录音对实时通路零影响（写文件是在主循环停了之后才做的）。
+REC = os.environ.get("LIVE_REC", "")
+if REC:
+    if not cap_in:
+        print("   [rec] LIVE_REC 设了，但一块都没跑完，不写 wav")
+    else:
+        try:
+            for suffix, arr in (("_in", np.concatenate(cap_in)),
+                                ("_out", np.concatenate(cap_out))):
+                path = REC + suffix + ".wav"
+                with wave.open(path, "wb") as f:
+                    f.setnchannels(1)
+                    f.setsampwidth(2)
+                    f.setframerate(int(round(FS)))
+                    f.writeframes(
+                        np.ascontiguousarray(arr, dtype="<i2").tobytes())
+                print("   [rec] %s  %.2f 秒  rms=%.0f"
+                      % (path, arr.size / FS, rms(arr.astype(np.float64))))
+            print("   处理前 = _in，处理后 = _out。两个是同一趟、同一块对齐的，"
+                  "直接对着放就能听出差别。")
+        except Exception as e:                           # noqa: BLE001
+            print("   [rec] 写 wav 失败：%r" % (e,))
 
 # 收尾：状态文件里记一笔"跑完了"+自检结论。界面靠 running=False 判断收工，
 # 不是靠"数字不动了"—— 停了和卡住在这条上长得一模一样。

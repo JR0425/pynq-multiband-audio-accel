@@ -42,6 +42,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+from urllib.parse import parse_qs, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -58,9 +59,21 @@ SCOPE_PATH = os.environ.get("FIR_SCOPE", "/dev/shm/fir_scope.bin")
 SCOPE_N    = int(os.environ.get("LIVE_SCOPE_N", "960"))
 SCOPE_MAGIC = 0x504F4353                # b"SCOP" 小端，和 fir_live.py 一致
 LIVE_LOG   = "/dev/shm/fir_webui_live.log"
+
+# 页面上"录音"按钮写的那两个 wav。/tmp 是 tmpfs，断电就没了，正好。
+REC_DIR   = "/tmp"
+REC_PREFIX = os.path.join(REC_DIR, "take")
+REC_NAMES = ("take_in.wav", "take_out.wav")
+REC_MAX_SEC = 120                       # 两个数组各 48000×120×2B ≈ 11.5 MB
 LAST_PATH  = "/dev/shm/fir_webui_last.json"
 FS         = 48000.0
 GD         = 96                          # 核的群延迟，画图时先补掉
+
+# 演示默认档位：L=360、NBUF=2 → 嘴到耳 16.2 ms（2026-10-23 的 600 秒长跑
+# 0 丢块、自检通过）。要退回稳定档（31.0 ms）就设 DEMO_L=480 DEMO_NBUF=3
+# 再重启服务，不用改代码。
+DEMO_L    = int(os.environ.get("DEMO_L", "360"))
+DEMO_NBUF = int(os.environ.get("DEMO_NBUF", "2"))
 
 LOCK    = threading.Lock()
 PROC    = {"p": None, "log": None, "stopping": False, "starting": False,
@@ -278,6 +291,19 @@ def _four(v, lo, hi, dflt):
     return [round(_clampf(x, lo, hi, dflt), 2) for x in v]
 
 
+def _opt_int(v, lo, hi):
+    """可选的整数参数：不给就返回 None（表示"用默认档位"）。"""
+    if v is None or v == "":
+        return None
+    try:
+        x = int(v)
+    except (TypeError, ValueError):
+        raise ValueError("参数要是整数：%r" % (v,))
+    if not lo <= x <= hi:
+        raise ValueError("参数 %d 超出范围 %d~%d" % (x, lo, hi))
+    return x
+
+
 def _apply_tune(d):
     """只截断，不替用户改语义 —— 页面和 notebook 写的是同一套字段。
 
@@ -368,7 +394,7 @@ def _hang_fix_state():
     return True, " / ".join(notes)
 
 
-def _start(src):
+def _start(src, l=None, nbuf=None, rec=None, cap_sec=None):
     with LOCK:
         p = PROC["p"]
         if p is not None and p.poll() is None:
@@ -405,10 +431,17 @@ def _start(src):
         except (TypeError, ValueError):
             gtxt = "0,0,0,0"
 
+        l_used = DEMO_L if l is None else l
+        nbuf_used = DEMO_NBUF if nbuf is None else nbuf
         env = dict(os.environ)
         env.update({"XILINX_XRT": "/usr", "PYTHONUNBUFFERED": "1",
                     "LIVE_SRC": src, "LIVE_SECONDS": "0",
-                    "LIVE_GAIN_DB": gtxt, "LIVE_SCOPE": "1"})
+                    "LIVE_GAIN_DB": gtxt, "LIVE_SCOPE": "1",
+                    "LIVE_L": str(l_used),
+                    "LIVE_NBUF": str(nbuf_used)})
+        if rec:
+            env["LIVE_REC"] = rec
+            env["LIVE_CAP_SEC"] = str(cap_sec or 20)
         try:
             lg = open(LIVE_LOG, "wb")
         except OSError as e:
@@ -447,7 +480,8 @@ def _start(src):
         time.sleep(2.0)
         if p.poll() is not None:
             return False, "它起跑就退了（退出码 %s）" % p.returncode, _log_tail(1600)
-        return True, "起来了，pid %d，音源 %s" % (p.pid, src), ""
+        return (True, "起来了，pid %d，音源 %s，缓冲 %.1f ms（L=%d × %d）"
+                % (p.pid, src, nbuf_used * l_used / 48.0, l_used, nbuf_used), "")
     finally:
         with LOCK:
             PROC["starting"] = False
@@ -644,6 +678,26 @@ class Handler(BaseHTTPRequestHandler):
         self._send(code, json.dumps(obj, ensure_ascii=False),
                    "application/json; charset=utf-8")
 
+    def _rec_file(self):
+        """把这一趟录的两个 wav 发回去。
+
+        名字只认死名单 —— 这个服务没有鉴权，让 query 直接拼路径就等于
+        把板上任意文件读出来了。
+        """
+        q = parse_qs(urlparse(self.path).query or "")
+        name = (q.get("name") or [""])[0]
+        if name not in REC_NAMES:
+            self._send(404, "not found", "text/plain; charset=utf-8")
+            return
+        try:
+            with open(os.path.join(REC_DIR, name), "rb") as f:
+                body = f.read()
+        except OSError:
+            self._send(404, "还没有这个文件（这一趟开录音了吗）",
+                       "text/plain; charset=utf-8")
+            return
+        self._send(200, body, "audio/wav")
+
     def do_GET(self):
         p = self.path.split("?")[0]
         if p in ("/", "/index.html"):
@@ -654,6 +708,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, "tune": read_tune()})
         elif p == "/api/scope":
             self._json(_scope_payload())
+        elif p == "/api/rec":
+            self._rec_file()
         else:
             self._send(404, "not found", "text/plain; charset=utf-8")
 
@@ -683,7 +739,22 @@ class Handler(BaseHTTPRequestHandler):
             src = str(d.get("src") or "mic")
             if src not in ("mic", "wav"):
                 src = "mic"
-            ok, msg, tail = _start(src)
+            try:
+                l = _opt_int(d.get("l"), 120, 1920)
+                nbuf = _opt_int(d.get("nbuf"), 2, 4)
+                cap_sec = _opt_int(d.get("cap_sec"), 1, 300)
+            except ValueError as exc:
+                self._json({"ok": False, "msg": str(exc)}, 400)
+                return
+            rec = d.get("rec")
+            if rec is not None:
+                rec = str(rec)
+                # 这个服务没有鉴权，别让它变成"往任意路径写文件"。
+                if not (rec.startswith("/dev/shm/") or rec.startswith("/tmp/")):
+                    self._json({"ok": False,
+                                "msg": "rec 只能放在 /dev/shm/ 或 /tmp/ 下"}, 400)
+                    return
+            ok, msg, tail = _start(src, l, nbuf, rec, cap_sec)
             self._json({"ok": ok, "msg": msg, "log": tail})
         elif p == "/api/stop":
             ok, msg = _stop_async()
@@ -892,6 +963,11 @@ details[open] summary::before{content:"▾ "}
     <select id="src" title="音源">
       <option value="mic">麦克风</option>
       <option value="wav">放 wav</option>
+    </select>
+    <select id="lat" title="缓冲档位（嘴到耳，含耳机段的 1.2 ms）">
+      <option value="360,2">低延迟 16 ms</option>
+      <option value="480,3">稳定 31 ms</option>
+      <option value="1920,4">反例 160 ms</option>
     </select>
     <button id="btnStart" class="primary">启动实时</button>
     <button id="btnStop" class="warn">停止</button>
@@ -1137,9 +1213,10 @@ $("btnStart").addEventListener("click", async () => {
   setPill("启动中…", "warn");
   note("检查死机防护、起实时那条…（约 2 秒）");
   try {
+    const [l, nbuf] = $("lat").value.split(",").map(Number);
     const r = await fetch("/api/start", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ src: $("src").value }),
+      body: JSON.stringify({ src: $("src").value, l, nbuf }),
     });
     const d = await r.json();
     note(d.msg, !d.ok);
