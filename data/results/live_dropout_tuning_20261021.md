@@ -2,7 +2,7 @@
 
 对象：PYNQ-Z2 上 `fir_live.py` 的实时麦克风通路（4 段分频 + 每段 WDRC）。
 配置：`fir_webui.py` 开着、页面用 headless Chrome 真实打开（150 ms 拉状态、
-250 ms 拉波形）、`LIVE_SCOPE=1`，和演示时一致。命令：
+250 ms 拉波形）、`LIVE_SCOPE=1`，和开网页工作时一致。命令：
 
     python tools/board_debug/run_drop_matrix.py --seconds 60 --arms <臂名>
 
@@ -115,10 +115,10 @@ kworker/[01]:* 调 `sched_setscheduler`。只读内存，不 fork、不写日志
 验证：
 
 - 空闲 45 秒，journal 里除 ssh 会话以外的行数 = 0（旧版每 30 秒 4 行）；
-- 60 秒演示配置（L=480、NBUF=3、SimpleQueue、网页开着）：6017 个块间空档，
+- 60 秒稳定档（L=480、NBUF=3、SimpleQueue、网页开着）：6017 个块间空档，
   中位 0.083 ms、最大 0.363 ms，没有一个超过 0.5 ms；丢块 0，自检通过。
 
-## 第四轮：600 秒演示配置复测
+## 第四轮：600 秒稳定档复测
 
 同样的配置跑 600 秒（网页开着、服务开着）：
 
@@ -138,7 +138,7 @@ kworker/[01]:* 调 `sched_setscheduler`。只读内存，不 fork、不写日志
 剩下的 0.5~3.9 ms 空档 17 次，间隔 12~63 秒、没有 30 秒周期（最大那几个
 出现在 401 / 451 / 508 / 571 秒，越往后越大）。没有造成丢块，暂时不追。
 
-## 结论 / 演示配置
+## 结论 / 稳定档配置
 
 - 搬样线程每块只做一次 C 调用，别的都在 dsp 线程上；
 - io→dsp、dsp→io 两条队列用 `queue.SimpleQueue`；
@@ -147,4 +147,4 @@ kworker/[01]:* 调 `sched_setscheduler`。只读内存，不 fork、不写日志
 - 板上要装 `install_ksoftirqd_rt.sh`：开机提权 + 常驻静默重扫，不能再用
   systemd timer。
 
-600 秒复测：丢块 0，自检通过，最大空档 3.91 ms。10 月 26 日按这一套再跑一次。
+600 秒复测：丢块 0，自检通过，最大空档 3.91 ms。

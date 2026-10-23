@@ -1,0 +1,307 @@
+{
+ "bit_md5": "5aa079f29e8d66c21d1d34f1302c3695",
+ "groups": [
+  {
+   "group": "A_input_edge",
+   "rows": [
+    {
+     "case": "全零",
+     "bypass_bad": 0,
+     "out_peak": 0.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "单点脉冲 +32767",
+     "bypass_bad": 0,
+     "out_peak": 24741.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "满幅方波 ±32767 @1kHz",
+     "bypass_bad": 0,
+     "out_peak": 26869.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "0 dBFS 正弦 @1kHz",
+     "bypass_bad": 0,
+     "out_peak": 26152.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "+32767 直流",
+     "bypass_bad": 0,
+     "out_peak": 26784.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "-32768 直流",
+     "bypass_bad": 0,
+     "out_peak": 26786.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "正弦 +0.25 直流偏置",
+     "bypass_bad": 0,
+     "out_peak": 14983.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "Nyquist +20000/-20000",
+     "bypass_bad": 0,
+     "out_peak": 15233.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "1 Hz 正弦（最慢摆动）",
+     "bypass_bad": 0,
+     "out_peak": 14984.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    },
+    {
+     "case": "满幅白噪声",
+     "bypass_bad": 0,
+     "out_peak": 26823.0,
+     "sign_ok": true,
+     "blocks": 6,
+     "sec": 0.17
+    }
+   ]
+  },
+  {
+   "group": "B1_dc_sweep",
+   "rows": [
+    {
+     "in": 0,
+     "out": 0.0
+    },
+    {
+     "in": 1000,
+     "out": 999.0
+    },
+    {
+     "in": 2000,
+     "out": 1999.0
+    },
+    {
+     "in": 4000,
+     "out": 3783.0
+    },
+    {
+     "in": 8000,
+     "out": 6583.0
+    },
+    {
+     "in": 12000,
+     "out": 9383.0
+    },
+    {
+     "in": 16000,
+     "out": 12183.0
+    },
+    {
+     "in": 20000,
+     "out": 14983.0
+    },
+    {
+     "in": 24000,
+     "out": 17783.0
+    },
+    {
+     "in": 28000,
+     "out": 20583.0
+    },
+    {
+     "in": 32000,
+     "out": 23383.0
+    },
+    {
+     "in": 32767,
+     "out": 23920.0
+    }
+   ]
+  },
+  {
+   "group": "B2_gain_sweep",
+   "rows": [
+    {
+     "gain_raw": 0,
+     "out_peak": 0.0
+    },
+    {
+     "gain_raw": 128,
+     "out_peak": 8119.0
+    },
+    {
+     "gain_raw": 256,
+     "out_peak": 14318.0
+    },
+    {
+     "gain_raw": 512,
+     "out_peak": 26153.0
+    },
+    {
+     "gain_raw": 1024,
+     "out_peak": 32768.0
+    },
+    {
+     "gain_raw": 2048,
+     "out_peak": 32768.0
+    },
+    {
+     "gain_raw": 4096,
+     "out_peak": 32768.0
+    },
+    {
+     "gain_raw": 8192,
+     "out_peak": 32768.0
+    },
+    {
+     "gain_raw": 16384,
+     "out_peak": 32768.0
+    },
+    {
+     "gain_raw": 32767,
+     "out_peak": 32768.0
+    }
+   ]
+  },
+  {
+   "group": "B3_neg_gain",
+   "rows": [
+    {
+     "neg_peak": 14319.0,
+     "pos_peak": 14318.0
+    }
+   ]
+  },
+  {
+   "group": "C_chunk",
+   "rows": [
+    {
+     "chunk": 1,
+     "blocks": 4096,
+     "mismatch": 0,
+     "sec": 5.5
+    },
+    {
+     "chunk": 2,
+     "blocks": 2048,
+     "mismatch": 0,
+     "sec": 2.78
+    },
+    {
+     "chunk": 17,
+     "blocks": 241,
+     "mismatch": 0,
+     "sec": 0.38
+    },
+    {
+     "chunk": 64,
+     "blocks": 64,
+     "mismatch": 0,
+     "sec": 0.14
+    },
+    {
+     "chunk": 157,
+     "blocks": 27,
+     "mismatch": 0,
+     "sec": 0.1
+    },
+    {
+     "chunk": 1024,
+     "blocks": 4,
+     "mismatch": 0,
+     "sec": 0.06
+    },
+    {
+     "chunk": 8192,
+     "blocks": 1,
+     "mismatch": 0,
+     "sec": 0.06
+    }
+   ],
+   "oversize_rejected": true
+  },
+  {
+   "group": "D_param_edge",
+   "rows": [
+    {
+     "case": "阈0/比0 → 输出全零",
+     "passed": true,
+     "detail": "末段峰值 0.0"
+    },
+    {
+     "case": "阈32767/比32767 → 等于直通",
+     "passed": true,
+     "detail": "与直通最大差 1 个 LSB"
+    },
+    {
+     "case": "阈0/比32767 → 几乎直通",
+     "passed": true,
+     "detail": "与直通最大差 1 个 LSB"
+    },
+    {
+     "case": "a 负压缩比（无记忆路径） → 有界",
+     "passed": true,
+     "detail": "峰值 6271，非零 4606，与输入反相 39%"
+    },
+    {
+     "case": "b 负压缩比（WDRC 路径） → 有界",
+     "passed": true,
+     "detail": "峰值 16385，非零 4606"
+    },
+    {
+     "case": "负阈值(-32768) → 不崩、有界",
+     "passed": true,
+     "detail": "峰值 32768，非零 4800"
+    },
+    {
+     "case": "起停 0.001ms（最快） → ≈无记忆",
+     "passed": true,
+     "detail": "与无记忆差 0.0000 dB"
+    },
+    {
+     "case": "起停 1e9ms（最慢） → 不崩、有界",
+     "passed": true,
+     "detail": "峰值 16385，非零 4606"
+    },
+    {
+     "case": "四段参数各不相同 → 不崩",
+     "passed": true,
+     "detail": "峰值 16640，非零 4596"
+    },
+    {
+     "case": "四段增益 0/1/-1/max → 不崩",
+     "passed": true,
+     "detail": "峰值 32768，非零 4414"
+    }
+   ]
+  },
+  {
+   "group": "E_state",
+   "reset_deterministic": true,
+   "carry_differs": 168,
+   "repeat_bad": 0,
+   "repeat_sec": 11.6
+  }
+ ]
+}
