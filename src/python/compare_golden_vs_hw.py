@@ -89,7 +89,7 @@ def compare_main():
 
     print("=" * 60)
     print("一、与黄金参考比对（SNR 是验收判据）")
-    print(f"  样本数            {len(ref)}")
+    print(f"  采样数            {len(ref)}")
     print(f"  信噪比 SNR        {snr:.1f} dB   （判据 ≥ {SNR_MIN_DB:.0f} dB）")
     print(f"  相关系数          {correlation:.9f}")
     print(f"  均方误差 MSE      {mse:.3e}")

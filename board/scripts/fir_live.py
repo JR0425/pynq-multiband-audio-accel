@@ -286,7 +286,7 @@ STATUS_SEC = float(os.environ.get("LIVE_STATUS", "0.1"))     # 多久写一次�
 RAMP_BLOCKS = max(1, int(os.environ.get("LIVE_RAMP", "4")))  # 新增益几块走到位
 
 CAPTURE_MAX = int(FS * float(os.environ.get("LIVE_CAP_SEC", "20")))
-#                       自检最多留多少秒的样本，别把内存吃光。
+#                       自检最多留多少秒的采样，别把内存吃光。
 #                       LIVE_REC 要录更长的话把它一起调大（60 秒约 5.8 MB）。
 
 # 丢块探针用：每块记一行 (墙钟, perf_counter 起点, 耗时, 槽位)，跑完写到
@@ -422,7 +422,7 @@ def _pin(cpu, rt_prio=0):
 def db_to_q15(db):
     """dBFS -> Q1.15 原始整数。1.0 满量程 = 32768。
 
-    门限用这个（它和核里的阈值一样是"相对满量程的比例"，不能大于 1），
+    阈值用这个（与核里的阈值同义，是"相对满量程的比例"，不能大于 1），
     增益不用 —— 增益要能大于 1，走 fir_core.db_to_gain 的 Q7.8。
     **这两个别搞混**，混了就正好差 8 位。
     """
@@ -438,9 +438,9 @@ def poll_tune(now):
     文件里认四个键，都可有可无，缺哪个就哪个不动：
 
         gain_db   [4 个数]  每段增益（dB），低→高
-        thr_db    [4 个数]  压缩门限（dBFS）
+        thr_db    [4 个数]  压缩阈值（dBFS）
         ratio     [4 个数]  压缩比 0~1
-        attack_ms [4 个数]  起振时间（毫秒，0 = 不启用）
+        attack_ms [4 个数]  启动时间（毫秒，0 = 不启用）
         release_ms[4 个数]  释放时间（毫秒，0 = 不启用）
         bypass    0 / 1
 
@@ -475,7 +475,7 @@ def poll_tune(now):
     if isinstance(t, (list, tuple)) and len(t) == 4:
         try:
             thr_cur[0] = tuple(db_to_q15(float(x)) for x in t)
-            what.append("门限 " + "/".join("%.3f" % (db_to_q15(float(x)) / 32768.0)
+            what.append("阈值 " + "/".join("%.3f" % (db_to_q15(float(x)) / 32768.0)
                                           for x in t))
         except (TypeError, ValueError):
             pass
@@ -493,7 +493,7 @@ def poll_tune(now):
     if isinstance(a, (list, tuple)) and len(a) == 4:
         try:
             atk_ms[0] = tuple(max(0.0, min(2000.0, float(x))) for x in a)
-            what.append("起振 " + "/".join("%.1f" % float(x) for x in a) + " ms")
+            what.append("启动 " + "/".join("%.1f" % float(x) for x in a) + " ms")
         except (TypeError, ValueError):
             pass
 
@@ -677,7 +677,7 @@ def i32_to_i16_chan(buf, ch=0):
 # 这一步留着，因为直流偏置是真的：cap_probe.py 在干净通路上量到原始均值约 1.0e5
 # → 16 位域约 390（1.2% 满量程）。去掉它给核省下动态范围，也让 in_rms 真的反映声音。
 #
-# 早期把「爬满」归因于 stream_begin 那 4 次 I2C 写造成的满幅自激，10-13 的 probe10
+# 早期把「爬满」归因于 stream_begin 那 4 次 I2C 写造成的满量程自激，10-13 的 probe10
 # （一次 I2C 写都不做）和 10-14 的 probe11 都不支持它。probe11 在 after_cfg 里实测到
 # 同形态的瞬态：3900 → 0，约 1 秒衰完，所以那 2.6e6 更可能就是 codec 打开后 ADC 自己的
 # 直流建立过程；而「爬满」整件事是读法的算术假象（见 cap_probe11.py 文件头）。
@@ -691,9 +691,9 @@ def adc_to_i16(buf, ch=0):
     """麦克风那一块原始缓冲区 → 喂核的 int16，顺带去掉慢漂的直流。
 
     低 24 位是**二进制补码、没有做符号扩展**（bits[31:24] = 0），所以必须先把
-    负样本按补码还原、再 /256。2026-10-10 那版直接在 content 上减均值：
+    负值按补码还原、再 /256。2026-10-10 那版直接在 content 上减均值：
     一个跨零的近零信号，content 一半贴 0、一半贴 16777216，减掉约 8388608 之后
-    就成了 ±32767 的**满幅方波** —— 耳机里那声很响的噪声就是这么来的。
+    就成了 ±32767 的**满量程方波** —— 耳机里那声很响的噪声就是这么来的。
     probe11 实测噪声底只有 ±50 LSB（约 -58 dBFS），原来的读法报成 rms 46000。
     """
     u = buf.reshape(-1, 2)[:, ch].astype(np.int64) & 0xFFFFFF
@@ -1062,7 +1062,7 @@ if _d0 is not None:
 
 print("   每段增益 %s dB（Q7.8 原始值 %s）"
       % ("/".join("%.1f" % x for x in GAIN_DB), list(gain_dst)))
-print("   压缩门限 %.3f，压缩比 %.2f，直通=%s"
+print("   压缩阈值 %.3f，压缩比 %.2f，直通=%s"
       % (THR_Q15 / 32768.0, RATIO_Q15 / 32768.0, BYPASS))
 print("   调参：界面写 %s，状态写在 %s" % (TUNE_PATH, STATUS_PATH))
 if SECONDS > 0:
@@ -1189,10 +1189,10 @@ if in_rms:
     # （原来卡在中位 200，于是正常说话也会触发"几乎是静音"。）
     if _p90 < 100:
         print("   ⚠️ 这一趟基本没有信号进来（P90 < 100）。")
-        print("      先试**拔插耳机**：U41 那颗自动耳机开关（TS3A226AE）只在插头")
+        print("      先试**插拔耳机**：U41 那颗自动耳机开关（TS3A226AE）只在插头")
         print("      插入的上升沿检测一次并锁存，插一次可能锁在错的那一档。一边")
-        print("      说话一边拔插，直到上面那一行的 P90 跳到几百以上 —— 2026-10-15")
-        print("      实测要连续拔插到第 18 秒才跳对。")
+        print("      说话一边插拔，直到上面那一行的 P90 跳到几百以上 —— 2026-10-15")
+        print("      实测要连续插拔到第 18 秒才跳对。")
     if np.median(in_rms) > 10000:
         print("   ⚠️ 电平顶到满量程了 —— 真到这一步就是**新**问题，不是 10-13 记的")
         print("      「自激」：那个已坐实是读法的算术假象（24 位补码没做符号扩展），")

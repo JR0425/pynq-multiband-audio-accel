@@ -128,7 +128,7 @@ def run_cond(boost, dv, tx, vol, drv_off):
     return rb, chunks
 
 
-print("每格 = 20 块(0.2 秒)的 rms 中位,int16 域;满幅 32767,安静 ~200")
+print("每格 = 20 块(0.2 秒)的 rms 中位,int16 域;满量程 32767,安静 ~200")
 print("每行 15 格 = 3 秒,左到右是时间顺序")
 print("R29/R30 读回值也打出来 —— 关功放那一档要看到 02 才算真关上了")
 print()

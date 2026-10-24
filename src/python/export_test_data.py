@@ -21,4 +21,4 @@ os.makedirs("data/audio", exist_ok=True)
 
 # 导出为纯文本，每行一个浮点数
 np.savetxt("data/audio/test_input.txt", x_test)
-print(f"✅ 测试数据导出成功！共 {len(x_test)} 个样本，路径：data/audio/test_input.txt")
+print(f"✅ 测试数据导出成功！共 {len(x_test)} 个采样，路径：data/audio/test_input.txt")

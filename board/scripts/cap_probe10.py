@@ -200,7 +200,7 @@ def run_cond(kind, do_i2c):
     return ch, dumps, before_after[0], before_after[1]
 
 
-print("每个数是 20 块(0.2 秒)的 rms 中位,int16 域;满幅 32767,安静 ~200")
+print("每个数是 20 块(0.2 秒)的 rms 中位,int16 域;满量程 32767,安静 ~200")
 print("每行 15 个数 = 3 秒 —— 要看的正是它会不会往上爬")
 print("cap_none 从开始到结束一次 I2C 写都不做;cap_i2c 只多 4 次裸 i2c 写")
 print()

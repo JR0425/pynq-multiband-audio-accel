@@ -1,51 +1,51 @@
-# Submission Checklist
+# 提交检查清单
 
-Status updated 2026-10-24 from the files currently present in this repository. A checked box means repository evidence exists; it does not replace team review or a live board demonstration.
+状态更新于 2026-10-24，依据本仓库当前实际有的文件。打勾只代表仓库里存在证据，不能替代团队评审或现场演示。
 
-## Repository, licence and naming
+## 仓库、许可证与命名
 
-- [x] Top-level project directories and tracked source filenames use English names with lowercase letters, digits, underscore and hyphen only.
-- [x] README describes the current repository status and the Python and HLS reproduction steps.
-- [x] MIT license is present.
-- [x] `.gitignore` excludes common generated files.
-- [x] The three board bitstreams stay as plain tracked files. Each is 3.9 MB, well below GitHub's 100 MB per-file limit, so Git LFS would add a client dependency for no benefit.
-- [ ] A clean-machine reproduction has not yet been performed. `BUILD_GUIDE.md` is written but has only been walked through on the development machine.
+- [x] 顶层项目目录与受追踪的源文件名使用英文名，字符仅限小写字母、数字、下划线和连字符。
+- [x] README 描述了仓库当前状态以及 Python 与 HLS 的复现步骤。
+- [x] MIT 许可证在位。
+- [x] `.gitignore` 排除常见的生成文件。
+- [x] 三个板上位流作为普通受追踪文件保留。每个 3.9 MB，远低于 GitHub 单文件 100 MB 上限，用 Git LFS 只会白添一个客户端依赖。
+- [ ] 干净机器复现尚未执行。`BUILD_GUIDE.md` 已写好，但只在开发机上走过一遍。
 
-## Python, HLS and RTL
+## Python、HLS 与 RTL
 
-- [x] Current Python baseline and its plot/audio artifacts were regenerated on 2026-10-01.
-- [x] The stored 1,000-sample HLS output was compared with regenerated Python golden data; SNR and transparent-mode alignment passed, and the comparison plot was generated.
-- [x] C simulation rebuilt from source with Vitis HLS 2020.2 via `build/hls/run_csim.tcl`; the flow is now one command (`./rebuild.sh csim`) and prints `PASS` when the C simulation matches the integer reference model. The coefficient-width sweep outputs are in `data/results/fixed_dw16_cw12/16/18/20.txt`.
-- [x] Python / HLS / RTL three-way comparison at one load: section 4.1 of the design report, `data/results/rtl_vs_hls.md`.
-- [x] RTL implementation and simulation evidence: `src/rtl/fir_lp.v` and `src/rtl/fir_mb_fe.v` pass a bit-for-bit xsim comparison against the integer reference model on all nine observed signals; reproduce with `sim/rtl_sim/run_xsim.sh` and `run_xsim_mb.sh`.
+- [x] 当前 Python 基线及其绘图/音频工件已于 2026-10-01 重新生成。
+- [x] 存储的 1,000 采样 HLS 输出与重新生成的 Python 金数据比对：SNR 与透明模式对齐通过，比对图已生成。
+- [x] C 仿真已用 Vitis HLS 2020.2 从源码重建，入口 `build/hls/run_csim.tcl`；流程已收敛为一条命令（`./rebuild.sh csim`），C 仿真与整数参考模型一致时打印 `PASS`。系数位宽扫描输出在 `data/results/fixed_dw16_cw12/16/18/20.txt`。
+- [x] 同一负载下的 Python / HLS / RTL 三方比对：设计报告 §4.1、`data/results/rtl_vs_hls.md`。
+- [x] RTL 实现与仿真证据：`src/rtl/fir_lp.v` 与 `src/rtl/fir_mb_fe.v` 在全部九个观测信号上与整数参考模型逐位一致（xsim）；用 `sim/rtl_sim/run_xsim.sh` 和 `run_xsim_mb.sh` 复现。
 
-## Hardware and board evidence
+## 硬件与板上证据
 
-- [x] Custom HLS core out-of-context and integrated synthesis/implementation results are recorded in `data/results/impl_metrics.md`; the delivered build is `v25_env_indep` (36 cycles/sample, 205 of 220 DSP, integrated WNS +0.533 ns).
-- [x] Reference overlay board measurements are documented separately in `data/results/reference_overlay_metrics.md` and are not presented as this project's accelerator result.
-- [x] Custom HLS core integrated into the board overlay: `board/overlay/fir.bit`, built by `board/overlay/build_fir.tcl`; timing and utilisation in `board/overlay/fir_timing.rpt` and `fir_util.rpt`.
-- [x] The bitstream in the repository and the bitstream on the board are the same file (md5 `5aa079f29e8d66c21d1d34f1302c3695`), checked before every board measurement from 2026-10-23 onward.
-- [x] Custom-core board measurement: 144,000 samples of captured audio through the core in 18 blocks, bit-exact against the reference; bypass and block-continuity checks also passed.
-- [x] Same-chip ARM-versus-core speedup, measured three times as the core changed: 19.5× against `v19` (31 cycles, 2026-10-08), 12.5× against `v21_wdrc` (49 cycles, 2026-10-22), and **16.7× against the delivered `v25_env_indep`** (36 cycles, 2026-10-23; ARM 6.117 µs/sample, core 0.367 µs/sample). Raw runs `compare_cpu_fpga_run_20261023.txt` and its dated predecessors; the caveats that must accompany the number are in `data/results/accel_cpu_vs_fpga.md`.
-- [x] Live audio demonstration: microphone → core → headphone in real time. A 40 s run on 2026-10-15 (4,000 blocks, 40.00 s of audio in 40.19 s of wall clock, bit-exact self-check 960,000/960,000) was audible in the headphones. Two corrections are recorded because each was a false conclusion: the 2026-10-13 "full-scale self-oscillation" was a missing sign extension on the 24-bit capture word (the probe logs are kept as a record of the error and must not be cited as evidence), and the real blocker was U41, the auto-headset switch on the `HP + Mic` jack, which latches on the insertion edge — the demonstration begins with replugging until the input level meter jumps.
-- [x] Per-band gain, live and audible: a 66 s run rewrote the four band gains six times while audio was flowing, one band alternating between 0.0 dB and −41.9 dB; all writes applied, the per-block self-check stayed bit-exact, the rate held at 1.00×, and the change was heard. Raw run `data/results/fir_gain_ab_run_20261015.txt`; reproduce with `board/scripts/gain_ab_live.sh`.
-- [x] WDRC attack/release, live and audible: a 90 s run switched 0/0 → 5/100 ms → 0/0 with threshold and ratio fixed; both switches were heard. Raw run `data/results/fir_wdrc_ab_run_20261019.txt`; reproduce with `board/scripts/wdrc_ab_live.sh`.
-- [x] Latency measured both ways: digital half from in-process timestamps, acoustic half from a sweep at the earpiece (R = 1.23 ms). Three configurations: 16.2 ms (L=360, NBUF=2), 21.1 ms (L=480, NBUF=2), 31.0 ms (L=480, NBUF=3). See section 5.5 and `data/results/latency_retest_20261023.md`.
-- [x] Stability: two 600 s runs on 2026-10-23 at the demonstration configuration, both with the web UI and service running (L=480/NBUF=3: 60,192 blocks, **0 dropped**; L=360/NBUF=2: 80,103 blocks, **0 dropped**, maximum inter-block gap 3.85 ms), neither hung, self-check bit-exact on both. The 2026-10-24 recheck added a 600 s run at 16.2 ms (80,188 blocks, 0 dropped) and identified the probe instrumentation itself as the cause of the drops seen on the evening of 2026-10-23. Older 600 s runs that report dropped blocks are kept in `data/results/` as history and must not be cited as the current figure.
+- [x] 自研 HLS 核的独立综合与集成综合/实现结果记录在 `data/results/impl_metrics.md`；出货构建为 `v25_env_indep`（36 拍/采样，220 个 DSP 用掉 205 个，集成 WNS +0.533 ns）。
+- [x] 参考 overlay 的板上测量单独记录在 `data/results/reference_overlay_metrics.md`，不作为本项目的加速器结果呈现。
+- [x] 自研 HLS 核已集成进板上 overlay：`board/overlay/fir.bit`，由 `board/overlay/build_fir.tcl` 构建；时序与利用率见 `board/overlay/fir_timing.rpt` 与 `fir_util.rpt`。
+- [x] 仓库里的位流与板上的位流是同一个文件（md5 `5aa079f29e8d66c21d1d34f1302c3695`），2026-10-23 以来每次板上测量前都核对。
+- [x] 自研核板上测量：144,000 采样采集音频过核，分 18 块，与参考逐位一致；直通检验与块连续性检验也通过。
+- [x] 同片 ARM 对核加速比，随核的演进实测三次：对 `v19`（31 拍，2026-10-08）19.5×，对 `v21_wdrc`（49 拍，2026-10-22）12.5×，**对出货的 `v25_env_indep` 16.7×**（36 拍，2026-10-23；ARM 6.117 µs/采样，核 0.367 µs/采样）。原始运行记录为 `compare_cpu_fpga_run_20261023.txt` 及更早的按期文件；引用该数字必须同时带上的限定条件见 `data/results/accel_cpu_vs_fpga.md`。
+- [x] 实时音频演示：麦克风 → 核 → 耳机。2026-10-15 的 40 秒运行（4,000 块，40.00 秒音频 / 40.19 秒实际用时，逐位自检 960,000/960,000）在耳机里可闻。两处更正已记录，因为它们都曾是错误结论：2026-10-13 的"满量程自激"是 24 位采集字漏做符号扩展（探针日志作为错误记录保留，不得作为证据引用）；真正的拦路虎是 U41，即 `HP + Mic` 插座上的自动耳机开关，在插入沿锁存 —— 演示从反复插拔到输入电平表跳起来开始。
+- [x] 分段增益实时可闻：一趟 66 秒运行中实时改写四段增益六次，单段在 0.0 dB 与 −41.9 dB 之间交替；全部写入生效，逐块自检保持逐位一致，速率保持 1.00×，改动被听到。原始运行 `data/results/fir_gain_ab_run_20261015.txt`；用 `board/scripts/gain_ab_live.sh` 复现。
+- [x] WDRC 起停时间实时可闻：一趟 90 秒运行中 0/0 → 5/100 ms → 0/0 切换，阈值与压缩比固定；两次切换都被听到。原始运行 `data/results/fir_wdrc_ab_run_20261019.txt`；用 `board/scripts/wdrc_ab_live.sh` 复现。
+- [x] 延迟两种量法：数字半程取进程内时间戳，声学半程取耳机口扫频（R = 1.23 ms）。三种配置：16.2 ms（L=360，NBUF=2）、21.1 ms（L=480，NBUF=2）、31.0 ms（L=480，NBUF=3）。见设计报告 §5.5 与 `data/results/latency_retest_20261023.md`。
+- [x] 稳定性：2026-10-23 两趟 600 秒运行，均为演示配置，Web UI 与服务都在运行（L=480/NBUF=3：60,192 块，**0 丢块**；L=360/NBUF=2：80,103 块，**0 丢块**，最大块间间隔 3.85 ms），均未挂死，两趟自检均逐位一致。2026-10-24 的复查又补了一趟 16.2 ms 配置的 600 秒运行（80,188 块，0 丢块），并查明 10-23 晚间出现的丢块是探针插桩自身造成的。更早的报有丢块的 600 秒运行作为历史留在 `data/results/`，不得作为当前数字引用。
 
-## Documentation and presentation
+## 文档与展示
 
-- [x] Collaboration logs are organized under `report/llm_collab_log/`.
-- [x] Skill package contains prompts, templates, checkers, and pitfalls.
-- [x] Target toolchain fixed and recorded: PYNQ-Z2 image 2.7.0 with Vivado and Vitis HLS 2020.2, with the reason for not using 2025.2/2026.1 stated in section 9 of the design report.
-- [x] Interface specification: `report/hardware_interface_spec.md` for the register contract.
-- [ ] Final design report. It is maintained as a Word document outside this repository; this repo supplies the evidence it cites (`data/results/`, `report/hardware_interface_spec.md`, `report/llm_collab_log/`, `skill/`). Open item: §3.4 of that document still has three evidence placeholders (A/B loudness-matched comparison, health-panel screenshot, RTL comparison table).
-- [x] Poster: out of scope for this submission. It is part of the finals (复赛) package and will be rebuilt then.
-- [ ] Record and edit the final demonstration video, then add its link to the README.
+- [x] 协作日志已归类到 `report/llm_collab_log/`。
+- [x] Skill 包内含提示词、模板、检查器和踩坑记录。
+- [x] 目标工具链已固定并记录：PYNQ-Z2 镜像 2.7.0 配 Vivado 与 Vitis HLS 2020.2，不用 2025.2/2026.1 的理由见设计报告 §9。
+- [x] 接口规范：`report/hardware_interface_spec.md`（寄存器契约）。
+- [ ] 最终设计报告。它作为 Word 文档维护在本仓库之外；本仓库为它提供引用的证据（`data/results/`、`report/hardware_interface_spec.md`、`report/llm_collab_log/`、`skill/`）。未决项：该文档 §3.4 还有三处证据占位（等响度匹配的 A/B 比对、健康面板截图、RTL 比对表）。
+- [x] 海报：本次提交范围之外。它属于复赛材料，复赛时按复赛要求重建。
+- [ ] 录制并剪辑最终演示视频，然后把链接加进 README。
 
-## Final gate
+## 最终关口
 
-- [ ] All final source and build files needed for reproduction are present, and a clean-machine run of `BUILD_GUIDE.md` has been recorded.
-- [x] Board scripts are in sync with the repository: the overlay and driver scripts were re-copied and hash-checked on 2026-10-23, `mic_level.py` and `mic_live.py` use the 200 threshold, and the 2026-10-13 edit to `scripts/audio_stream.cpp` touched comments only, so `libaudio_stream.so` needs no rebuild.
-- [ ] Every performance claim in the report, poster and video cites the measurement scope it came from (31 / 36 / 49 cycles, out-of-context against integrated).
-- [ ] Submission package is checked against the official competition guide, tagged, and archived.
+- [ ] 复现所需的全部最终源文件与构建文件齐全，且 `BUILD_GUIDE.md` 的干净机器运行已留下记录。
+- [x] 板上脚本与仓库同步：overlay 与驱动脚本已于 2026-10-23 重拷并做哈希核对，`mic_level.py` 与 `mic_live.py` 使用 200 阈值，2026-10-13 对 `scripts/audio_stream.cpp` 的改动只动了注释，`libaudio_stream.so` 无需重建。
+- [ ] 报告、海报和视频中的每一项性能声明都注明其测量口径（31 / 36 / 49 拍，独立综合对集成）。
+- [ ] 提交包已对照官方竞赛指南检查、打 tag 并归档。

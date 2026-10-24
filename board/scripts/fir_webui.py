@@ -9,7 +9,7 @@
 
   1. 把 /dev/shm/fir_status.json 和 /dev/shm/fir_scope.bin 转成 JSON 给页面；
   2. 把页面的旋钮写进 /dev/shm/fir_tune.json（复用 fir_tune.write_tune）；
-  3. 起停 fir_live.py（沿用 w5_tuning_ui.ipynb 里那套死机防护前置检查）。
+  3. 开始/停止 fir_live.py（沿用 w5_tuning_ui.ipynb 里那套死机防护前置检查）。
 
 为什么页面跑在板子上，而不是 PC 上跑一个小程序
 ------------------------------------------------
@@ -357,7 +357,7 @@ _BITS = {"key": None, "info": None}
 
 
 def _bit_info():
-    """fir.bit 的 md5：认得出来就是出货那版，顺带说出每样本多少拍。"""
+    """fir.bit 的 md5：认得出来就是出货那版，顺带说出每采样多少拍。"""
     try:
         stt = os.stat(BIT_PATH)
         key = (stt.st_mtime, stt.st_size)
@@ -549,7 +549,7 @@ def _apply_tune(d):
     return True, "ok"
 
 # ---------------------------------------------------------------------------
-# 起停实时那条
+# 开始/停止实时那条
 # ---------------------------------------------------------------------------
 
 def _hang_fix_state():
@@ -1299,11 +1299,11 @@ details[open] summary::before{content:"▾ "}
 
   <section class="glass card drc">
     <details>
-      <summary>压缩门限 / 压缩比 / 起振释放（点开）</summary>
+      <summary>压缩阈值 / 压缩比 / 启动 / 释放（点开）</summary>
       <div class="drcgrid">
-        <label>门限<input id="thr" type="range" min="-60" max="0" step="0.5" value="-10"><b id="thrV">-10.0 dBFS</b></label>
+        <label>阈值<input id="thr" type="range" min="-60" max="0" step="0.5" value="-10"><b id="thrV">-10.0 dBFS</b></label>
         <label>压缩比<input id="ratio" type="range" min="1" max="10" step="0.5" value="2"><b id="ratioV">2.0 : 1</b></label>
-        <label>起振<input id="atk" type="range" min="0" max="200" step="1" value="0"><b id="atkV">0 ms</b></label>
+        <label>启动<input id="atk" type="range" min="0" max="200" step="1" value="0"><b id="atkV">0 ms</b></label>
         <label>释放<input id="rel" type="range" min="0" max="1000" step="5" value="0"><b id="relV">0 ms</b></label>
         <label class="chk"><input id="byp" type="checkbox">直通（跳过压缩）</label>
         <div class="chips" id="wdrcPresets"></div>
@@ -1500,7 +1500,7 @@ async function pushNow() {
   }
 }
 
-// ---------- 起停 ----------
+// ---------- 开始/停止 ----------
 $("btnStart").addEventListener("click", async () => {
   $("btnStart").disabled = true;
   setPill("启动中…", "warn");
@@ -1611,9 +1611,9 @@ function renderState(d) {
     bits.push("过核 " + (st.dsp_ms ? st.dsp_ms.toFixed(2) + " ms" : "—"));
     if (st.attack_ms && st.release_ms &&
         (st.attack_ms[0] > 0 || st.release_ms[0] > 0)) {
-      bits.push("起振 " + st.attack_ms[0].toFixed(0) + " / 释放 " + st.release_ms[0].toFixed(0) + " ms");
+      bits.push("启动 " + st.attack_ms[0].toFixed(0) + " / 释放 " + st.release_ms[0].toFixed(0) + " ms");
     } else {
-      bits.push("起振释放 关");
+      bits.push("启动 / 释放 关");
     }
     if (st.error) bits.push("报错：" + st.error);
   } else {
@@ -1832,7 +1832,7 @@ async function init() {
     }
   } catch (e) { /* 板子刚起，接口还没好；下一次刷新再说 */ }
   // 一定要写一次：/dev/shm 每次重启都是空的，而界面上已经显示了
-  // 门限 -10 dBFS / 2:1。不写的话，核里用的还是 fir_live.py 自己的默认值，
+  // 阈值 -10 dBFS / 2:1。不写的话，核里用的还是 fir_live.py 自己的默认值，
   // 界面显示的和实际生效的对不上。notebook 那一版末尾也有 push_tune()。
   schedulePush();
   pollState();

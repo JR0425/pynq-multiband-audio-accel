@@ -78,8 +78,8 @@ for name, sel in (("LINE_IN", audio.select_line_in),
               % (ch, v.min(), v.max(), v.mean()))
         print("       真电平 rms(24位) %.0f  →  int16 域 %.1f   %s"
               % (rms24, rms16,
-                 "有信号" if rms16 >= SILENT_RMS else "低于门限＝静音"))
-        print("       贴近满量程(|v|>0.9*2^23)的样本 %d / %d   （多＝过载）"
+                 "有信号" if rms16 >= SILENT_RMS else "低于阈值＝静音"))
+        print("       贴近满量程(|v|>0.9*2^23)的采样 %d / %d   （多＝过载）"
               % (rail, v.size))
 
 print("""

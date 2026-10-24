@@ -44,7 +44,7 @@ base overlay 的音频通路怎么用，换个音频题目照样成立。
 | 条目 | 适用场景 | 使用方法 | 已验证的效果 | 不适用 |
 |---|---|---|---|---|
 | `pynq-direct-ethernet`<br>`pitfalls/pynq_direct_ethernet_windows.md` | 网线直连无路由器；网卡拿到 169.254.x.x；9090 打不开；重启后 IP 没了 | 两端静态地址 + 避开 `dhclient` 陷阱 | 192.168.2.99 冷启动后可连，冷启动验收清单已跑过 | 板子接路由器自动取 IP 时 |
-| `pynq-serial-console`<br>`pitfalls/pynq_serial_console.md` | 不知道板子 IP；Jupyter 打不开；串口中文显示成 `??????` | PowerShell 直开 COM 口，注意三处编码 | 网络全断时靠 COM6 起停程序、读启动日志 | 需要同时开两个串口任务 |
+| `pynq-serial-console`<br>`pitfalls/pynq_serial_console.md` | 不知道板子 IP；Jupyter 打不开；串口中文显示成 `??????` | PowerShell 直开 COM 口，注意三处编码 | 网络全断时靠 COM6 开始/停止程序、读启动日志 | 需要同时开两个串口任务 |
 | `pynq-shutdown-and-power`<br>`pitfalls/pynq_shutdown_and_power.md` | 收板过夜；刚改过配置；不确定现在拔电会不会弄坏 SD 卡 | 按三档判断，等 halt 真的结束 | 拔电与卡损坏的判据来自实测 | 只是重启 Jupyter |
 | `pynq-board-hang-capture`<br>`pitfalls/pynq_board_hang_capture.md` | 板子不回 ping/SSH；串口全静；同一条命令时好时坏 | 先判断电还是死机，再用 `panic_print=31` 抓栈 | 抓到了 RCU stall 的栈；断电/死机判据在真实死机上验证过 | 板子还在跑实时管线时打重命令 |
 | `pynq-overlay-loading`<br>`pitfalls/pynq_overlay_loading.md` | `Overlay(...)` 报 `No Devices Found`；自建 PS-only overlay；硬件与软件比对相关系数低 | 检查 `.hwh` 与 bit 的配套；用互相关而不是逐点比 | `fir.bit` 加载成功，直通模式按群延迟对齐后错配 0 个 | 用出厂 base overlay（开机已灌好） |

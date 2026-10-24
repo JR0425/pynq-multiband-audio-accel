@@ -3,7 +3,7 @@
 本目录是**所有实测读数**的落盘处。文件名带日期，代表测的那天；同一件事可能测过好几次，
 **以本文件「当前结论」那一栏指定的文件为准**，其余是历史或被推翻的记录。
 
-出货配置固定为：位流 `v25_env_indep`（36 拍/样本、205/220 DSP、WNS +0.533 ns、
+出货配置固定为：位流 `v25_env_indep`（36 拍/采样、205/220 DSP、WNS +0.533 ns、
 md5 `5aa079f29e8d66c21d1d34f1302c3695`），演示档 16.2 ms（L=360 / NBUF=2）。
 凡是版本号写 `v18`/`v19`/`v20`/`v21` 的读数都不是出货版的数。
 
@@ -11,7 +11,7 @@ md5 `5aa079f29e8d66c21d1d34f1302c3695`），演示档 16.2 ms（L=360 / NBUF=2�
 
 | 问题 | 文件 | 结论 |
 | --- | --- | --- |
-| 加速比多少 | `accel_cpu_vs_fpga.md` | **16.7×**（10-23 实测，ARM 6.117 µs/样本 vs 核 0.367 µs/样本）；引用必须带四条限定 |
+| 加速比多少 | `accel_cpu_vs_fpga.md` | **16.7×**（10-23 实测，ARM 6.117 µs/采样 vs 核 0.367 µs/采样）；引用必须带四条限定 |
 | 核单独 / 整机 overlay 的资源与时序 | `impl_metrics.md` | 布局布线后的实测；`hls_synth_metrics.md` 是同一批的 csynth 估算值，两者不要混用 |
 | 三个延迟档位的数字延迟 | `latency_retest_20261023.md` | 36 拍核复测；验配界面的端到端延迟另见 `tuning_ui_latency_20261018.md` |
 | 实时通路会不会丢块 | `live_dropout_recheck_20261024.md` | 16.2 ms 档 600 秒 0 丢块；10-23 那次「两档都在丢」是探针插桩自己造成的 |
@@ -43,6 +43,6 @@ md5 `5aa079f29e8d66c21d1d34f1302c3695`），演示档 16.2 ms（L=360 / NBUF=2�
 
 | 文件 | 为什么 |
 | --- | --- |
-| `mic_input_selfosc_run_20261010.txt`、`mic_input_selfosc_scan_20261013.txt`、`mic_selfosc_probe3~10_log_20261013.txt`、`live_run_with_probe7_fix_20261013.txt` | 10-13 判定的「话筒满幅自激」**是错的**：低 24 位补码没做符号扩展，数字零被读成 rms 46341（= 65535/√2）。保留是为了记这次误判，不能当故障证据 |
+| `mic_input_selfosc_run_20261010.txt`、`mic_input_selfosc_scan_20261013.txt`、`mic_selfosc_probe3~10_log_20261013.txt`、`live_run_with_probe7_fix_20261013.txt` | 10-13 判定的「话筒满量程自激」**是错的**：低 24 位补码没做符号扩展，数字零被读成 rms 46341（= 65535/√2）。保留是为了记这次误判，不能当故障证据 |
 | `reference_overlay_metrics.md` | 开源参考 overlay（`soheilbh/fir_accel_pynq`）的数据，和自研核无关 |
 | `board_hang_evidence_20261016.md`、`board_hang_evidence_20261017.md` 及 `board_hang_rcu_stall_dump_*` | 板子死机调查的现场账本。里面「关实时就能救」的结论**已被推翻**，读之前先看 10-17 那份的最终判断 |

@@ -138,7 +138,7 @@ def run_cond(boost, dv, tx, vol):
     return chunks
 
 
-print("每个数是 20 块(0.2 秒)的 rms 中位,int16 域;满幅 32767,安静 ~200")
+print("每个数是 20 块(0.2 秒)的 rms 中位,int16 域;满量程 32767,安静 ~200")
 print("每行 15 个数 = 3 秒,从左到右是时间顺序 —— 要看的正是它会不会往上爬")
 print()
 

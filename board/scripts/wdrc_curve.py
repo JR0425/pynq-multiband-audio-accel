@@ -77,7 +77,7 @@ SETTINGS = (
 ENV_LIMIT_MS = 0.001      # 包络极限：ms_to_coef 会饱和到 32767，env ≈ |x|
 
 # ---- B. 阶跃响应 ----
-STEP_QUIET_DB = -20.0     # 静段不能太低：low 到 env 掉到门限以下，gr 归零就量不到了
+STEP_QUIET_DB = -20.0     # 静段不能太低：low 到 env 掉到阈值以下，gr 归零就量不到了
 STEP_LOUD_DB = -10.0
 STEP_QUIET_SEC = 2.5      # 停 500 ms 要 4~5 倍时间常数才落回基线
 STEP_LOUD_SEC = 1.2
@@ -186,7 +186,7 @@ dev = max(abs(db(dry_pk[f]) - db(peak(ladders[f][skip:n_lev]) / 32768.0)) for f 
 print("\n   直通对账：输入峰值与直通输出峰值应相同")
 check("直通不改变电平", dev < 0.1, "最大偏差 %.3f dB" % dev)
 
-# 门限以下的参考必须用**直通**，不能用原始输入：
+# 阈值以下的参考必须用**直通**，不能用原始输入：
 # 低电平时峰值只有几十个 LSB，Q1.15 输入量化和滤波器系数量化本身就有 0.1 dB 量级
 # 的偏差，拿原始输入当参考会把这个量化误差算成压缩器的错。
 bypass_lin = {f: [ladder_levels(run(ladders[f], 0, 0, 0, 0, bypass=True), k)
@@ -230,7 +230,7 @@ for st in SETTINGS:
                 for f in TONES for k in range(13))
     check("%s：包络极限 == 无记忆" % sname, worst < 0.05, "最大偏差 %.4f dB" % worst)
 
-    # 判据 2：门限以下原样通过（按这一组自己的阈值判，参考是**直通**）
+    # 判据 2：阈值以下原样通过（按这一组自己的阈值判，参考是**直通**）
     # 用 LSB 绝对差，不用 dB：−54 dBFS 时峰值只有 65 个 LSB，差 1 个 LSB 就是 0.13 dB。
     # 非直通路径比直通多一次 `(drc_t)band[i] * g[i]` 的 floor，差 1 个 LSB 属正常。
     worst_lsb = 0.0
@@ -240,7 +240,7 @@ for st in SETTINGS:
             if 10 ** (c["in_db"][k] / 20.0) < (thr / 32768.0) * 0.9:
                 worst_lsb = max(worst_lsb,
                                 abs(c["real_lin"][k] - bypass_lin[f][k]) * 32768.0)
-    check("%s：门限以下原样通过" % sname, worst_lsb <= 2.0,
+    check("%s：阈值以下原样通过" % sname, worst_lsb <= 2.0,
           "与直通最大差 %.2f 个 LSB" % worst_lsb)
 
     # 判据 3：单调。LEVEL_DB 是递减的，所以 k 增大时输出应当跟着**变小**
@@ -418,7 +418,7 @@ for name, thr, ratio, atk, rel in THD_CONFIGS:
 
 mem_rows = result["C"][0]["rows"]
 below = [r["thd"] or 0.0 for r in mem_rows if r["level_db"] <= -30]
-check("无记忆那组：门限以下没有失真", max(below) < 0.005,
+check("无记忆那组：阈值以下没有失真", max(below) < 0.005,
       "最大 %.3f%%" % (100 * max(below)))
 print("     注：无记忆那组在 −20 dBFS 有 7.2% THD，不是 bug —— `drc()` 本身就是折线，")
 print("         −20 dBFS 正好落在拐点（阈 0.030 = −30.5 dBFS）附近，压的是波峰那一小段。")

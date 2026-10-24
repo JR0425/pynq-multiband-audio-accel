@@ -122,7 +122,7 @@ rbuf = ffi.new("unsigned int[]", 2 * L)
 
 def levels():
     """本块两个声道的 (去直流 rms, 峰),单位 int16 域(满量程 32767)。
-    低 24 位是二进制补码,必须先符号扩展,否则近零信号会被读成满幅。"""
+    低 24 位是二进制补码,必须先符号扩展,否则近零信号会被读成满量程。"""
     a = np.frombuffer(bytes(ffi.buffer(rbuf, 4 * 2 * L)), dtype=np.int32)
     c = a.reshape(-1, 2).astype(np.int64) & 0xFFFFFF
     s = np.where(c >= HALF24, c - FULL24, c).astype(np.float64) / 256.0

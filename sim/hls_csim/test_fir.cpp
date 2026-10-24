@@ -35,7 +35,7 @@ int main() {
     infile.close();
     
     int length = input.size();
-    std::cout << "成功读取测试数据，样本数：" << length << std::endl;
+    std::cout << "成功读取测试数据，采样数：" << length << std::endl;
 
     // 2. 模拟 FIR 滤波器系数（实际使用时会由 Python 生成）
     // 这里硬编码一个简单的 65 抽头全通滤波器作为占位，队友会替换成真实的
@@ -47,7 +47,7 @@ int main() {
     fir_filter(input.data(), output.data(), taps.data(), length);
 
     // 4. 输出前 10 个结果，供验证比对
-    std::cout << "C++ 仿真输出（前 10 个样本）：" << std::endl;
+    std::cout << "C++ 仿真输出（前 10 个采样）：" << std::endl;
     for (int i = 0; i < 10 && i < length; i++) {
         std::cout << "Sample " << i << ": " << output[i] << std::endl;
     }

@@ -10,7 +10,7 @@ Finished，`LogLevelMax=` 管不到这些），journald 把日志落在 SD 卡�
 600 秒那一趟里，丢块时间戳正好对在 timer 的启动和结束时刻上，每次 5~90 ms。
 
 这个进程只在内存里扫 /proc、调 sched_setscheduler，不 fork、不写日志、
-不碰磁盘。扫描间隔和原来一样是 30 秒，所以新 kworker 的提权时延不变。
+不碰磁盘。扫描间隔和原来一样是 30 秒，所以新 kworker 的提权延迟不变。
 
 用法（安装脚本会做）：
     /usr/bin/python3 /usr/local/sbin/ksoftirqd_rt_watch.py

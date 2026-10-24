@@ -31,9 +31,9 @@ from ref_model_wdrc import (EDGES, N_BANDS, N_LP, load_coeffs, process,
 
 FS = 48000
 Q17 = float(1 << 17)
-# -20 dBFS 是核的默认门限（寄存器 3277/32768）；用来做"DRC 打开"那一行。
+# -20 dBFS 是核的默认阈值（寄存器 3277/32768）；用来做"DRC 打开"那一行。
 DEF_THR, DEF_RATIO = 3277, 22938
-OFF_THR = 32767                      # 门限顶到量程 = 压缩器不动作
+OFF_THR = 32767                      # 阈值顶到量程 = 压缩器不动作
 DEFAULT_ATK, DEFAULT_REL = 136, 7    # 5 ms / 100 ms @ 48 kHz
 
 EDGES_HZ = (20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400,

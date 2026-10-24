@@ -304,7 +304,7 @@ def alive(y):
             "峰值 %.0f，非零 %d" % (peak(y), int(np.count_nonzero(y))))
 
 
-# D1 阈值 0、压缩比 0 -> 门限以上全压成 0
+# D1 阈值 0、压缩比 0 -> 阈值以上全压成 0
 dcase("D1 阈0/比0 → 输出全零",
       lambda y: (peak(y[-2000:]) == 0.0, "末段峰值 %.1f" % peak(y[-2000:])),
       lambda: proc(xd, thr=(0,) * N_BANDS, ratio=(0,) * N_BANDS))

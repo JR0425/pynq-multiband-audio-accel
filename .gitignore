@@ -75,5 +75,4 @@ build/rtl_impl/
 # OS
 .DS_Store
 Thumbs.db
-"pynq_venv/" 
 pynq_venv/ 

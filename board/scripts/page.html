@@ -397,16 +397,16 @@ footer{color:var(--faint);font-size:10px;display:flex;justify-content:space-betw
     <h3>压缩（WDRC） <span class="sub">四个频段同一组参数</span></h3>
     <div id="comp-grid">
       <div class="comp-cell">
-        <div class="lab"><span>门限</span><b id="v-thr">−10.0 dBFS</b></div>
-        <input type="range" id="s-thr" min="-60" max="0" step="0.5" value="-10" aria-label="压缩门限">
+        <div class="lab"><span>阈值</span><b id="v-thr">−10.0 dBFS</b></div>
+        <input type="range" id="s-thr" min="-60" max="0" step="0.5" value="-10" aria-label="压缩阈值">
       </div>
       <div class="comp-cell">
         <div class="lab"><span>压缩比</span><b id="v-ratio">2.0 : 1</b></div>
         <input type="range" id="s-ratio" min="1" max="10" step="0.5" value="2" aria-label="压缩比">
       </div>
       <div class="comp-cell">
-        <div class="lab"><span>起振</span><b id="v-atk">5 ms</b></div>
-        <input type="range" id="s-atk" min="0" max="200" step="1" value="5" aria-label="起振时间">
+        <div class="lab"><span>启动</span><b id="v-atk">5 ms</b></div>
+        <input type="range" id="s-atk" min="0" max="200" step="1" value="5" aria-label="启动时间">
       </div>
       <div class="comp-cell">
         <div class="lab"><span>释放</span><b id="v-rel">100 ms</b></div>
@@ -428,7 +428,7 @@ footer{color:var(--faint);font-size:10px;display:flex;justify-content:space-betw
       <div><span class="k">可用内存</span><b id="hl-mem" class="num">—</b></div>
       <div><span class="k">板子运行</span><b id="hl-up" class="num">—</b></div>
       <div><span class="k">死机防护</span><b id="hl-guard" class="num">—</b></div>
-      <div><span class="k">比特流</span><b id="hl-bit" class="num">—</b></div>
+      <div><span class="k">位流</span><b id="hl-bit" class="num">—</b></div>
     </div>
   </section>
 
@@ -1038,7 +1038,7 @@ function renderStatus(p){
   else if (st || p.last)                              setBadge("", "已停止");
   else                                                setBadge("", "未运行");
 
-  /* 起停按钮：忙一律禁用；停要能停“在跑的”，不管是本页还是别人起的。
+  /* 开始/停止按钮：忙一律禁用；停要能停“在跑的”，不管是本页还是别人起的。
      没有计时器兜底 —— 状态完全由 proc.starting / proc.running / age 决定。 */
   const busy = starting || S.stopping;
   $("#btn-start").disabled = busy || audioOn || procRunning;
@@ -1124,7 +1124,7 @@ async function pollScope(){
 }
 
 /* =====================================================================
- * 起停
+ * 开始/停止
  * ===================================================================== */
 $("#src-sel").addEventListener("change", () => {
   const [k, w] = $("#src-sel").value.split(":");
@@ -1185,7 +1185,7 @@ function renderStatusSafe(){ if (lastStatus) renderStatus(lastStatus); }
 /* =====================================================================
  * 系统健康：板子自己的状态。2 秒一次，只在页面可见时拉。
  * 这里的三项是台上要盯的：处理余量（还有多少 CPU 时间没用到）、
- * 死机防护（ksoftirqd/kworker 有没有被提权）、比特流（是不是出货那版）。
+ * 死机防护（ksoftirqd/kworker 有没有被提权）、位流（是不是出货那版）。
  * ===================================================================== */
 function setHl(sel, text, cls){
   const el = $(sel);
@@ -1229,7 +1229,7 @@ function renderHealth(h){
   }
   const b = h.bit || {};
   if (b.ok && b.label)
-    setHl("#hl-bit", `${b.label} · ${b.cycles} 拍/样本`, "");
+    setHl("#hl-bit", `${b.label} · ${b.cycles} 拍/采样`, "");
   else if (b.ok)
     setHl("#hl-bit", "未知 " + String(b.md5 || "").slice(0, 8), "warn");
   else
