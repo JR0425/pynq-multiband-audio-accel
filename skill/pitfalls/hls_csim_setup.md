@@ -75,10 +75,10 @@ csim_design -argv "[unixify $in_file] [unixify $out_file]"
 
 ## 三、先拿本机 g++ 验语法，再上 HLS
 
-本机装了 MinGW g++ 8.1.0：
+本机装了 MinGW g++ 8.1.0。`bin` 目录加进 PATH 之后直接调，或写绝对路径：
 
 ```
-E:\vscodedowmload\mingw64\bin\g++.exe
+g++ --version
 ```
 
 纯语法错误用 g++ 编一遍 **3 秒**就能看出来，而 HLS 走一遍要 9 秒以上
@@ -107,7 +107,7 @@ add_files $src_file -cflags $cflags
 
 ```
 MSYS_NO_PATHCONV=1 HLS_CFLAGS=-DFIR_PARTIAL=5 \
-  "E:/Xilinx/Vitis_HLS/2020.2/bin/vitis_hls.bat" -f build/hls/run_csim.tcl
+  "$VITIS_HLS_BIN" -f build/hls/run_csim.tcl      # 或 vitis_hls.bat 的绝对路径
 ```
 
 `MSYS_NO_PATHCONV=1` 不能省 —— 否则 Git Bash 会把 `-D` 后面的路径风格参数改写掉。

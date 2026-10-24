@@ -30,7 +30,11 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 - 同芯片 ARM vs PL 加速比：**16.7 倍**（2026-10-23 板上实测，测的是当前出货版 `v25_env_indep`，原始输出 `data/results/compare_cpu_fpga_run_20261023.txt`）。Zynq PS 侧的 ARM 每采样 **6.117 µs**（3.41× 实时），PL 里的核 **0.367 µs**（56.77× 实时；理论 0.360 µs = 36 拍 @ 100 MHz）。2026-10-22 那次的 **12.5 倍**是 `v21_wdrc`（49 拍）的数，2026-10-08 的 **19.5 倍**是 `v19`（31 拍）的数，都别和现在这颗混用。引用这个数必须带四条说明 —— 两边精度不同（float64 vs Q1.15）、CPU 那边是 scipy 的 C 实现、核的耗时里含每块约 60 µs 的 Python 开销（占长块实测不到 10%）、两边每采样都是 579 次有效乘法。全文见 `data/results/accel_cpu_vs_fpga.md`。
 - 早期还测过一个开源参考 overlay。结果在 `data/results/reference_overlay_metrics.md`，和自研核无关，别混着引用。
 - 当前英文海报在 `report/poster_en/pynq_multiband_audio_poster_v2.pptx`；早期 `pynq_multiband_audio_poster_draft.pptx` 已被它取代。海报明确把核级 OOC 资源数据和板级吞吐数据分开。
-- Python/HLS/RTL 三实现对比还没做。`src/rtl/fir_lp.v` 已存在（只有 3 个低通，没有相减 / DRC / AXI 外壳），xsim 逐位对拍通过。
+- Python / HLS / RTL 三实现对比已经做完，同一负载、同一精度契约、同一 10 ns 约束，表在
+  `report/design_report_draft.md` §4.1。自研 RTL 分两块：`src/rtl/fir_lp.v`（单低通）和
+  `src/rtl/fir_mb_fe.v`（3 个低通 + 相减 + 4 段综合），xsim 逐位等于整数参考模型；两块都
+  没有 DRC、每段增益和 AXI 外壳。范围和限制见 `data/results/rtl_vs_hls.md`，跑法见
+  `sim/rtl_sim/README.md`。
 
 ## 目录结构
 
@@ -38,15 +42,17 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 | --- | --- |
 | `src/python/` | Python 基线、系数与测试数据导出、比对与分析工具 |
 | `src/hls/` | HLS 核与 C 测试台 |
-| `src/rtl/` | 自研 RTL：`fir_lp.v`（3 个低通，无相减 / DRC / AXI 外壳） |
-| `sim/hls_csim/` | C 仿真用的 FIR 系数文件 |
-| `build/hls/` | HLS 与 Vivado 的脚本、指令文件和报告 |
-| `board/` | PYNQ 笔记本、整机 overlay（`overlay/fir.bit`）、核驱动、板级脚本 |
+| `src/rtl/` | 自研 RTL：`fir_lp.v`（单低通）与 `fir_mb_fe.v`（多频段前端；都没有 DRC / 每段增益 / AXI 外壳） |
+| `sim/hls_csim/` | C 仿真的测试台与 FIR 系数文件 |
+| `sim/rtl_sim/` | RTL 仿真的 testbench、参考模型与逐位比对脚本，跑法见该目录的 `README.md` |
+| `build/` | 构建脚本、HLS 指令文件、各版本综合与实现报告；索引见 `build/README.md` |
+| `board/` | PYNQ 笔记本、整机 overlay（`overlay/fir.bit`）、核驱动、板级脚本；索引见 `board/README.md` |
 | `data/audio/` | 测试音频与生成的音频 |
 | `data/figures/` | 生成的分析图 |
-| `data/results/` | 软件、仿真与实现的记录 |
+| `data/results/` | 所有实测读数；**哪个文件是当前结论、哪些不能引用，见 `data/results/README.md`** |
 | `skill/` | 提示词、模板、检查脚本、踩坑笔记 |
 | `report/` | 设计报告、接口说明、提交清单、协作日志 |
+| `tools/` | 主机侧辅助脚本：参考模型、系数生成、质量指标、板子调试 |
 
 ## Python 基线
 
@@ -75,13 +81,12 @@ python src/python/export_golden.py --taps 193
 
 ## HLS C 仿真
 
-项目的 C 仿真脚本用的就是 `build/hls/run_csim.tcl` 里写的那个 Vivado/Vitis HLS 安装路径。
-在装好这套工具链的 Windows 机器上，从仓库根目录跑文档里那条批处理命令，
-再把 `data/results/hw_output.txt` 和 `data/results/python_golden.txt` 做比对：
+在装好这套工具链的机器上，从仓库根目录跑 `./rebuild.sh csim`，它调用
+`build/hls/run_csim.tcl`（工具位置用 `VITIS_HLS_BIN` 指定，不写死在脚本里）。
+跑完再把 `data/results/hw_output.txt` 和 `data/results/python_golden.txt` 做比对：
 
-```powershell
-$env:MSYS_NO_PATHCONV = '1'
-cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_csim.tcl"
+```bash
+./rebuild.sh csim
 python src/python/compare_golden_vs_hw.py
 ```
 

@@ -86,5 +86,5 @@ curl -sS -m 10 -o /dev/null -w "api    %{http_code}\n" https://api.github.com
 
 ## 不要用的
 
-**Watt Toolkit**：点开加速页就卡死，进程以管理员权限跑、杀不掉。
-它靠改 hosts 工作，而这里封的是 IP 不是解析 —— 方向就不对。
+**改 hosts 类的加速工具**：方向就不对 —— 这类工具改的是 DNS 解析，
+而这种情况封的是 IP，改完解析照样连不上；有的还会以管理员权限常驻、杀不掉。
