@@ -259,15 +259,15 @@ round6/mon_A_dump_1.stamp   末次 ok [22:57:58] up=314.38   →  [22:58:33] 失
 
 ## 六、怎么复现
 
-主机侧（Windows，工作目录 `C:\Users\XIA\Desktop\PYNQ音频项目`）：
+主机侧（Windows，工作目录为仓库根目录）：
 
 ```sh
 # 串口抓现场(必须开着,不然 panic_print 打出来也没人接)
-python tools/pynq_serial_capture.py COM6 21600 tools/_tmp/round8/console.log
+python tools/board_debug/pynq_serial_capture.py COM6 21600 tools/_tmp/round8/console.log
 
 # 另一头跑对照。NEXT_SETTLE 把每臂起跑 uptime 对齐 —— 这次的教训就在这
 NEXT_SETTLE=180 NEXT_WAITMIN=180 NEXT_HANGWAIT=6 \
-  python tools/_tmp/next_round.py tools/_tmp/round8 2 Z_idle N_long
+  python tools/board_debug/next_round.py tools/_tmp/round8 2 Z_idle N_long
 ```
 
 板上（`one_run.sh` 是驱动，`next_round.py` 自己推上去）：
@@ -287,5 +287,5 @@ sh /home/xilinx/one_run.sh "LIVE_SRC=wav LIVE_SCOPE=1 DUMP=1 NOBOX=1" 8
 | **死机** | **Connected / 1 Gbps**（PHY 不用 Zynq 配置就能自协商） | 设备还在，但**一个字都不吐** |
 
 再加 `arp -a` 里连 192.168.2.99 的条目都没有 ⇒ **内核整个停了**（ARP 是内核答的）。
-注意 192.168.2.1 在「以太网」这张真网卡上；「以太网 2」是 Sangfor SSL VPN 的虚拟网卡，
+注意 192.168.2.1 在「以太网」这张真网卡上；「以太网 2」是 VPN 软件装的虚拟网卡，
 永远 Disconnected，**别看错那一行**。

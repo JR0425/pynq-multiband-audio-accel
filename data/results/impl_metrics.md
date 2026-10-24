@@ -15,6 +15,10 @@
       cmd /c "E:\Xilinx\Vivado\2020.2\bin\vivado.bat -notrace -mode batch \
               -source build\hls\run_vivado_impl.tcl"
 
+> 下文命令里的 `E:\Xilinx\...` 只是写这份记录那台机器上的安装位置。工具装在别处时，
+> 换成自己的绝对路径；Git Bash 里也可以用 `"$VIVADO_BIN"` / `"$VITIS_HLS_BIN"`
+> 指过去，口径和 `rebuild.sh` 一致。
+
 RTL 得先存下来 —— HLS 每次综合都覆盖它的工程目录，所以量完一版要
 `cp -r <HLS 的 solution 目录> build/hls/sol_<版本>` 留档。已留档的：
 `sol_v4_float`（浮点限流5）、`sol_v11_fixed`（定点限流5）、`sol_v10_fixed_nolimit`（定点不限流）、
@@ -147,7 +151,7 @@ RTL 得先存下来 —— HLS 每次综合都覆盖它的工程目录，所以�
 - 余量 +0.256 ns 不算宽。**以后往 PL 里再加东西必须重量**（比如 ③d 想加 AXI DMA 的话）。
 
 报告：`board/overlay/fir_timing.rpt`、`board/overlay/fir_util.rpt`。
-复现：`E:\Xilinx\Vivado\2020.2\bin\vivado.bat -mode batch -source board/overlay/build_fir.tcl`
+复现：`"$VIVADO_BIN" -mode batch -source board/overlay/build_fir.tcl`
 
 ### 整机复量（2026-10-07，`v19_shift_chain` 改完移位之后）
 
@@ -213,13 +217,13 @@ RTL 得先存下来 —— HLS 每次综合都覆盖它的工程目录，所以�
 —— 比这里的 120 µs 大，是因为开销里有一部分（cache flush / invalidate）本来就随数据量涨。
 两档不矛盾，但**要引用就引 8000 采样那一档**。
 
-⚠️ 还没做的：**加速比复测已经做了，做了三次。**
+**加速比复测：2026-10-08 起一共做了三次，三次的数字都对得上。**
 2026-10-08（`v19`，31 拍）：ARM 每采样 **6.199 µs**（3.36× 实时），核 **0.317 µs**（65.69×），
 加速比 19.5 倍（`compare_cpu_fpga_run_20261008.txt`）。
 2026-10-22（`v21_wdrc`，49 拍）：ARM **6.204 µs**，核 **0.497 µs**（41.88×），
 加速比 12.5 倍（`compare_cpu_fpga_run_20261022.txt`）。
 2026-10-23（`v25_env_indep`，36 拍）：ARM **6.117 µs**，核 **0.367 µs**（56.77×），
-加速比 **16.7 倍**（`compare_cpu_fpga_run_20261023.txt`）——**引用用这一条**。
+加速比 **16.7 倍**（`compare_cpu_fpga_run_20261023.txt`）——**引用以这一条为准**。
 加速比**不能**拿 450→31 直接换算成 14.5 倍 —— 上面那个 11.5 倍已经说明为什么。
 （旧的 4.507 µs / 1.4 倍是 450 拍那一版的数，已经全部换掉了。）
 
@@ -473,7 +477,7 @@ DSP 从 202 降到 86、LUT 反而从 3962 涨到 10443。两条曲线都是往�
 | `v4_ref_limit5` | 27 → 27（分毫不差） | 9936 → 6396 | 12627 → 11051 |
 
 **DSP 的估算在两个方向上都不准**，LUT 的估算一律偏高约 2.5 倍。
-所以**不能拿任何一个固定的修正系数去换算**，估算值也不能当结果写进报告。
+所以**不能拿任何一个固定的修正系数去换算**，估算值也不能当作实测结果引用。
 
 ## 关键路径在哪
 
