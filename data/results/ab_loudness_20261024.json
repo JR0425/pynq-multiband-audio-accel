@@ -1,0 +1,43 @@
+{
+  "source": "board_input_48k.wav",
+  "seconds": 6.0,
+  "how": "板上 src=wav 跑一趟，取 fir_live 的 cap_in / cap_out（逐位自检用的那一对）",
+  "params": {
+    "thr": 0.029998779296875,
+    "ratio_q15": 16384,
+    "attack_ms": 5.0,
+    "release_ms": 100.0,
+    "attack_reg": 136,
+    "release_reg": 7,
+    "band_gain_db": 0.0,
+    "L": 480,
+    "nbuf": 3
+  },
+  "checks": {
+    "in_matches_source": true,
+    "out_vs_offline_model_mismatch": 142753,
+    "out_vs_offline_model_max_lsb": 2
+  },
+  "common_trim_db": -1.37,
+  "makeup_gain_db": 4.7,
+  "original": {
+    "rms_db": -17.85,
+    "peak_db": -2.94,
+    "crest_db": 14.91
+  },
+  "core": {
+    "rms_db": -22.55,
+    "peak_db": -5.7,
+    "crest_db": 16.85
+  },
+  "matched": {
+    "rms_db": -17.85,
+    "peak_db": -1.0,
+    "crest_db": 16.85
+  },
+  "files": [
+    "ab_20261024_01_original.wav",
+    "ab_20261024_02_core.wav",
+    "ab_20261024_03_matched.wav"
+  ]
+}

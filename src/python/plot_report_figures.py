@@ -16,7 +16,8 @@ import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+import numpy as np
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Rectangle
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(ROOT, "data", "figures", "report")
@@ -78,6 +79,70 @@ def fig_flow():
 
     ax.text(0.4, 5.9, "设计验证流程：上一级通过才进入下一级", fontsize=12, color=INK)
     save(fig, "fig1_1_flow.png")
+
+
+def fig_block():
+    """系统整体框图（中文版，对应 fig2_1）。英文版见 plot_block_diagram.py。"""
+    ORANGE = "#fbe3cc"
+    GREEN = "#dcefd9"
+    LBLUE = "#dbe7f3"
+
+    def bx(x, y, w, h, text, fc=GREY, fs=10, weight="normal"):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.25",
+                                    lw=1.1, edgecolor=INK, fc=fc))
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
+                fontsize=fs, color=INK, weight=weight, linespacing=1.45)
+
+    def ar(p0, p1, label="", rad=0.0, fs=9, dx=0, dy=0):
+        ax.add_patch(FancyArrowPatch(p0, p1, arrowstyle="-|>", mutation_scale=12,
+                                     lw=1.1, color=INK,
+                                     connectionstyle="arc3,rad=%s" % rad))
+        if label:
+            ax.text((p0[0] + p1[0]) / 2 + dx, (p0[1] + p1[1]) / 2 + dy, label,
+                    ha="center", va="center", fontsize=fs, color=INK,
+                    bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none"))
+
+    fig, ax = plt.subplots(figsize=(9.8, 5.4))
+    ax.set_xlim(0, 124)
+    ax.set_ylim(0, 66)
+    ax.axis("off")
+
+    ax.add_patch(Rectangle((46, 36), 76, 27, fill=False, ls="--", lw=1.2,
+                           edgecolor="#888888"))
+    tag_box = dict(boxstyle="round,pad=0.15", fc="white", ec="none")
+    ax.text(47.5, 61.0, "PL（可编程逻辑，100 MHz）", fontsize=9.5, color="#555555",
+            bbox=tag_box)
+    ax.add_patch(Rectangle((46, 3), 76, 25, fill=False, ls="--", lw=1.2,
+                           edgecolor="#888888"))
+    ax.text(47.5, 26.4, "PS（ARM Cortex-A9，Linux，PYNQ 2.7 / Python 3.6）",
+            fontsize=9.5, color="#555555", bbox=tag_box)
+
+    bx(2, 46, 20, 10, "麦克风\n(TRRS, HP+Mic)", fc=ORANGE)
+    bx(2, 30, 20, 10, "耳机 / 扬声器\n(TRRS, HP+Mic)", fc=ORANGE)
+    bx(25, 33, 18, 24, "ADAU1761\ncodec\n\nADC / DAC\n48 kHz, int16", fc=ORANGE, fs=9.5)
+    bx(50, 48, 26, 11, "audio_codec_ctrl\n(PYNQ 音频 IP)\nMMIO，无 DMA", fc=GREEN)
+    bx(84, 48, 34, 11,
+       "fir_multiband 核 v25\n四段相减 FIR + WDRC\n36 拍/采样 @ 100 MHz",
+       fc=LBLUE, weight="bold", fs=9.5)
+    bx(88, 22, 30, 9, "DDR3\n块缓冲 in[] / out[]", fc="#eeeeee")
+    bx(48, 6, 22, 12, "fir_live.py\n搬样线程\n(SCHED_FIFO)", fc=LBLUE, fs=9.5)
+    bx(76, 6, 20, 9, "网页验配界面\n/dev/shm/fir_tune.json", fc=LBLUE, fs=8.5)
+
+    ar((22, 51), (25, 51), "mic", dy=1.9, fs=8.5)
+    ar((25, 35), (22, 35), "out", dy=-1.9, fs=8.5)
+    ar((43, 45), (50, 51), "I2S", dy=-6.5)
+    ar((101, 48), (101, 31), "AXI4 主机 → S_AXI_HP0", fs=8.5)
+    ar((88, 24.5), (70, 15), "cffi：拷 in[] / out[]", dx=9, dy=-2, fs=8.5)
+    ar((59, 18), (59, 48), "MMIO 读写 FIFO\n(duplex_block)", dx=13, fs=8.5)
+    ar((70, 18), (86, 48), "AXI-Lite", rad=-0.28, dx=9, dy=10, fs=8.5)
+
+    ax.text(62, 0.6,
+            "虚线框是 PL / PS 边界。音频 IP 没有 DMA：PS 用 MMIO 读写它的 FIFO，\n"
+            "核通过自己的 AXI4 主机口从 DDR 取块。",
+            fontsize=8.5, color="#666666", ha="center", va="center", linespacing=1.4)
+
+    fig.tight_layout()
+    save(fig, "fig2_1_block.png")
 
 
 def fig_chain():
@@ -271,8 +336,119 @@ def fig_thd():
     save(fig, "fig3_5_thd.png")
 
 
+def fig_ab_loudness():
+    """§3.4.1：原始 / 过核未补偿 / 过核补回等响度。数据来自板上实录那一对 wav。"""
+    import wave
+
+    def rd(name):
+        with wave.open(os.path.join(ROOT, "data", "audio", name), "rb") as w:
+            return np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float64)
+
+    x = rd("ab_20261024_01_original.wav")
+    y = rd("ab_20261024_02_core.wav")
+    z = rd("ab_20261024_03_matched.wav")
+    fs = 48000
+    t = np.arange(len(x)) / fs
+
+    win = int(0.1 * fs)
+    nb = len(x) // win
+    def env(v):
+        return 20 * np.log10(np.sqrt(np.mean(v[:nb * win].reshape(nb, win) ** 2, axis=1)) / 32768.0 + 1e-12)
+    te = (np.arange(nb) + 0.5) * 0.1
+    e1, e2, e3 = env(x), env(y), env(z)
+
+    # 0.12 秒窗口：取压缩量（原始与过核包络差）最大的那一段
+    fig, a1 = plt.subplots(figsize=(9.2, 4.2))
+    a1.plot(te, e1, color="#7d868f", lw=1.3, label="原始输入")
+    a1.plot(te, e2, color=BLUE, lw=1.2, label="过核（未补偿）")
+    a1.plot(te, e3, color=ACCENT, lw=1.3, ls="--", label="过核 + 等响度补偿")
+    a1.set_xlim(0, t[-1])
+    a1.set_ylim(-60, -5)
+    a1.set_xlabel("时间 / s")
+    a1.set_ylabel("100 ms 包络 / dBFS")
+    a1.set_title("原始与等响度补偿后：整段 RMS 都是 −17.85 dBFS", fontsize=11)
+    a1.grid(True, color="#dfe3e6", lw=0.6)
+    a1.legend(fontsize=8.5, ncol=3, loc="lower right")
+
+    fig.tight_layout()
+    save(fig, "fig3_6_ab_loudness.png")
+
+
+def fig_software():
+    """2.3.1 软件架构：控制面与数据面只在一对 /dev/shm json 上相交。"""
+    fig, ax = plt.subplots(figsize=(9.4, 8.2))
+    ax.set_xlim(0, 100)
+    ax.set_ylim(-8, 108)
+    ax.axis("off")
+
+    def bx(x, y, w, h, text, fc="#eef2f5", ec=INK, fs=8, weight="normal"):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.25,rounding_size=0.5",
+                                    lw=1.1, edgecolor=ec, fc=fc, zorder=2))
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fs,
+                color=INK, weight=weight, linespacing=1.45, zorder=3)
+
+    def poly(pts, label="", lx=None, ly=None, ha="left", ls="-", fs=7.5):
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=INK, lw=1.0, ls=ls,
+                solid_capstyle="butt", solid_joinstyle="miter", zorder=1)
+        ax.add_patch(FancyArrowPatch(pts[-2], pts[-1], arrowstyle="-|>",
+                                     mutation_scale=10, lw=1.0, color=INK, linestyle=ls,
+                                     shrinkA=0, shrinkB=0, zorder=2))
+        if label:
+            ax.text(lx, ly, label, ha=ha, va="center", fontsize=fs, color=INK, zorder=4,
+                    bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none"))
+
+    # 区域：板端 PS / 板端 PL，标签竖排在框内左边，不压任何走线
+    ax.add_patch(Rectangle((2, 44), 96, 48, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
+    ax.text(4.6, 68, "板端 PS：ARM Cortex-A9 · PYNQ 2.7 · Linux", fontsize=7.5,
+            color="#70787f", rotation=90, ha="center", va="center")
+    ax.add_patch(Rectangle((2, 2), 96, 38, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
+    ax.text(4.6, 21, "板端 PL：100 MHz", fontsize=7.5, color="#70787f",
+            rotation=90, ha="center", va="center")
+
+    # 浏览器（PC 上）
+    bx(12, 96, 46, 10, "浏览器（PC）：验配页面 page.html\n四段增益 / 门限 / 压缩比 / 起振 / 释放",
+       fc="#fdf1e8", ec=ACCENT)
+    poly([(32, 96), (32, 90)], "HTTP：/api/tune · /api/start · /api/status", 33.5, 93)
+
+    # 控制面
+    bx(8, 80, 38, 10, "fir_webui.py　HTTP 服务 :8080\n起停 fir_live 子进程、写参数文件", fc="#dbe7f3")
+    poly([(32, 80), (32, 72)], "写参数", 33.5, 76.5)
+    bx(20, 62, 26, 10, "/dev/shm/fir_tune.json\n旋钮参数", fc="#eeeeee")
+    bx(8, 50, 38, 10, "/dev/shm/fir_status.json\n状态 + 电平", fc="#eeeeee")
+    poly([(12, 60), (12, 80)], "读状态（20 Hz）", 13.5, 75)
+
+    # 数据面：两条线程 + 一个 C 库
+    bx(54, 78, 20, 12, "dsp 线程\nSCHED_FIFO 10\n过核 + 写状态", fc="#dbe7f3")
+    bx(82, 78, 16, 12, "io 线程\nSCHED_FIFO 20\n只调 duplex_block", fc="#dbe7f3")
+    poly([(74, 86), (82, 86)], "q1", 78, 88.3, ha="center", fs=7)
+    poly([(82, 82), (74, 82)], "q2", 78, 79.7, ha="center", fs=7)
+    bx(82, 46, 16, 10, "libaudio_stream.so\n（C++，cffi）", fc="#e8eef3")
+    poly([(90, 78), (90, 56)], "cffi", 91.5, 67)
+
+    # 调参通道：dsp 每 0.05 s 读一次，写完状态再写回文件
+    poly([(46, 67), (50, 67), (50, 76), (56, 76), (56, 78)], "每 0.05 s 读一次", 51, 76.9, fs=7)
+    poly([(62, 78), (62, 72), (53, 72), (53, 54), (46, 54)], "写状态 / 电平", 52, 70.4, fs=7)
+
+    # PL：核与 DDR、音频 IP 与 codec
+    bx(52, 22, 22, 12, "fir_multiband 核 v25\n36 拍 / 采样", fc="#dbe7f3", weight="bold")
+    bx(76, 22, 22, 12, "音频 IP（codec ctrl）\nMMIO FIFO，无 DMA", fc="#dcefd9")
+    bx(52, 6, 22, 10, "DDR3 块缓冲\ncin[] / cout[]", fc="#eeeeee")
+    bx(76, 6, 22, 10, "ADAU1761 codec\n麦克风 / 耳机（TRRS）", fc="#fbe3cc")
+    poly([(63, 78), (63, 34)], "AXI-Lite 写寄存器", 64.5, 60)
+    poly([(90, 46), (90, 34)], "MMIO 读写 FIFO", 88.5, 42, ha="right")
+    poly([(63, 22), (63, 16)], "AXI4 主机 S_AXI_HP0", 64.5, 19)
+    poly([(87, 22), (87, 16)], "I2S", 85.5, 19, ha="right")
+
+    ax.text(2, -4.5,
+            "左为控制面、右为数据面：两条线程不共享内存里的任何旋钮，只通过 /dev/shm 下两个 json 文件交换参数与状态。\n"
+            "q1 / q2 是两条 queue.SimpleQueue —— io 把收到的整块交给 dsp，dsp 把算好的一块交回 io；界面不碰 MMIO。",
+            fontsize=7.5, color="#70787f", linespacing=1.6)
+    save(fig, "fig2_5_software.png")
+
+
 if __name__ == "__main__":
     fig_flow()
+    fig_block()
     fig_chain()
     fig_response()
     fig_versions()
@@ -281,3 +457,5 @@ if __name__ == "__main__":
     fig_soak()
     fig_wdrc_curve()
     fig_thd()
+    fig_ab_loudness()
+    fig_software()
