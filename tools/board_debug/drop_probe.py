@@ -156,7 +156,7 @@ def audio_thread_cpu(pid, threads):
 
 
 def pct(a, b, hz):
-    if a is None or b is None:
+    if a is None or b is None or not hz:
         return None
     return round((b - a) / float(hz) * 100.0, 1)
 
@@ -169,6 +169,9 @@ def main():
     ap.add_argument("--l", type=int, default=480)
     ap.add_argument("--src", default="mic")
     ap.add_argument("--hz", type=float, default=20.0)
+    ap.add_argument("--no-trace", action="store_true",
+                    help="不打开 DROP_TRACE/GAP_TRACE：那两样在搬样线程上每块"
+                         "多五次计时 + list 追加，量小配置时会自己制造丢块")
     a = ap.parse_args()
 
     # 探针自己躲到 CPU1，别在 CPU0 上跟搬样线程抢
@@ -203,9 +206,9 @@ def main():
         "LIVE_L": str(a.l),
         "LIVE_SRC": a.src,
         "LIVE_SCOPE": "1",
-        "DROP_TRACE": trace_path,
-        "GAP_TRACE": gap_path,
     })
+    if not a.no_trace:
+        env.update({"DROP_TRACE": trace_path, "GAP_TRACE": gap_path})
 
     sys_info = {
         "uptime": read_text("/proc/uptime").split()[0],
@@ -344,7 +347,7 @@ def main():
             cpu_prev_t = now
 
             fam = family_cpu(fam0)
-            if fam_prev and fam_prev_t:
+            if fam_prev and fam_prev_t and now > fam_prev_t:
                 dt_s = now - fam_prev_t
                 fam_series.append({
                     "dt": round(now - t0, 1) if t0 else None,
@@ -358,7 +361,7 @@ def main():
             fam_prev = fam
             fam_prev_t = now
 
-            if threads and th_prev and th_prev_t:
+            if threads and th_prev and th_prev_t and now > th_prev_t:
                 cur_th = audio_thread_cpu(p.pid, threads)
                 dt_s = now - th_prev_t
                 row = {"dt": round(now - t0, 1) if t0 else None}
