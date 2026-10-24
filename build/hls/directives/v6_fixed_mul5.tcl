@@ -21,5 +21,5 @@
 # 复现命令(在仓库根目录):
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v6_fixed_mul5 HLS_DIRECTIVES=build/hls/directives/v6_fixed_mul5.tcl \
 #     HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18" \
-#     "E:/Xilinx/Vitis_HLS/2020.2/bin/vitis_hls.bat" -f build/hls/run_synth.tcl
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 set_directive_allocation -limit 5 -type operation fir_multiband mul

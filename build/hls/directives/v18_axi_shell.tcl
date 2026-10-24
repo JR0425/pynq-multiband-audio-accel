@@ -54,7 +54,7 @@ set_directive_interface -mode s_axilite -bundle control "fir_multiband" return
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v18_axi_shell \
 #     HLS_DIRECTIVES=build/hls/directives/v18_axi_shell.tcl \
 #     HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18 -DFIR_ACC_SAT=0 -DFIR_N_TAPS=193" \
-#     cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_synth.tcl"
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 #
 # CFLAGS 逐字照抄 v13_sub_n193 那一轮（见 build/hls/synth_v13.log 第 14 行），
 # 否则出来的不是「选定的那一版」，和已有的数对不上。
@@ -63,5 +63,5 @@ set_directive_interface -mode s_axilite -bundle control "fir_multiband" return
 #   ① 重跑 csim 确认数值逐位不变：
 #      MSYS_NO_PATHCONV=1 HLS_LABEL=csim_v18_axi \
 #        HLS_CFLAGS="<同上>" \
-#        cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_csim.tcl"
+#        "$VITIS_HLS_BIN" -f build/hls/run_csim.tcl
 #   ② 量 WNS：把 solution 存成 build/hls/sol_v18_axi_shell，再走 run_vivado_impl.tcl

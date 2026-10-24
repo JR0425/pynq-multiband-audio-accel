@@ -7,7 +7,7 @@
 #   这一步故意不放音频 IP：万一失败，只可能是流程问题，不会是音频 IP 的问题。
 #
 # 用法（在任意目录）：
-#   E:\Xilinx\Vivado\2020.2\bin\vivado.bat -mode batch -source build_ps_only.tcl
+#   vivado -mode batch -source build_ps_only.tcl      # 路径按本机安装位置调整
 #
 # 产物：
 #   board/overlay/ps_only.bit   给 PYNQ 加载的

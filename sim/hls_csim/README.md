@@ -42,7 +42,7 @@ b4 = 输入延迟 D 拍 - LP2000        D = (抽头数-1)/2
 在仓库根目录：
 
     MSYS_NO_PATHCONV=1 HLS_CFLAGS="-DFIR_FIXED=1 -DFIR_N_TAPS=193" \
-      cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_csim.tcl"
+      "$VITIS_HLS_BIN" -f build/hls/run_csim.tcl
 
 不带 `HLS_CFLAGS` 就是浮点版。**抽头数的默认值是 193**（和固件一致，
 `src/hls/fir_coeffs.h` 里的 `FIR_N_TAPS` 默认值也是 193）——

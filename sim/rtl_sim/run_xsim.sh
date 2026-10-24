@@ -22,9 +22,10 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SIM="$ROOT/sim/rtl_sim"
 WORK="$SIM/xsim_work"
 
-XV="E:/Xilinx/Vivado/2020.2/bin/xvlog.bat"
-XE="E:/Xilinx/Vivado/2020.2/bin/xelab.bat"
-XS="E:/Xilinx/Vivado/2020.2/bin/xsim.bat"
+# 工具路径可用环境变量覆盖（默认是这份仓库当初用的安装位置）
+XV="${XVLOG_BIN:-E:/Xilinx/Vivado/2020.2/bin/xvlog.bat}"
+XE="${XELAB_BIN:-E:/Xilinx/Vivado/2020.2/bin/xelab.bat}"
+XS="${XSIM_BIN:-E:/Xilinx/Vivado/2020.2/bin/xsim.bat}"
 
 for f in "$XV" "$XE" "$XS"; do
     [ -f "$f" ] || { echo "找不到 $f"; exit 1; }

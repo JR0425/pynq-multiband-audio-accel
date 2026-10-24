@@ -28,7 +28,7 @@
 #
 # 用法（在仓库根目录）：
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v11_fixed_nosat_mul5 \
-#     cmd /c "E:\Xilinx\Vivado\2020.2\bin\vivado.bat -notrace -mode batch -source build\hls\run_vivado_impl.tcl"
+#     "$VIVADO_BIN" -notrace -mode batch -source build/hls/run_vivado_impl.tcl
 #
 #   量别的版本时用 HLS_SOL 指到另一份 solution 目录（HLS 每次综合都会覆盖
 #   impl_proj，所以要先 `cp -r impl_proj/solution1 <别处>` 把 RTL 存下来）。

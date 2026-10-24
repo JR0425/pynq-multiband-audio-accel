@@ -12,8 +12,8 @@
 #
 # 用法（在仓库根目录）：
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v15_sub_n193_mul64 HLS_CLK_MHZ=80 \
-#     cmd /c "E:\Xilinx\Vivado\2020.2\bin\vivado.bat -notrace -mode batch \
-#             -source build\hls\report_alt_clock.tcl"
+#     "$VIVADO_BIN" -notrace -mode batch \
+#             -source build/hls/report_alt_clock.tcl
 #
 #   多个频率用逗号隔开：HLS_CLK_MHZ=100,90,80,75,66.7
 #

@@ -272,8 +272,8 @@ extern "C" void stream_end(void* h)
  * 读法假象（数字零被读成 rms 46341 = 65535/√2）。所以当初那些分辨实验里的
  * 「安静 / 满幅」读数全部作废，跟这 4 次写没有关系。
  *
- * 这个函数本身还是好用的 —— 运行期改单个 codec 寄存器，改完记得回读一眼
- * （`read_audio_reg`）。当年的教训：只看 0.2 秒窗口、不看回读，等于没测。
+ * 这个函数本身还是好用的 —— 运行期改单个 codec 寄存器。改完应回读一眼
+ * （`read_audio_reg`）：只看 0.2 秒窗口、不看回读，等于没测。
  *
  * 用法（Python，cffi）：先 `audio.select_microphone()`，再
  *     lib.stream_reg_write(0x1C, 0x21, audio.iic_index)

@@ -16,7 +16,7 @@
 #
 # 复现命令（在仓库根目录）：
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v8_float_nolimit HLS_CFLAGS="-DFIR_PARTIAL=5" \
-#     "E:/Xilinx/Vitis_HLS/2020.2/bin/vitis_hls.bat" -f build/hls/run_synth.tcl
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 #
 # 这个文件里没有 set_directive_* —— 它存在的意义就是把「不下指令」这件事
 # 写成一份可复现的记录，而不是靠「当时忘了加」。

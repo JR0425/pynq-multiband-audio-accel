@@ -19,6 +19,6 @@
 # 复现命令（在仓库根目录）：
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v10_fixed_nosat \
 #     HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18 -DFIR_ACC_SAT=0" \
-#     "E:/Xilinx/Vitis_HLS/2020.2/bin/vitis_hls.bat" -f build/hls/run_synth.tcl
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 
 # 无指令：不限制任何运算的个数，让 HLS 自己铺开。

@@ -25,7 +25,7 @@
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v18_axi_shell \
 #     HLS_DIRECTIVES=build/hls/directives/v18_axi_shell.tcl \
 #     HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18 -DFIR_ACC_SAT=0 -DFIR_N_TAPS=193" \
-#     cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_export_ip.tcl"
+#     "$VITIS_HLS_BIN" -f build/hls/run_export_ip.tcl
 #
 # 产物：
 #   build/vivado/ip_repo/fir_multiband_v1_0/component.xml   ← block design 用它

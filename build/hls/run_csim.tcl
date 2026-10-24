@@ -1,7 +1,7 @@
 # 一键跑 C 仿真（不综合，只验算法）
 #
 # 用法：
-#   MSYS_NO_PATHCONV=1 cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_csim.tcl"
+#   MSYS_NO_PATHCONV=1 "$VITIS_HLS_BIN" -f build/hls/run_csim.tcl
 #
 # 干什么：建工程 -> 挂上核和测试台 -> csim_design
 #         结果写到 data/results/hw_output.txt，再用

@@ -3,13 +3,13 @@
 # 用法（在仓库根目录跑）：
 #
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v0_baseline \
-#     cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_synth.tcl"
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 #
 # 要带上优化指令的版本，再加一个变量：
 #
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v1_partition \
 #     HLS_DIRECTIVES=build/hls/directives/v1_partition.tcl \
-#     cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_synth.tcl"
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 #
 # 干什么：
 #   建工程 -> 挂核 -> 综合 -> 把报告拷到 build/hls/reports/<HLS_LABEL>/

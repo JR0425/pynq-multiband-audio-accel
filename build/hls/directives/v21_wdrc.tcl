@@ -41,7 +41,7 @@ set_directive_interface -mode s_axilite -bundle control "fir_multiband" return
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v21_wdrc \
 #     HLS_DIRECTIVES=build/hls/directives/v21_wdrc.tcl \
 #     HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18 -DFIR_ACC_SAT=0 -DFIR_N_TAPS=193 -DFIR_SHIFT_CHAIN=1" \
-#     cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build/hls/run_synth.tcl"
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 #
 # CFLAGS **逐字照抄出货那一版**（v20）。少一个 -DFIR_SHIFT_CHAIN=1，
 # 出来的就是 450 拍/采样那一版，跟已有的数全对不上。

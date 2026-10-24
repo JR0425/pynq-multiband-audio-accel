@@ -4,16 +4,16 @@
 # 但那个 bit 的 PL 里是空的。这一步往里放音频 IP，目标是
 # **上板之后 base.audio 那套代码照用，能出声**。
 #
-# 走的是 PLAN §2.2 说的"甲"路线：复用 PYNQ 官方那个自研音频 IP
-# （xilinx.com:user:audio_codec_ctrl:1.0），于是 pynq.lib.audio.AudioADAU1761
-# 和已经跑通的 verify_audio_playback.py 一行都不用改。
-# 代价是代码和引脚全部照抄官方 —— 但这正是"省事"的含义，不是缺陷。
+# 复用 PYNQ 官方那个自研音频 IP（xilinx.com:user:audio_codec_ctrl:1.0），
+# 于是 pynq.lib.audio.AudioADAU1761 和已经跑通的 verify_audio_playback.py
+# 一行都不用改。代价是代码和引脚全部沿用官方实现 —— 这是刻意选择而不是缺陷：
+# 整机 overlay 的验证重点是加速核，不在重写 codec 控制层。
 #
 # 这个 IP 不在 Vivado 自带库里，要先拉源码：
 #   python board/overlay/fetch_audio_ip.py
 #
 # 用法（在任意目录）：
-#   E:\Xilinx\Vivado\2020.2\bin\vivado.bat -mode batch -source build_audio.tcl
+#   vivado -mode batch -source build_audio.tcl      # 路径按本机安装位置调整
 #
 # 产物：
 #   board/overlay/audio.bit   给 PYNQ 加载的

@@ -45,7 +45,7 @@ set_directive_interface -mode s_axilite -bundle control "fir_multiband" return
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v20_gain \
 #     HLS_DIRECTIVES=build/hls/directives/v20_gain.tcl \
 #     HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18 -DFIR_ACC_SAT=0 -DFIR_N_TAPS=193 -DFIR_SHIFT_CHAIN=1" \
-#     cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_synth.tcl"
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 #
 # CFLAGS **逐字照抄出货那一版**（export_ip_v19.log 第 13 行）。
 # 少一个 -DFIR_SHIFT_CHAIN=1，出来的就是 450 拍/采样那一版，跟已有的数全对不上。
@@ -58,6 +58,6 @@ set_directive_interface -mode s_axilite -bundle control "fir_multiband" return
 #   ③ csim：单位增益下输出必须和加增益之前**逐位相同**
 #      MSYS_NO_PATHCONV=1 HLS_LABEL=csim_v20 \
 #        HLS_CFLAGS="<同上>" \
-#        cmd /c "E:\Xilinx\Vitis_HLS\2020.2\bin\vitis_hls.bat -f build\hls\run_csim.tcl"
+#        "$VITIS_HLS_BIN" -f build/hls/run_csim.tcl
 #   ④ 走 run_vivado_impl.tcl 看 WNS（现在 +1.283 ns，加一级乘法后仍要为正），
 #      再导出 IP、重跑 bitstream、上板做逐位自检

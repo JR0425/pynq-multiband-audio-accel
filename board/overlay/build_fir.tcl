@@ -21,7 +21,7 @@
 #      build/vivado/ip_repo/fir_multiband_v1_0/component.xml
 #
 # 用法（在任意目录）：
-#   E:\Xilinx\Vivado\2020.2\bin\vivado.bat -mode batch -source build_fir.tcl
+#   vivado -mode batch -source build_fir.tcl      # 路径按本机安装位置调整
 #
 # 产物：
 #   board/overlay/fir.bit / fir.hwh   给 PYNQ 加载的
@@ -281,7 +281,7 @@ if {!$unzip_ok} {
 
 # ---- 14. 整机时序：这次是**在 context 里**量的，不是光杆司令 ----
 # 前面 HLS 那边量的 +0.932 ns 是 -mode out_of_context 的数（当独立零件量）。
-# 这张报告才回答「整机能不能跑 100 MHz」—— 项目里一直欠着的那一条证据。
+# 这张报告回答的是「整机能不能跑 100 MHz」。
 report_timing_summary -quiet -file [file join $script_dir fir_timing.rpt]
 report_utilization  -quiet -file [file join $script_dir fir_util.rpt]
 

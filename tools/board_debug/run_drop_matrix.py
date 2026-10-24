@@ -31,7 +31,8 @@ USER = "xilinx"
 PASS = "xilinx"
 BOARD_DIR = "/home/xilinx/jupyter_notebooks"
 BOARD_PY = "/usr/local/share/pynq-venv/bin/python3"
-CHROME = r"C:\Users\XIA\.agent-browser\browsers\chrome-155.0.8059.84\chrome.exe"
+# 用 Chrome 开网页里的播放页当负载。路径按本机安装位置改，或用 CHROME_BIN 指过去。
+CHROME = os.environ.get("CHROME_BIN", r"C:\Program Files\Google\Chrome\Application\chrome.exe")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 

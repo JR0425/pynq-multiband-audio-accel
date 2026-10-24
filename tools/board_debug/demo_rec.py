@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""demo_rec.py —— 录一段"我实时说话的产出"。**在 Windows 上跑。**
+"""demo_rec.py —— 录一段实时说话的处理前后对比。**在 Windows 上跑。**
 
     python tools/board_debug/demo_rec.py 15
 
 做的事：让板子用演示档位（L=360/NBUF=2，嘴到耳 16.2 ms）开实时，
 对着耳机麦说 N 秒，然后停下、等自检跑完、把两个 wav 拉回电脑：
 
-    <桌面>\\演示素材\\take_in.wav    处理前（进核的信号）
-    <桌面>\\演示素材\\take_out.wav   处理后（出核的信号）
+    data/audio/demo/take_in.wav     处理前（进核的信号）
+    data/audio/demo/take_out.wav    处理后（出核的信号）
 
-两个文件是**同一趟、逐块对齐**的，对着放就能让评委听出差别。
+两个文件是**同一趟、逐块对齐**的，对着放即可对比处理前后的差别。
 
 为什么走网页服务而不是直接起 fir_live：
   fir_live.py 每次只允许一条在跑（有文件锁）。从网页服务起，现场那一趟
@@ -33,7 +33,7 @@ import paramiko
 HOST, USER, PASSWD = "192.168.2.99", "xilinx", "xilinx"
 BOARD_DIR = "/home/xilinx/jupyter_notebooks"
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "演示素材")
+OUT_DIR = os.path.join(REPO, "data", "audio", "demo")
 REC_PREFIX = "/tmp/take"          # 只准 /tmp 或 /dev/shm（服务端会检查）
 BASE = "http://%s:8080" % HOST
 

@@ -23,8 +23,8 @@
 
 网络说明
 --------
-本机 `github.com` 被 IP 层封锁，但 `api.github.com` 和 `raw.githubusercontent.com`
-是通的 —— 本脚本只走这两个，不碰 github.com。
+在 `github.com` 被 IP 层封锁的网络里，`api.github.com` 和 `raw.githubusercontent.com`
+往往还是通的 —— 本脚本只走这两个，不碰 github.com。
 """
 
 import argparse

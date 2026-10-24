@@ -18,8 +18,8 @@
 #
 # 用法（在仓库根目录）：
 #   MSYS_NO_PATHCONV=1 HLS_LABEL=v11_fixed_nosat_mul5 HLS_IO_DELAY=1.5 \
-#     cmd /c "E:\Xilinx\Vivado\2020.2\bin\vivado.bat -notrace -mode batch \
-#             -source build\hls\report_io_timing.tcl"
+#     "$VIVADO_BIN" -notrace -mode batch \
+#             -source build/hls/report_io_timing.tcl
 #
 # HLS_IO_DELAY 是要给的值，单位 ns。**这个数不该由脚本猜** —— 它等于
 # 「上一级寄存器出来、走到我这根管脚花了多久」，取决于外面套什么壳。

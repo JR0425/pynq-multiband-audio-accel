@@ -6,5 +6,8 @@
 # 既然复用的代价这么低，就继续往下压，看 DSP 能到多小、LUT 涨到多少。
 #
 # 复现命令（在仓库根目录）：
-#   MSYS_NO_PATHCONV=1 HLS_LABEL=v16_sub_n193_mul32 #     HLS_DIRECTIVES=build/hls/directives/v16_sub_n193_mul32.tcl #     HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18 -DFIR_ACC_SAT=0 -DFIR_N_TAPS=193" #     "E:/Xilinx/Vitis_HLS/2020.2/bin/vitis_hls.bat" -f build/hls/run_synth.tcl
+#   MSYS_NO_PATHCONV=1 HLS_LABEL=v16_sub_n193_mul32 \
+#     HLS_DIRECTIVES=build/hls/directives/v16_sub_n193_mul32.tcl \
+#     HLS_CFLAGS="-DFIR_PARTIAL=5 -DFIR_FIXED=1 -DFIR_DW=16 -DFIR_CW=18 -DFIR_ACC_SAT=0 -DFIR_N_TAPS=193" \
+#     "$VITIS_HLS_BIN" -f build/hls/run_synth.tcl
 set_directive_allocation -limit 32 -type operation fir_multiband mul

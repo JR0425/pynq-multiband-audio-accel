@@ -141,7 +141,7 @@ def levels():
     """本块两个声道的 (去直流 rms, 峰),单位 int16 域(满量程 32767)。
 
     低 24 位是**二进制补码**,必须先符号扩展 —— 不做的话,一个跨零的近零信号
-    会被读成 rms ≈ 46341 的"满幅"(2026-10-14 栽过,见 PROGRESS.md)。
+    会被读成 rms ≈ 46341 的"满幅"(2026-10-14 踩过,详见 cap_probe11.py 文件头)。
     """
     a = np.frombuffer(bytes(ffi.buffer(rbuf, 4 * 2 * L)), dtype=np.int32)
     c = a.reshape(-1, 2).astype(np.int64) & 0xFFFFFF
