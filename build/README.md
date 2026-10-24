@@ -36,7 +36,7 @@
 | `<版本>_impl/` | `timing_synth.rpt`、`timing_impl.rpt`、`timing_impl_worst_paths.rpt`、`utilization_synth.rpt`、`utilization_impl.rpt` 及两份分级 `_hier` 版 |
 | `*_clk{75,80,85,90,100}MHz/` | 同一设计在不同时钟约束下的时序，用来判断余量 |
 
-关键几版：`v0_baseline`（起点，1661 拍）、`v13_sub_n193`（海报那张资源图的出处，449 拍）、
+关键几版：`v0_baseline`（起点，1661 拍）、`v13_sub_n193`（早期展示材料里那张资源图的出处，449 拍）、
 `v19_true_baseline`（31 拍，加速比 19.5× 那趟跑的就是这一版）、`v21_wdrc`（49 拍，加了
 WDRC）、`v25_env_indep`（36 拍，出货）。
 
