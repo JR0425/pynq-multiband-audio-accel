@@ -95,7 +95,18 @@ main{padding:8px 12px 10px;max-width:none}
 .a-lvl{grid-column:2;grid-row:1}
 .a-gain{grid-column:2;grid-row:2}
 .a-comp{grid-column:2;grid-row:3}
+.a-health{grid-column:2;grid-row:4}
 .scope-col>.sect{margin:0}
+
+/* 系统健康：两列小表，数值右对齐 */
+.hl-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+.hl-grid>div{display:flex;justify-content:space-between;align-items:baseline;
+  gap:8px;padding-bottom:3px;border-bottom:1px dashed var(--line)}
+.hl-grid .k{color:var(--faint);font-size:11.5px;white-space:nowrap}
+.hl-grid b{color:var(--dim);font-weight:400;font-family:var(--mono);
+  font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.hl-grid b.warn{color:#d9a45e}
+.hl-grid b.bad{color:var(--neg)}
 #errbar,#errlog{margin-bottom:10px}
 h3{font-size:13px;font-weight:600;color:var(--text);letter-spacing:1px;
   margin-bottom:5px;display:flex;align-items:baseline;gap:8px}
@@ -242,7 +253,7 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
   #grid{grid-template-columns:1fr}
   .a-fr{grid-column:1;grid-row:auto}
   .scope-col{grid-column:1;grid-row:auto;display:contents}
-  .a-lvl,.a-gain,.a-comp{grid-column:1;grid-row:auto}
+  .a-lvl,.a-gain,.a-comp,.a-health{grid-column:1;grid-row:auto}
   .gain-row{grid-template-columns:120px 1fr 96px}
   header{height:auto;padding:8px 12px;gap:8px}
   .chips{display:none}
@@ -393,6 +404,19 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
     <div class="comp-row2">
       <div class="preset-row" id="comp-presets" style="border:none;margin:0;padding:0"></div>
       <label class="ck"><input type="checkbox" id="ck-bypass"> 直通（只跳过压缩，四段增益仍然生效）</label>
+    </div>
+  </section>
+
+  <!-- 系统健康：板子自己的状态，2 秒拉一次 -->
+  <section class="sect a-health">
+    <h3>系统健康 <span class="sub">每 2 秒从板上读一次 · 三项过关才敢开讲</span></h3>
+    <div class="hl-grid">
+      <div><span class="k">过核用时</span><b id="hl-dsp" class="num">—</b></div>
+      <div><span class="k">CPU 温度</span><b id="hl-temp" class="num">—</b></div>
+      <div><span class="k">可用内存</span><b id="hl-mem" class="num">—</b></div>
+      <div><span class="k">板子运行</span><b id="hl-up" class="num">—</b></div>
+      <div><span class="k">死机防护</span><b id="hl-guard" class="num">—</b></div>
+      <div><span class="k">比特流</span><b id="hl-bit" class="num">—</b></div>
     </div>
   </section>
 
@@ -1147,6 +1171,65 @@ $("#btn-stop").addEventListener("click", async () => {
 function renderStatusSafe(){ if (lastStatus) renderStatus(lastStatus); }
 
 /* =====================================================================
+ * 系统健康：板子自己的状态。2 秒一次，只在页面可见时拉。
+ * 这里的三项是台上要盯的：处理余量（还有多少 CPU 时间没用到）、
+ * 死机防护（ksoftirqd/kworker 有没有被提权）、比特流（是不是出货那版）。
+ * ===================================================================== */
+function setHl(sel, text, cls){
+  const el = $(sel);
+  el.textContent = text;
+  el.className = "num" + (cls ? " " + cls : "");
+}
+function fmtUp(s){
+  if (s == null) return "—";
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
+        m = Math.floor(s % 3600 / 60);
+  return d ? `${d} 天 ${h} 时` : h ? `${h} 小时 ${m} 分` : `${m} 分`;
+}
+function renderHealth(h){
+  const st = (lastStatus && lastStatus.status) || null;
+  /* 处理余量：拿过核线程的用时比块长。搬样线程那条是等 I2S 的，
+     占比天然贴满，拿它算"余量"会吓人，所以只看 dsp。 */
+  if (S.audioOn && st && st.dsp_ms != null && st.l){
+    const blk = st.l / 48;                       // 48 kHz → 每块毫秒数
+    const pc  = st.dsp_ms / blk * 100;
+    setHl("#hl-dsp", `${st.dsp_ms.toFixed(2)} / ${blk.toFixed(1)} ms · ${pc.toFixed(0)}%`,
+          pc > 80 ? "bad" : pc > 60 ? "warn" : "");
+  } else {
+    setHl("#hl-dsp", "未运行", "");
+  }
+  setHl("#hl-temp", h.temp_c == null ? "读不到"
+        : h.temp_c.toFixed(1) + " °C", h.temp_c > 85 ? "warn" : "");
+  setHl("#hl-mem", h.mem_avail_mb == null ? "—" : h.mem_avail_mb + " MB",
+        h.mem_avail_mb != null && h.mem_avail_mb < 60 ? "warn" : "");
+  setHl("#hl-up", fmtUp(h.uptime_s), "");
+  const g = h.guard || {};
+  if (g.ksoftirqd && g.ksoftirqd.length){
+    const ks = g.ksoftirqd, w = g.kworker || {n:0, fifo:0};
+    const nbad = ks.filter(x => !x.fifo).length + (w.n - w.fifo);
+    setHl("#hl-guard",
+          nbad ? `${nbad} 个未提权` : `正常 · ${ks.length + w.n} 个线程`,
+          nbad ? "bad" : "");
+    $("#hl-guard").title = ks.map(x => x.name + (x.fifo ? " FIFO" : " 普通"))
+                            .join("  ") + `  ·  kworker ${w.fifo}/${w.n} FIFO`;
+  } else {
+    setHl("#hl-guard", "找不到", "bad");
+  }
+  const b = h.bit || {};
+  if (b.ok && b.label)
+    setHl("#hl-bit", `${b.label} · ${b.cycles} 拍/样本`, "");
+  else if (b.ok)
+    setHl("#hl-bit", "未知 " + String(b.md5 || "").slice(0, 8), "warn");
+  else
+    setHl("#hl-bit", b.msg || "读不到", "bad");
+}
+async function pollHealth(){
+  try { const h = await getJSON("/api/health"); if (h) renderHealth(h); }
+  catch(e){ /* 板子掉线由状态轮询统一提示 */ }
+  setTimeout(pollHealth, document.hidden ? 6000 : 2000);
+}
+
+/* =====================================================================
  * 初始化：读 /api/tune；tune 为 null（板子刚刷机）就填默认并立刻写回
  * ===================================================================== */
 function applyTune(t){
@@ -1173,6 +1256,7 @@ function applyTune(t){
   } catch(e){ /* 板子不在线：保持默认，轮询会继续试 */ }
   pollStatus();
   pollScope();
+  pollHealth();
 })();
 </script>
 </body>

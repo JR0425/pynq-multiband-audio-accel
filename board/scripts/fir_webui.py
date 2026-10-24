@@ -32,6 +32,7 @@
 
 import argparse
 import atexit
+import hashlib
 import json
 import os
 import re
@@ -75,6 +76,12 @@ GD         = 96                          # 核的群延迟，画图时先补掉
 # 再重启服务，不用改代码。
 DEMO_L    = int(os.environ.get("DEMO_L", "360"))
 DEMO_NBUF = int(os.environ.get("DEMO_NBUF", "2"))
+
+# 健康面板：板子自己的状态，全读只读文件、不起子进程 —— 起进程本身就在
+# CPU0 上加活，10-24 刚量过：搬样线程上多一点点东西就能把 16.2 ms 档压出丢块。
+BIT_PATH = os.path.join(HERE, "fir.bit")
+KNOWN_BITS = {"5aa079f29e8d66c21d1d34f1302c3695": ("v25_env_indep", 36)}
+IIO_DIR = "/sys/bus/iio/devices/iio:device0"       # Zynq XADC，CPU 温度
 
 LOCK    = threading.Lock()
 PROC    = {"p": None, "log": None, "stopping": False, "starting": False,
@@ -336,6 +343,105 @@ def _state():
                      "log": "" if run else _log_tail()},
             "last": last,
             "age": age}
+
+
+def _read_txt(path):
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+_BITS = {"key": None, "info": None}
+
+
+def _bit_info():
+    """fir.bit 的 md5：认得出来就是出货那版，顺带说出每样本多少拍。"""
+    try:
+        stt = os.stat(BIT_PATH)
+        key = (stt.st_mtime, stt.st_size)
+    except OSError:
+        return {"ok": False, "msg": "板上找不到 fir.bit"}
+    if _BITS["key"] != key:
+        h = hashlib.md5()
+        try:
+            with open(BIT_PATH, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+        except OSError as e:
+            return {"ok": False, "msg": "读不了 fir.bit：%s" % e}
+        md5 = h.hexdigest()
+        label, cycles = KNOWN_BITS.get(md5, (None, None))
+        _BITS["key"] = key
+        _BITS["info"] = {"ok": True, "md5": md5, "label": label, "cycles": cycles}
+    return _BITS["info"]
+
+
+_GUARD = {"t": 0.0, "v": None}
+
+
+def _guard_state(ttl=10.0):
+    """搬样线程是 SCHED_FIFO 且永不阻塞，CPU 上的 ksoftirqd / kworker
+    若还是普通优先级会被饿死，约 60 秒后 RCU stall → panic。
+    这里看内核里实际的调度策略：直接读 /proc/<pid>/stat 的 policy 和
+    priority 两个域，比 pgrep/chrt 起子进程便宜得多（起进程本身就在
+    往 CPU0 上加活）。"""
+    now = time.time()
+    if _GUARD["v"] is not None and now - _GUARD["t"] < ttl:
+        return _GUARD["v"]
+    ks = []
+    kw = {"n": 0, "fifo": 0}
+    for d in os.listdir("/proc"):
+        if not d.isdigit():
+            continue
+        comm = _read_txt("/proc/%s/comm" % d).strip()
+        if not (comm.startswith("ksoftirqd/")
+                or comm.startswith(("kworker/0:", "kworker/1:"))):
+            continue
+        s = _read_txt("/proc/%s/stat" % d)
+        try:
+            rest = s.rsplit(")", 1)[1].split()
+            policy = int(rest[38])          # stat 第 41 域
+            prio = int(rest[15])            # stat 第 18 域，实时任务 = -(rt+1)
+        except (IndexError, ValueError):
+            continue
+        fifo = (policy == 1 and prio <= -21)
+        if comm.startswith("ksoftirqd/"):
+            ks.append({"name": comm, "fifo": fifo})
+        else:
+            kw["n"] += 1
+            if fifo:
+                kw["fifo"] += 1
+    ks.sort(key=lambda x: x["name"])
+    ok = bool(ks) and all(x["fifo"] for x in ks) and kw["fifo"] == kw["n"]
+    out = {"ok": ok, "ksoftirqd": ks, "kworker": kw}
+    _GUARD["t"] = now
+    _GUARD["v"] = out
+    return out
+
+
+def _health():
+    temp = None
+    try:
+        raw = int(_read_txt(IIO_DIR + "/in_temp0_raw").strip())
+        off = int(_read_txt(IIO_DIR + "/in_temp0_offset").strip())
+        sca = float(_read_txt(IIO_DIR + "/in_temp0_scale").strip())
+        temp = round((raw + off) * sca / 1000.0, 1)
+    except (OSError, ValueError):
+        temp = None
+    mem = None
+    m = re.search(r"MemAvailable:\s+(\d+)", _read_txt("/proc/meminfo"))
+    if m:
+        mem = int(int(m.group(1)) / 1024)
+    up = None
+    try:
+        up = int(float(_read_txt("/proc/uptime").split()[0]))
+    except (IndexError, ValueError):
+        pass
+    return {"temp_c": temp, "mem_avail_mb": mem, "uptime_s": up,
+            "load": _read_txt("/proc/loadavg").split()[:3],
+            "guard": _guard_state(), "bit": _bit_info()}
 
 
 def _scope_payload():
@@ -846,6 +952,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, "tune": read_tune()})
         elif p == "/api/scope":
             self._json(_scope_payload())
+        elif p == "/api/health":
+            self._json(_health())
         elif p == "/api/rec":
             self._rec_file()
         else:
