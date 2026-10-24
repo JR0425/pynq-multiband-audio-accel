@@ -30,7 +30,7 @@
 
 ---
 
-## 演示方案（定稿 2026-10-15）
+## 演示方案（2026-10-15 定稿，2026-10-24 更新实时档）
 
 **器材**：PYNQ-Z2 板子、带麦耳机、有源音箱（已购）、公对公 3.5mm 线、笔记本（录屏 + 录声）。
 
@@ -134,8 +134,16 @@
 
 ```
 echo xilinx | sudo -S sh -c 'cd /home/xilinx/jupyter_notebooks && \
-    LIVE_EXTRA="LIVE_VOLUME=35 LIVE_DIAG=1" sh run_live.sh 40'
+    LIVE_EXTRA="LIVE_VOLUME=35 LIVE_DIAG=1 LIVE_L=360 LIVE_NBUF=2" sh run_live.sh 40'
 ```
+
+`LIVE_L=360 LIVE_NBUF=2` 就是报告里那个 **16.2 ms 低延迟档**（2026-10-24 复测：
+关掉探针插桩后连续 600 秒 80188 块 0 丢块）。不写这两个变量时脚本用默认的
+480/3，那是 **31.0 ms 稳定档** —— 视频里说 16.2 ms 就必须带上这两个变量。
+
+这一档每块的余量只有十几微秒（7.49 ms 预算里余下约 14 µs），所以**跑的时候别从电脑
+SSH 进板子做别的事**：10-24 实测，5 分钟里查了几次 `df`/`ps` 就累积了 9 块积压；
+界面自己 150/250 ms 拉一次状态不受影响。
 
 字幕要写清这条边界，别让观众以为超出实测：40 秒里多花 0.19 秒 ≈ **丢 18 块**，
 耳机里会有一点断续（音频 IP 没有 DMA，搬样线程空转占到 99% 预算，是结构性的，
@@ -152,7 +160,7 @@ echo xilinx | sudo -S sh -c 'cd /home/xilinx/jupyter_notebooks && \
 
 ```
 echo xilinx | sudo -S sh -c 'cd /home/xilinx/jupyter_notebooks && \
-    LIVE_EXTRA="LIVE_VOLUME=35 LIVE_SCOPE=1" sh run_live.sh 40'
+    LIVE_EXTRA="LIVE_VOLUME=35 LIVE_SCOPE=1 LIVE_L=360 LIVE_NBUF=2" sh run_live.sh 40'
 ```
 
 **纵轴是钉死满量程的，不自动缩放** —— 自动缩放会把"电平变了"重新归一化掉，

@@ -45,7 +45,7 @@
     传 `D:/.../build/hls/csim_proj` 进去直接报
     `[HLS 200-70] The name '...' contains illegal character ':'` —— 冒号和斜杠都非法。
   - `csim_design` 的工作目录是它自己临时建的目录，**相对路径到不了仓库根**。
-  - 顺带发现本机有 g++（`E:\vscodedowmload\mingw64\bin`）。
+  - 顺带发现本机有 g++ 可以拿来做语法检查。
 
 【怎么修正】
 1. **黄金参考改用和硬件完全相同的那组系数去算。**
