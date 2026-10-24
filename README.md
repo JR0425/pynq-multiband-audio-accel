@@ -34,9 +34,9 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 - 同芯片 ARM vs PL 加速比：**16.7 倍**（2026-10-23 板上实测，测的是当前出货版 `v25_env_indep`，原始输出 `data/results/compare_cpu_fpga_run_20261023.txt`）。Zynq PS 侧的 ARM 每采样 **6.117 µs**（3.41× 实时），PL 里的核 **0.367 µs**（56.77× 实时；理论 0.360 µs = 36 拍 @ 100 MHz）。2026-10-22 那次的 **12.5 倍**是 `v21_wdrc`（49 拍）的数，2026-10-08 的 **19.5 倍**是 `v19`（31 拍）的数，都别和现在这颗混用。引用这个数必须带四条说明 —— 两边精度不同（float64 vs Q1.15）、CPU 那边是 scipy 的 C 实现、核的耗时里含每块约 60 µs 的 Python 开销（占长块实测不到 10%）、两边每采样都是 579 次有效乘法。全文见 `data/results/accel_cpu_vs_fpga.md`。
 - 早期还测过一个开源参考 overlay。结果在 `data/results/reference_overlay_metrics.md`，和自研核无关，别混着引用。
 - Python / HLS / RTL 三实现对比已经做完，同一负载、同一精度契约、同一 10 ns 约束，表在
-  `report/design_report_draft.md` §4.1。自研 RTL 分两块：`src/rtl/fir_lp.v`（单低通）和
+  `data/results/rtl_vs_hls.md`。自研 RTL 分两块：`src/rtl/fir_lp.v`（单低通）和
   `src/rtl/fir_mb_fe.v`（3 个低通 + 相减 + 4 段综合），xsim 逐位等于整数参考模型；两块都
-  没有 DRC、每段增益和 AXI 外壳。范围和限制见 `data/results/rtl_vs_hls.md`，跑法见
+  没有 DRC、每段增益和 AXI 外壳。范围和限制也见该文件，跑法见
   `sim/rtl_sim/README.md`。
 
 ## 目录结构
@@ -54,7 +54,7 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 | `data/figures/` | 生成的分析图 |
 | `data/results/` | 所有实测读数；**哪个文件是当前结论、哪些不能引用，见 `data/results/README.md`** |
 | `skill/` | 提示词、模板、检查脚本、踩坑笔记 |
-| `report/` | 设计报告、接口说明、提交清单、协作日志 |
+| `report/` | 接口说明、提交清单、协作日志、板端截图 |
 | `tools/` | 主机侧辅助脚本：参考模型、系数生成、质量指标、板子调试 |
 
 ## Python 基线

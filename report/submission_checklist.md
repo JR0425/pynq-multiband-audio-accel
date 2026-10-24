@@ -39,7 +39,7 @@ Status updated 2026-10-24 from the files currently present in this repository. A
 - [x] Skill package contains prompts, templates, checkers, and pitfalls.
 - [x] Target toolchain fixed and recorded: PYNQ-Z2 image 2.7.0 with Vivado and Vitis HLS 2020.2, with the reason for not using 2025.2/2026.1 stated in section 9 of the design report.
 - [x] Interface specification: `report/hardware_interface_spec.md` for the register contract.
-- [x] Final design report. `report/design_report_draft.md` carries the current numbers (36 cycles, 16.7×, +0.533 ns). The three sections the official guide asks for are now written: the functional block diagram and data path (§2.2, Figure 1), the hardware/software partitioning rationale with the register contract (§2.3), and the collaboration record plus skill-package distillation (§11, §12). Remaining work is a full read-through and any wording fixes it turns up.
+- [ ] Final design report. It is maintained as a Word document outside this repository; this repo supplies the evidence it cites (`data/results/`, `report/hardware_interface_spec.md`, `report/llm_collab_log/`, `skill/`). Open item: §3.4 of that document still has three evidence placeholders (A/B loudness-matched comparison, health-panel screenshot, RTL comparison table).
 - [x] Poster: out of scope for this submission. It is part of the finals (复赛) package and will be rebuilt then.
 - [ ] Record and edit the final demonstration video, then add its link to the README.
 
