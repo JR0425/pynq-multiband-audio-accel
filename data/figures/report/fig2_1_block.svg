@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1890" height="1120" viewBox="0 0 1890 1120" font-family="Microsoft YaHei, SimHei, sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4A5560"/>
+    </marker>
+    <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4A5560"/>
+    </marker>
+  </defs>
+  <rect width="1890" height="1120" fill="#FFFFFF"/>
+
+  <!-- 板外：音源 / 耳机 / 浏览器 -->
+  <rect x="40" y="95" width="260" height="125" rx="10" fill="#F5F6F8" stroke="#9AA5B1" stroke-width="2"/>
+  <text x="170" y="148" font-size="26" fill="#22364D" text-anchor="middle" font-weight="bold">笔记本浏览器</text>
+  <text x="170" y="188" font-size="22" fill="#5A6472" text-anchor="middle">验配界面（滑杆 · 预设）</text>
+
+  <rect x="40" y="690" width="260" height="100" rx="10" fill="#F5F6F8" stroke="#9AA5B1" stroke-width="2"/>
+  <text x="170" y="730" font-size="26" fill="#22364D" text-anchor="middle" font-weight="bold">音源</text>
+  <text x="170" y="768" font-size="22" fill="#5A6472" text-anchor="middle">麦克风 / 线路输入 / WAV 回放</text>
+
+  <rect x="40" y="820" width="260" height="100" rx="10" fill="#F5F6F8" stroke="#9AA5B1" stroke-width="2"/>
+  <text x="170" y="860" font-size="26" fill="#22364D" text-anchor="middle" font-weight="bold">耳机 / 音箱</text>
+  <text x="170" y="898" font-size="22" fill="#5A6472" text-anchor="middle">处理后声音输出</text>
+
+  <!-- PYNQ-Z2 容器 -->
+  <rect x="350" y="50" width="1210" height="1020" rx="14" fill="none" stroke="#333A45" stroke-width="2.5"/>
+  <text x="375" y="90" font-size="26" fill="#333A45" font-weight="bold">PYNQ-Z2（Zynq XC7Z020）</text>
+
+  <!-- PS 区域 -->
+  <rect x="380" y="115" width="580" height="525" rx="10" fill="#F5F7FA" stroke="#B7C3CF" stroke-width="1.5"/>
+  <text x="400" y="150" font-size="23" fill="#5A6472" font-weight="bold">PS — ARM Cortex-A9 ×2（Linux）</text>
+
+  <rect x="410" y="170" width="290" height="110" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
+  <text x="555" y="215" font-size="24" fill="#22364D" text-anchor="middle" font-weight="bold">Web 服务</text>
+  <text x="555" y="252" font-size="21" fill="#445060" text-anchor="middle">fir_webui.py（http.server）</text>
+
+  <rect x="760" y="170" width="170" height="110" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
+  <text x="845" y="215" font-size="24" fill="#22364D" text-anchor="middle" font-weight="bold">DDR 缓冲</text>
+  <text x="845" y="252" font-size="21" fill="#445060" text-anchor="middle">进 / 出数据块</text>
+
+  <rect x="410" y="350" width="290" height="120" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
+  <text x="555" y="392" font-size="24" fill="#22364D" text-anchor="middle" font-weight="bold">搬样线程</text>
+  <text x="555" y="428" font-size="21" fill="#445060" text-anchor="middle">逐采样读写音频寄存器</text>
+  <text x="555" y="456" font-size="21" fill="#445060" text-anchor="middle">（通路的瓶颈所在）</text>
+
+  <rect x="410" y="520" width="290" height="120" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
+  <text x="555" y="562" font-size="24" fill="#22364D" text-anchor="middle" font-weight="bold">FIR 核驱动</text>
+  <text x="555" y="598" font-size="21" fill="#445060" text-anchor="middle">写参数 · 启停 · 等待完成</text>
+  <text x="555" y="626" font-size="21" fill="#445060" text-anchor="middle">读 /dev/shm/fir_tune.json</text>
+
+  <!-- PL 区域 -->
+  <rect x="990" y="115" width="540" height="525" rx="10" fill="#EFF5F0" stroke="#AFC6B8" stroke-width="1.5"/>
+  <text x="1010" y="150" font-size="23" fill="#4A6A55" font-weight="bold">PL — FPGA</text>
+
+  <rect x="1020" y="170" width="310" height="150" rx="8" fill="#E7F2EC" stroke="#5B9279" stroke-width="2"/>
+  <text x="1175" y="212" font-size="24" fill="#1F3A2D" text-anchor="middle" font-weight="bold">音频 IP</text>
+  <text x="1175" y="246" font-size="21" fill="#3A5A48" text-anchor="middle">audio_codec_ctrl（PYNQ 自研）</text>
+  <text x="1175" y="276" font-size="21" fill="#3A5A48" text-anchor="middle">内含 I2S 收发器 · 48 kHz 写死</text>
+  <text x="1175" y="304" font-size="21" fill="#3A5A48" text-anchor="middle">S_AXI 从接口，无流接口</text>
+
+  <rect x="1020" y="380" width="480" height="230" rx="8" fill="#E7F2EC" stroke="#5B9279" stroke-width="2.5"/>
+  <text x="1260" y="420" font-size="24" fill="#1F3A2D" text-anchor="middle" font-weight="bold">FIR 加速核 v25_env_indep（出货版）</text>
+  <text x="1260" y="456" font-size="21" fill="#3A5A48" text-anchor="middle">3×193 抽头低通 FIR · 相减式四段分频</text>
+  <text x="1260" y="486" font-size="21" fill="#3A5A48" text-anchor="middle">四段包络 + WDRC 压缩 + 独立段增益</text>
+  <text x="1260" y="516" font-size="21" fill="#3A5A48" text-anchor="middle">36 拍/采样 @ 100 MHz · 205/220 DSP</text>
+  <text x="1260" y="546" font-size="21" fill="#3A5A48" text-anchor="middle">Q1.15 输入输出 · Q8.32 系数</text>
+  <text x="1260" y="586" font-size="21" fill="#3A5A48" text-anchor="middle">控制口 s_axilite · 数据口 m_axi</text>
+
+  <!-- ADAU1761 codec -->
+  <rect x="380" y="700" width="300" height="130" rx="8" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
+  <text x="530" y="742" font-size="24" fill="#4A331A" text-anchor="middle" font-weight="bold">ADAU1761 codec</text>
+  <text x="530" y="778" font-size="21" fill="#5A4A38" text-anchor="middle">48 kHz 采样 · I2S 接口</text>
+  <text x="530" y="808" font-size="21" fill="#5A4A38" text-anchor="middle">I2C1 配置（从地址 0x3B）</text>
+
+  <!-- 连线 -->
+  <!-- 浏览器 ↔ Web：网口 -->
+  <polyline points="300,155 340,155 340,140 430,140 430,168" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+  <text x="360" y="128" font-size="21" fill="#445060">网口 TCP 8080</text>
+
+  <!-- Web → 驱动：/dev/shm 参数 -->
+  <polyline points="410,225 395,225 395,580 408,580" fill="none" stroke="#4A5560" stroke-width="2" marker-end="url(#ah)"/>
+  <text x="388" y="410" font-size="20" fill="#445060" transform="rotate(-90 388 410)" text-anchor="middle">/dev/shm/fir_tune.json</text>
+
+  <!-- 搬样 ↔ DDR -->
+  <line x1="700" y1="410" x2="758" y2="410" stroke="#4A5560" stroke-width="2.5" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+  <!-- 驱动 ↔ DDR -->
+  <polyline points="700,555 730,555 730,470 758,470" fill="none" stroke="#4A5560" stroke-width="2" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+  <!-- 驱动 → 核：S_AXI 控制口 -->
+  <line x1="700" y1="605" x2="1018" y2="605" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+  <text x="860" y="594" font-size="21" fill="#445060" text-anchor="middle">S_AXI 控制口（参数 · 启停）</text>
+
+  <!-- 核 ↔ DDR：m_axi ↔ HP0 -->
+  <line x1="1020" y1="470" x2="932" y2="470" stroke="#4A5560" stroke-width="2.5" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  <text x="1012" y="458" font-size="21" fill="#445060" text-anchor="end">m_axi ↔ S_AXI_HP0（成块搬移）</text>
+
+  <!-- 音频 IP ↔ 搬样：逐采样寄存器 -->
+  <polyline points="1020,290 960,290 960,320 690,320 690,348" fill="none" stroke="#4A5560" stroke-width="2.5" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  <text x="855" y="310" font-size="21" fill="#445060" text-anchor="middle">逐采样寄存器读写（/dev/uio）</text>
+
+  <!-- 音源 → codec -->
+  <line x1="300" y1="740" x2="378" y2="740" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+  <text x="339" y="728" font-size="21" fill="#445060" text-anchor="middle">线路输入</text>
+
+  <!-- codec → 耳机 -->
+  <line x1="378" y1="870" x2="302" y2="870" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+  <text x="340" y="900" font-size="21" fill="#445060" text-anchor="middle">DAC 输出</text>
+
+  <!-- codec ↔ 音频 IP：I2S -->
+  <polyline points="680,765 960,765 960,340 1080,340 1080,324" fill="none" stroke="#4A5560" stroke-width="2.5" marker-start="url(#ah)" marker-end="url(#ah)"/>
+  <text x="890" y="753" font-size="21" fill="#445060">I2S（BCLK / LRCLK / SDATA）</text>
+
+  <!-- 底注 -->
+  <text x="955" y="1105" font-size="22" fill="#8C9BAB" text-anchor="middle">数据通路（黑实线）：音源 → codec → 搬样线程 → DDR → FIR 核 → DDR → 搬样线程 → codec → 耳机　·　控制通路：浏览器 → Web 服务 → /dev/shm → 驱动 → 核</text>
+</svg>

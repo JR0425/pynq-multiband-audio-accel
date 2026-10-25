@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1890" height="780" viewBox="0 0 1890 780" font-family="Microsoft YaHei, SimHei, sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4A5560"/>
+    </marker>
+  </defs>
+  <rect width="1890" height="780" fill="#FFFFFF"/>
+
+  <!-- 第一行：① → ② → ③ -->
+  <g>
+    <rect x="90" y="150" width="440" height="170" rx="10" fill="#EDF3FA" stroke="#7A97B8" stroke-width="2"/>
+    <circle cx="122" cy="182" r="20" fill="#3B6BA5"/>
+    <text x="122" y="191" font-size="24" fill="#FFFFFF" text-anchor="middle" font-weight="bold">1</text>
+    <text x="310" y="192" font-size="30" fill="#22364D" text-anchor="middle" font-weight="bold">Python 参考实现</text>
+    <text x="310" y="238" font-size="23" fill="#445060" text-anchor="middle">float64 + scipy · 193 抽头四段基线</text>
+    <text x="310" y="274" font-size="23" fill="#445060" text-anchor="middle">产出黄金输出，作为后续所有对拍的基准</text>
+
+    <line x1="530" y1="235" x2="712" y2="235" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+
+    <rect x="720" y="150" width="440" height="170" rx="10" fill="#EDF3FA" stroke="#7A97B8" stroke-width="2"/>
+    <circle cx="752" cy="182" r="20" fill="#3B6BA5"/>
+    <text x="752" y="191" font-size="24" fill="#FFFFFF" text-anchor="middle" font-weight="bold">2</text>
+    <text x="940" y="192" font-size="30" fill="#22364D" text-anchor="middle" font-weight="bold">HLS 实现 · csim 对拍</text>
+    <text x="940" y="238" font-size="23" fill="#445060" text-anchor="middle">Q1.15 定点核 vs Python 黄金输出</text>
+    <text x="940" y="274" font-size="23" fill="#445060" text-anchor="middle">判据：逐位相同（0 LSB 错配）</text>
+
+    <line x1="1160" y1="235" x2="1342" y2="235" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+
+    <rect x="1350" y="150" width="440" height="170" rx="10" fill="#EDF3FA" stroke="#7A97B8" stroke-width="2"/>
+    <circle cx="1382" cy="182" r="20" fill="#3B6BA5"/>
+    <text x="1382" y="191" font-size="24" fill="#FFFFFF" text-anchor="middle" font-weight="bold">3</text>
+    <text x="1570" y="192" font-size="30" fill="#22364D" text-anchor="middle" font-weight="bold">综合 · 布局布线</text>
+    <text x="1570" y="238" font-size="23" fill="#445060" text-anchor="middle">100 MHz 时序约束下收敛</text>
+    <text x="1570" y="274" font-size="23" fill="#445060" text-anchor="middle">判据：WNS 为正 · 失败端点 0 · 资源达标</text>
+  </g>
+
+  <!-- 换行箭头 -->
+  <line x1="1570" y1="320" x2="1570" y2="452" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+
+  <!-- 第二行：④ → ⑤ → ⑥（自右向左） -->
+  <g>
+    <rect x="1350" y="460" width="440" height="170" rx="10" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
+    <circle cx="1382" cy="492" r="20" fill="#E08A3C"/>
+    <text x="1382" y="501" font-size="24" fill="#FFFFFF" text-anchor="middle" font-weight="bold">4</text>
+    <text x="1570" y="502" font-size="30" fill="#4A331A" text-anchor="middle" font-weight="bold">overlay 打包上板</text>
+    <text x="1570" y="548" font-size="23" fill="#5A4A38" text-anchor="middle">fir.bit + hwh → PYNQ-Z2</text>
+    <text x="1570" y="584" font-size="23" fill="#5A4A38" text-anchor="middle">加载成功、寄存器可读写</text>
+
+    <line x1="1350" y1="545" x2="1168" y2="545" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+
+    <rect x="720" y="460" width="440" height="170" rx="10" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
+    <circle cx="752" cy="492" r="20" fill="#E08A3C"/>
+    <text x="752" y="501" font-size="24" fill="#FFFFFF" text-anchor="middle" font-weight="bold">5</text>
+    <text x="940" y="502" font-size="30" fill="#4A331A" text-anchor="middle" font-weight="bold">板上自检</text>
+    <text x="940" y="548" font-size="23" fill="#5A4A38" text-anchor="middle">与黄金向量逐位对拍（直通 + 压缩）</text>
+    <text x="940" y="584" font-size="23" fill="#5A4A38" text-anchor="middle">判据：0 LSB 错配 · 分块与整块一致</text>
+
+    <line x1="720" y1="545" x2="538" y2="545" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+
+    <rect x="90" y="460" width="440" height="170" rx="10" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
+    <circle cx="122" cy="492" r="20" fill="#E08A3C"/>
+    <text x="122" y="501" font-size="24" fill="#FFFFFF" text-anchor="middle" font-weight="bold">6</text>
+    <text x="310" y="502" font-size="30" fill="#4A331A" text-anchor="middle" font-weight="bold">系统级验收</text>
+    <text x="310" y="548" font-size="23" fill="#5A4A38" text-anchor="middle">端到端延迟 · 600 s 长跑丢块</text>
+    <text x="310" y="584" font-size="23" fill="#5A4A38" text-anchor="middle">WDRC 特性曲线 · 同芯片加速比对测</text>
+  </g>
+
+  <text x="945" y="712" font-size="22" fill="#8C9BAB" text-anchor="middle">蓝色 = 主机侧验证（不上板）　·　橙色 = 板上验证　·　每一级都有独立的通过判据，任一级不过即停在原地排查</text>
+</svg>
