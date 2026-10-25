@@ -1,126 +1,113 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1890" height="1000" viewBox="0 0 1890 1000" font-family="Microsoft YaHei, SimHei, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="560" viewBox="0 0 1080 560" font-family="Microsoft YaHei, SimHei, sans-serif">
   <defs>
-    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#4A5560"/>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7A8290"/>
+    </marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5B9BD5"/>
+    </marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E8873C"/>
     </marker>
   </defs>
-  <rect width="1890" height="1000" fill="#FFFFFF"/>
+
+  <rect x="0" y="0" width="1080" height="560" fill="#FFFFFF"/>
+
+  <!-- 标题区 -->
+  <text x="28" y="36" font-size="21" font-weight="bold" fill="#1F2D3D">相减式四段分频与 WDRC 信号链</text>
+  <text x="28" y="64" font-size="13" fill="#6B7280">三个 193 抽头低通 + 一条 96 采样共享延迟；相减得到互补四段，再逐段增益与压缩。</text>
 
   <!-- 输入 -->
-  <rect x="60" y="430" width="140" height="100" rx="8" fill="#F5F6F8" stroke="#9AA5B1" stroke-width="2"/>
-  <text x="130" y="472" font-size="24" fill="#22364D" text-anchor="middle" font-weight="bold">输入 x[n]</text>
-  <text x="130" y="504" font-size="20" fill="#5A6472" text-anchor="middle">48 kHz · Q1.15</text>
+  <rect x="30" y="228" width="105" height="110" rx="8" fill="#F4F5F7" stroke="#B9BEC6" stroke-width="1.2"/>
+  <text x="82.5" y="272" font-size="14" font-weight="bold" fill="#24313F" text-anchor="middle">输入 x</text>
+  <text x="82.5" y="294" font-size="12.5" fill="#55606C" text-anchor="middle">int16</text>
+  <text x="82.5" y="312" font-size="12.5" fill="#55606C" text-anchor="middle">Q1.15</text>
+  <line x1="135" y1="283" x2="170" y2="283" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
 
-  <!-- 干线与四条支路 -->
-  <line x1="200" y1="480" x2="240" y2="480" stroke="#4A5560" stroke-width="2.5"/>
-  <polyline points="240,480 240,170 278,170" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <polyline points="240,480 240,410 278,410" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <polyline points="240,480 240,650 278,650" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <polyline points="240,480 240,890 278,890" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+  <!-- 滤波器主体 -->
+  <rect x="175" y="105" width="150" height="356" rx="8" fill="#F4F5F7" stroke="#B9BEC6" stroke-width="1.2"/>
+  <text x="250" y="208" font-size="13" font-weight="bold" fill="#24313F" text-anchor="middle">三路 193 抽头</text>
+  <text x="250" y="233" font-size="13" font-weight="bold" fill="#24313F" text-anchor="middle">低通滤波器</text>
+  <text x="250" y="258" font-size="13" fill="#55606C" text-anchor="middle">500 / 1000</text>
+  <text x="250" y="283" font-size="13" fill="#55606C" text-anchor="middle">2000 Hz</text>
+  <text x="250" y="308" font-size="13" fill="#55606C" text-anchor="middle">18 位 Q1.17</text>
+  <text x="250" y="333" font-size="13" fill="#55606C" text-anchor="middle">共享 96 采样</text>
+  <text x="250" y="358" font-size="13" fill="#55606C" text-anchor="middle">延迟 = 2.00 ms</text>
 
-  <!-- 三个低通 + 延迟 -->
-  <rect x="280" y="120" width="200" height="100" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
-  <text x="380" y="160" font-size="23" fill="#22364D" text-anchor="middle" font-weight="bold">FIR 低通 500 Hz</text>
-  <text x="380" y="192" font-size="20" fill="#445060" text-anchor="middle">193 抽头 · Q1.17 系数</text>
+  <!-- 四个支路 -->
+  <!-- b0 -->
+  <line x1="325" y1="283" x2="350" y2="152" stroke="#5B9BD5" stroke-width="1.4" marker-end="url(#ab)"/>
+  <rect x="355" y="125" width="245" height="54" rx="8" fill="#E9F1FB" stroke="#5B9BD5" stroke-width="1.3"/>
+  <text x="477.5" y="157" font-size="13.5" font-weight="bold" fill="#24313F" text-anchor="middle">b0 = LP500(x)</text>
+  <line x1="600" y1="152" x2="625" y2="152" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="630" y="125" width="70" height="54" rx="8" fill="#E9F1FB" stroke="#5B9BD5" stroke-width="1.2"/>
+  <text x="665" y="149" font-size="13" font-weight="bold" fill="#24313F" text-anchor="middle">g0</text>
+  <text x="665" y="167" font-size="11.5" fill="#55606C" text-anchor="middle">Q7.8</text>
+  <line x1="700" y1="152" x2="725" y2="152" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="730" y="125" width="142" height="54" rx="8" fill="#FFFFFF" stroke="#B9BEC6" stroke-width="1.2"/>
+  <text x="801" y="143" font-size="12.5" font-weight="bold" fill="#24313F" text-anchor="middle">WDRC</text>
+  <text x="801" y="159" font-size="11" fill="#55606C" text-anchor="middle">attack / release</text>
+  <text x="801" y="175" font-size="11" fill="#55606C" text-anchor="middle">包络 Q2.22</text>
 
-  <rect x="280" y="360" width="200" height="100" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
-  <text x="380" y="400" font-size="23" fill="#22364D" text-anchor="middle" font-weight="bold">FIR 低通 1 kHz</text>
-  <text x="380" y="432" font-size="20" fill="#445060" text-anchor="middle">193 抽头 · Q1.17 系数</text>
+  <!-- b1 -->
+  <line x1="325" y1="283" x2="350" y2="246" stroke="#5B9BD5" stroke-width="1.4" marker-end="url(#ab)"/>
+  <rect x="355" y="219" width="245" height="54" rx="8" fill="#E9F5EC" stroke="#57A472" stroke-width="1.3"/>
+  <text x="477.5" y="251" font-size="13.5" font-weight="bold" fill="#24313F" text-anchor="middle">b1 = LP1000(x) − LP500(x)</text>
+  <line x1="600" y1="246" x2="625" y2="246" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="630" y="219" width="70" height="54" rx="8" fill="#E9F5EC" stroke="#57A472" stroke-width="1.2"/>
+  <text x="665" y="243" font-size="13" font-weight="bold" fill="#24313F" text-anchor="middle">g1</text>
+  <text x="665" y="261" font-size="11.5" fill="#55606C" text-anchor="middle">Q7.8</text>
+  <line x1="700" y1="246" x2="725" y2="246" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="730" y="219" width="142" height="54" rx="8" fill="#FFFFFF" stroke="#B9BEC6" stroke-width="1.2"/>
+  <text x="801" y="237" font-size="12.5" font-weight="bold" fill="#24313F" text-anchor="middle">WDRC</text>
+  <text x="801" y="253" font-size="11" fill="#55606C" text-anchor="middle">attack / release</text>
+  <text x="801" y="269" font-size="11" fill="#55606C" text-anchor="middle">包络 Q2.22</text>
 
-  <rect x="280" y="600" width="200" height="100" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
-  <text x="380" y="640" font-size="23" fill="#22364D" text-anchor="middle" font-weight="bold">FIR 低通 2 kHz</text>
-  <text x="380" y="672" font-size="20" fill="#445060" text-anchor="middle">193 抽头 · Q1.17 系数</text>
+  <!-- b2 -->
+  <line x1="325" y1="283" x2="350" y2="340" stroke="#5B9BD5" stroke-width="1.4" marker-end="url(#ab)"/>
+  <rect x="355" y="313" width="245" height="54" rx="8" fill="#FAF4DE" stroke="#C0A233" stroke-width="1.3"/>
+  <text x="477.5" y="345" font-size="13.5" font-weight="bold" fill="#24313F" text-anchor="middle">b2 = LP2000(x) − LP1000(x)</text>
+  <line x1="600" y1="340" x2="625" y2="340" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="630" y="313" width="70" height="54" rx="8" fill="#FAF4DE" stroke="#C0A233" stroke-width="1.2"/>
+  <text x="665" y="337" font-size="13" font-weight="bold" fill="#24313F" text-anchor="middle">g2</text>
+  <text x="665" y="355" font-size="11.5" fill="#55606C" text-anchor="middle">Q7.8</text>
+  <line x1="700" y1="340" x2="725" y2="340" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="730" y="313" width="142" height="54" rx="8" fill="#FFFFFF" stroke="#B9BEC6" stroke-width="1.2"/>
+  <text x="801" y="331" font-size="12.5" font-weight="bold" fill="#24313F" text-anchor="middle">WDRC</text>
+  <text x="801" y="347" font-size="11" fill="#55606C" text-anchor="middle">attack / release</text>
+  <text x="801" y="363" font-size="11" fill="#55606C" text-anchor="middle">包络 Q2.22</text>
 
-  <rect x="280" y="840" width="200" height="100" rx="8" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
-  <text x="380" y="880" font-size="23" fill="#4A331A" text-anchor="middle" font-weight="bold">延迟 96 采样</text>
-  <text x="380" y="912" font-size="20" fill="#5A4A38" text-anchor="middle">群延迟 2.00 ms @ 48 kHz</text>
+  <!-- b3 -->
+  <line x1="325" y1="283" x2="350" y2="434" stroke="#5B9BD5" stroke-width="1.4" marker-end="url(#ab)"/>
+  <rect x="355" y="407" width="245" height="54" rx="8" fill="#F1ECF8" stroke="#8172B3" stroke-width="1.3"/>
+  <text x="477.5" y="439" font-size="13.5" font-weight="bold" fill="#24313F" text-anchor="middle">b3 = x[n−96] − LP2000(x)</text>
+  <line x1="600" y1="434" x2="625" y2="434" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="630" y="407" width="70" height="54" rx="8" fill="#F1ECF8" stroke="#8172B3" stroke-width="1.2"/>
+  <text x="665" y="431" font-size="13" font-weight="bold" fill="#24313F" text-anchor="middle">g3</text>
+  <text x="665" y="449" font-size="11.5" fill="#55606C" text-anchor="middle">Q7.8</text>
+  <line x1="700" y1="434" x2="725" y2="434" stroke="#7A8290" stroke-width="1.4" marker-end="url(#ag)"/>
+  <rect x="730" y="407" width="142" height="54" rx="8" fill="#FFFFFF" stroke="#B9BEC6" stroke-width="1.2"/>
+  <text x="801" y="425" font-size="12.5" font-weight="bold" fill="#24313F" text-anchor="middle">WDRC</text>
+  <text x="801" y="441" font-size="11" fill="#55606C" text-anchor="middle">attack / release</text>
+  <text x="801" y="457" font-size="11" fill="#55606C" text-anchor="middle">包络 Q2.22</text>
 
-  <!-- 低通输出 → 汇合点 x=560 -->
-  <line x1="480" y1="170" x2="618" y2="170" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <circle cx="560" cy="170" r="4" fill="#333A45"/>
+  <!-- 汇入求和 -->
+  <line x1="872" y1="152" x2="898" y2="248" stroke="#7A8290" stroke-width="1.2" marker-end="url(#ag)"/>
+  <line x1="872" y1="246" x2="898" y2="278" stroke="#7A8290" stroke-width="1.2" marker-end="url(#ag)"/>
+  <line x1="872" y1="340" x2="898" y2="312" stroke="#7A8290" stroke-width="1.2" marker-end="url(#ag)"/>
+  <line x1="872" y1="434" x2="898" y2="342" stroke="#7A8290" stroke-width="1.2" marker-end="url(#ag)"/>
 
-  <line x1="480" y1="410" x2="560" y2="410" stroke="#4A5560" stroke-width="2.5"/>
-  <circle cx="560" cy="410" r="4" fill="#333A45"/>
-  <polyline points="560,410 560,316" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <polyline points="560,410 560,506" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+  <!-- 求和输出 -->
+  <rect x="900" y="210" width="150" height="170" rx="8" fill="#FBE7D9" stroke="#E8873C" stroke-width="1.3"/>
+  <text x="975" y="278" font-size="15" font-weight="bold" fill="#24313F" text-anchor="middle">Σ 四段</text>
+  <text x="975" y="300" font-size="13" fill="#55606C" text-anchor="middle">求和 + 饱和</text>
+  <text x="975" y="322" font-size="13" fill="#55606C" text-anchor="middle">int16 输出</text>
+  <line x1="1050" y1="295" x2="1070" y2="295" stroke="#E8873C" stroke-width="1.6" marker-end="url(#ao)"/>
 
-  <line x1="480" y1="650" x2="560" y2="650" stroke="#4A5560" stroke-width="2.5"/>
-  <circle cx="560" cy="650" r="4" fill="#333A45"/>
-  <polyline points="560,650 560,556" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <polyline points="560,650 560,749" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
+  <!-- 底部横幅 -->
+  <rect x="30" y="492" width="1020" height="42" rx="8" fill="#FBEEDF"/>
+  <text x="540" y="519" font-size="14" font-weight="bold" fill="#E8873C" text-anchor="middle">关闭压缩且四段单位增益时，Σ band[i] = x[n−96]；96 是群延迟，不是抽头数。</text>
 
-  <polyline points="480,890 560,890 560,801" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-
-  <!-- LP500 → S1 减输入 -->
-  <polyline points="560,170 560,264" fill="none" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-
-  <!-- 减法器 S1 / S2 / S4 -->
-  <circle cx="560" cy="290" r="22" fill="#FFFFFF" stroke="#333A45" stroke-width="2.5"/>
-  <text x="533" y="262" font-size="22" fill="#445060">−</text>
-  <text x="533" y="330" font-size="22" fill="#445060">+</text>
-
-  <circle cx="560" cy="530" r="22" fill="#FFFFFF" stroke="#333A45" stroke-width="2.5"/>
-  <text x="533" y="500" font-size="22" fill="#445060">+</text>
-  <text x="533" y="572" font-size="22" fill="#445060">−</text>
-
-  <circle cx="560" cy="775" r="22" fill="#FFFFFF" stroke="#333A45" stroke-width="2.5"/>
-  <text x="533" y="745" font-size="22" fill="#445060">−</text>
-  <text x="533" y="818" font-size="22" fill="#445060">+</text>
-
-  <!-- 四段 → WDRC -->
-  <line x1="582" y1="290" x2="618" y2="290" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="582" y1="530" x2="618" y2="530" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="582" y1="775" x2="618" y2="775" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-
-  <rect x="620" y="125" width="300" height="90" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
-  <rect x="620" y="245" width="300" height="90" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
-  <rect x="620" y="485" width="300" height="90" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
-  <rect x="620" y="730" width="300" height="90" rx="8" fill="#EAF1F8" stroke="#3B6BA5" stroke-width="2"/>
-
-
-  <text x="770" y="160" font-size="21" fill="#22364D" text-anchor="middle" font-weight="bold">段1 · 包络检波 + WDRC</text>
-  <text x="770" y="196" font-size="20" fill="#445060" text-anchor="middle">attack / release · 阈值 · 压缩比</text>
-  <text x="770" y="280" font-size="21" fill="#22364D" text-anchor="middle" font-weight="bold">段2 · 包络检波 + WDRC</text>
-  <text x="770" y="316" font-size="20" fill="#445060" text-anchor="middle">attack / release · 阈值 · 压缩比</text>
-  <text x="770" y="520" font-size="21" fill="#22364D" text-anchor="middle" font-weight="bold">段3 · 包络检波 + WDRC</text>
-  <text x="770" y="556" font-size="20" fill="#445060" text-anchor="middle">attack / release · 阈值 · 压缩比</text>
-  <text x="770" y="765" font-size="21" fill="#22364D" text-anchor="middle" font-weight="bold">段4 · 包络检波 + WDRC</text>
-  <text x="770" y="801" font-size="20" fill="#445060" text-anchor="middle">attack / release · 阈值 · 压缩比</text>
-
-  <!-- WDRC → 段增益 → 求和总线 -->
-  <line x1="920" y1="170" x2="972" y2="170" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="920" y1="290" x2="972" y2="290" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="920" y1="530" x2="972" y2="530" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="920" y1="775" x2="972" y2="775" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-
-  <circle cx="1000" cy="170" r="26" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
-  <text x="1000" y="178" font-size="21" fill="#4A331A" text-anchor="middle" font-weight="bold">×g1</text>
-  <circle cx="1000" cy="290" r="26" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
-  <text x="1000" y="298" font-size="21" fill="#4A331A" text-anchor="middle" font-weight="bold">×g2</text>
-  <circle cx="1000" cy="530" r="26" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
-  <text x="1000" y="538" font-size="21" fill="#4A331A" text-anchor="middle" font-weight="bold">×g3</text>
-  <circle cx="1000" cy="775" r="26" fill="#FDF2E9" stroke="#D8A87A" stroke-width="2"/>
-  <text x="1000" y="783" font-size="21" fill="#4A331A" text-anchor="middle" font-weight="bold">×g4</text>
-
-  <line x1="1026" y1="170" x2="1252" y2="170" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="1026" y1="290" x2="1252" y2="290" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="1026" y1="530" x2="1252" y2="530" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <line x1="1026" y1="775" x2="1252" y2="775" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-
-  <!-- 求和总线 -->
-  <line x1="1260" y1="170" x2="1260" y2="775" stroke="#333A45" stroke-width="3"/>
-  <circle cx="1260" cy="170" r="4" fill="#333A45"/>
-  <circle cx="1260" cy="290" r="4" fill="#333A45"/>
-  <circle cx="1260" cy="530" r="4" fill="#333A45"/>
-  <circle cx="1260" cy="775" r="4" fill="#333A45"/>
-  <text x="1240" y="440" font-size="24" fill="#333A45" text-anchor="end" font-weight="bold">四段求和 Σ</text>
-
-  <!-- 输出 -->
-  <line x1="1260" y1="472" x2="1396" y2="472" stroke="#4A5560" stroke-width="2.5" marker-end="url(#ah)"/>
-  <rect x="1400" y="422" width="220" height="100" rx="8" fill="#F5F6F8" stroke="#9AA5B1" stroke-width="2"/>
-  <text x="1510" y="464" font-size="24" fill="#22364D" text-anchor="middle" font-weight="bold">输出 y[n]</text>
-  <text x="1510" y="496" font-size="20" fill="#5A6472" text-anchor="middle">输出级带饱和不绕回</text>
-
-  <!-- 底注 -->
-  <text x="945" y="965" font-size="22" fill="#8C9BAB" text-anchor="middle">阈值、压缩比、起振/释放时间、四段增益均为运行期寄存器，经网页验配界面实时可改　·　四段相加重建全带信号，相减式分频保证无相位失配缝隙</text>
+  <!-- 页脚依据 -->
+  <text x="28" y="552" font-size="11" fill="#9AA3AD">依据：src/hls/fir_coeffs_n193.h、src/hls/fir_multiband.cpp、report/hardware_interface_spec.md。</text>
 </svg>
