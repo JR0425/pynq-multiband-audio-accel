@@ -12,13 +12,18 @@
 #   echo xilinx | sudo -S env XILINX_XRT=/usr \
 #     /usr/local/share/pynq-venv/bin/python3 fir_selftest.py
 
+import argparse
 import sys
 import numpy as np
 
 from pynq import Overlay
 from fir_core import FirMultiband, ms_to_coef
 
-BITFILE = "fir.bit"
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--bit", default="fir.bit",
+                 help="出货版是 fir.bit；验 DMA 那版用 fir_dma_core.bit")
+_args = _ap.parse_args()
+BITFILE = _args.bit
 N = 1000                      # 一块的采样数
 FS = 48000.0
 
@@ -43,7 +48,8 @@ if "fir_multiband_0" not in ol.ip_dict:
 
 ip = ol.ip_dict["fir_multiband_0"]
 print("  核的地址：", hex(ip["phys_addr"]), " 范围：", hex(ip["addr_range"]))
-check("核在 0x43C10000", ip["phys_addr"] == 0x43C10000, hex(ip["phys_addr"]))
+_want = 0x43C10000 if BITFILE == "fir.bit" else 0x43C20000
+check("核在 0x%08X" % _want, ip["phys_addr"] == _want, hex(ip["phys_addr"]))
 
 k = FirMultiband(ol.fir_multiband_0.mmio)
 

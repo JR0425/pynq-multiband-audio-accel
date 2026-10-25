@@ -40,6 +40,12 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
   块模式 14407 拍、DMA 版 14408 拍，两版逐位相同；65535 点连发 25.7 M 采样/秒。
   另有一颗只出握手时序图的抓取位流。**这三颗位流不在演示通路上、也不替代 `fir.bit`**，
   范围和限制见该文件 §9，跑法见 `sim/rtl_sim/README.md` 和 `board/README.md`。
+- 2026-10-25 晚上还起了第二条线：把音频数据从 PS 手里挪出来。四颗新位流
+  （只有 DMA / DMA + v25 核 / 全 PL 直连 / 带内置音源的自环诊断版）里，
+  DMA + 核那版口到耳 14.4~14.8 ms、连跑 60 秒零丢字；全 PL 直连按各级缓冲推算约 2.3 ms。
+  但 2.3 ms **是推算不是实测**，那颗位流的四段增益又是编译期写死的、**驱动不了网页验配**，
+  所以**都不在演示通路上，出货演示仍然是 `fir.bit`**。
+  数字、口径和哪些还不成立，全部写在 `data/results/dma_pl_direct_20261025.md`。
 
 ## 目录结构
 
@@ -47,7 +53,7 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 | --- | --- |
 | `src/python/` | Python 基线、系数与测试数据导出、比对与分析工具 |
 | `src/hls/` | HLS 核与 C 测试台 |
-| `src/rtl/` | 自研 RTL：前端、四段压缩、两种 AXI 外壳、握手监视器与抓取器；索引见 `sim/rtl_sim/README.md` |
+| `src/rtl/` | 自研 RTL：前端、四段压缩、两种 AXI 外壳、握手监视器与抓取器、自写 I2S 收发与全 PL 直连顶；索引见 `sim/rtl_sim/README.md` |
 | `sim/hls_csim/` | C 仿真的测试台与 FIR 系数文件 |
 | `sim/rtl_sim/` | RTL 仿真的 testbench、参考模型、黄金向量与逐位比对脚本，跑法见该目录的 `README.md` |
 | `build/` | 构建脚本、HLS 指令文件、各版本综合与实现报告；索引见 `build/README.md` |
@@ -110,6 +116,15 @@ python src/python/compare_golden_vs_hw.py
 `board/scripts/compare_cpu_fpga.py` 在同一块板子上量 ARM 基线与核的对比（2026-10-23 板上实测 **16.7 倍**，见 `data/results/accel_cpu_vs_fpga.md`）。
 
 `overlay/fir_rtl.bit`、`fir_rtl_dma.bit`、`fir_rtl_dma_cap.bit` 是 2026-10-25 的自研 RTL 实验位流（块模式 / DMA + AXI-Stream / 只出握手时序图），由 `overlay/build_rtl*.tcl` 构建，探针是 `board/scripts/rtl_*.py`。它们**不在演示通路上**，出货演示仍只有 `fir.bit`；位定义和跑法见 `board/README.md`。
+
+同一天晚上还有一组四颗，做的是"把音频数据从 PS 手里挪开"：
+`overlay/fir_dma.bit`（自写 I2S + `axi_dma`，不含核，用来量这条路的结构地板）、
+`overlay/fir_dma_core.bit`（同上再加出货那颗 v25 核）、
+`overlay/fir_pl.bit`（全 PL 直连，音频一个字节都不出 PL）、
+`overlay/i2sdbg.bit`（内置 440 Hz 音源 + 片内自收 + 翻转计数，是诊断用的仪器位流）。
+构建脚本是 `overlay/build_audio_dma.tcl`（`FIR_AUDIO_DMA_WITH_FIR` / `FIR_AUDIO_DMA_TX_AW`
+选版本）和 `build_audio_pl.tcl`，探针在 `board/scripts/dma_*.py` / `pl_*.py` / `core_dump.py`。
+**同样不在演示通路上**，数字和适用范围见 `data/results/dma_pl_direct_20261025.md`。
 
 `overlay/ps_only.bit` 是更早的板级放音产物，PL 里是空的。
 `overlay/audio.bit` 是更早的「我们自己建的工程能出声」里程碑产物，只有音频 codec。

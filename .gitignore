@@ -79,7 +79,27 @@ sim/rtl_sim/xsim_work*/
 build/rtl_synth/
 build/rtl_impl/
 
+# 2026-10-25 那轮 DMA / 全 PL 直连的一次性脚手架：xsim 工作目录、一份本地快照、
+# 控制台日志、带本机绝对路径的构建重试器。位流和它们的时序/资源报告才是证据，
+# 在 board/overlay；这堆只是当时跑命令留下的残留。
+build/sim_i2s*/
+build/sim_dbgchk/
+build/snapshot_*/
+build/*.txt
+!build/requirements.txt
+build/*_stdout.log
+build/run_*.bat
+build/run_pl_build.sh
+build/run_cap_build2.sh
+build/dbg_*.py
+build/read_test.tcl
+build/audio_dma_bd_dump.tcl
+
+# 一次性诊断脚本的临时落盘。值得留的两个（A/B 放音对照、codec 全片读数）
+# 已经搬进 tools/board_debug/，剩下的是散件和日志。
+tools/board_debug/_tmp/
+
 # OS
 .DS_Store
 Thumbs.db
-pynq_venv/ 
+pynq_venv/

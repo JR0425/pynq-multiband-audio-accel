@@ -74,6 +74,23 @@ IP 包，C 代码的改动一点都进不去。
 
 位流和 hwh **必须成对**拷到板上，版本对不上 PYNQ 会拒绝加载。
 
+### 其它 overlay 的构建脚本
+
+`rebuild.sh` 只管出货那一颗。仓库里另有几颗实验位流，各自一个脚本，
+直接 `vivado -mode batch -source <脚本>` 跑：
+
+| 脚本 | 环境变量 | 产物 |
+|---|---|---|
+| `board/overlay/build_rtl.tcl` | — | `fir_rtl.bit`（块模式外壳） |
+| `board/overlay/build_rtl_dma.tcl` | — | `fir_rtl_dma.bit`（AXI-Stream + DMA） |
+| `board/overlay/build_rtl_dma_cap.tcl` | — | `fir_rtl_dma_cap.bit`（抓取位流） |
+| `board/overlay/build_audio_dma.tcl` | `FIR_AUDIO_DMA_WITH_FIR=0/1`、`FIR_AUDIO_DMA_TX_AW`（默认 10） | `fir_dma.bit` / `fir_dma_core.bit` / `fir_dma_tx<AW>.bit` |
+| `board/overlay/build_audio_pl.tcl` | `FIR_PL_TX_TARGET`（默认 128） | `fir_pl.bit` / `fir_pl_tx<T>.bit` |
+| `board/overlay/build_audio_i2sdbg.tcl` | — | `i2sdbg.bit`（内置音源 + 片内自收的诊断位流） |
+
+**这些都不在演示通路上**，出货演示只有 `fir.bit`。它们的功能、延迟数字和适用范围在
+`data/results/dma_pl_direct_20261025.md` 和 `data/results/rtl_vs_hls.md` §9。
+
 ---
 
 ## 3. 上板
@@ -170,6 +187,22 @@ rm -rf build/vivado/fir
 
 **6. 实时跑起来耳机里断续。** 先看有没有装 §3.2 那个服务，再看是不是改过
 `audio_stream.cpp` 却没重编 `.so`。
+
+**7. `create_bd_design` 随机报 `couldn't read file ...: no such file or directory`，
+或者 `Failed to load feature 'ipintegrator'`，每次点到的文件还不一样。**
+这是 Vivado 2020.2 在 Windows 上的偶发问题，和设计无关 —— 同样的脚本前一次能过、
+这一次过不去，过一阵子再跑又会过。**处理办法就是删干净工程目录重试**：
+
+```bash
+rm -rf build/vivado/<工程名>
+```
+
+一遍过不去就换个时间再跑几遍。2026-10-25 编 `fir_pl.bit` 时连续挂了 8 次，
+第 9 次自己好了；`i2sdbg.bit` 和抓取位流也各碰到过一次。**重试之前一定先
+`rm -rf`**，在残留目录上重跑几乎不会成功。
+
+**8. 某个 IP 的综合结果里 DSP 数是 0。** 那是空壳位流（曾经出过一次）。
+`build_rtl*.tcl` 在综合后检查 DSP 数，少于 100 直接报错，用它们构建不会中招。
 
 ---
 

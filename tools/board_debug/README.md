@@ -22,7 +22,7 @@
 
 ## 文件
 
-### 板上跑
+### 板上跑（2026-10-15 死机排查那一轮）
 
 | 文件 | 干什么 | 状态 |
 |---|---|---|
@@ -30,6 +30,25 @@
 | `one_run.sh` | 走一遍 notebook 那条路：起实时 → 等稳 → 拖一次滑杆 → 发 SIGINT。行为由 `$1` 里的一串开关控制（`IDLE` / `DUMP` / `FASTSTALL` / `NOJRNL` / `WD` / `IRQ1` / `NOSIG` / `NOTUNE` / `STOP9` / `NOBOX`）。跑完打一行 `RESULT=done` | 当前版 |
 | `hangmon3.sh` | 早期黑匣子 | **已废弃**，会写 SD、可能就是它自己把板子弄死的。留作反面教材 |
 | `wd_guard.sh` | 只在 `fir_live.py` 活着时武装硬件看门狗 | **已判死**，这块板的 SWDT 实测不复位。留作记录 |
+
+### 板上跑（2026-10-25 晚：DMA 与全 PL 直连那条线）
+
+查「音频数据能不能不经过 PS」时写的。五颗位流、探针和 `.hwh` 都放在
+`/home/xilinx/dma_exp/`，数字与结论在 `data/results/dma_pl_direct_20261025.md`。
+`board/scripts/` 下另有 `dma_audio_probe.py`、`dma_fir_loop.py`、`pl_direct_probe.py`、
+`pl_listen.py`、`core_dump.py` 和 `run_dma_live.sh`，是和这几个配套的正式探针。
+
+| 文件 | 干什么 | 状态 |
+|---|---|---|
+| `playback_echo.py` | **不放音给人听也能判断 DAC 出没出声**：同一时刻 MM2S 放单音、S2MM 录音，在录到的频谱里找那个频率。板载麦和耳机口在同一块板上，DAC 一驱动就有电/声泄漏进 ADC。判据：目标频段谱峰比噪底高 20 dB | 当前版 |
+| `dbg_tone.py` | `i2sdbg.bit` 的读数板：三路 AXI GPIO 拆成 `pl` / `pframe` / `tog` / `wr`，把"PL 到底有没有在 `sdata_o` 上送东西"变成数字 | 当前版 |
+| `ab_ship_tone.py` | **A/B 放音对照**：同一个 codec、同一副耳机，第一轮走出货 `fir.bit`，第二轮走 `i2sdbg.bit`，两轮各 10 秒 440 Hz。两轮都不响这件事本身就是结论 —— 输出侧整体哑掉，不是我们的设计 | 当前版 |
+| `codec_check.py` | 用出货位流单独验 codec 硬件，不碰自写 I2S。分不清"codec 坏了"还是"我们这版 overlay 坏了"时先跑它 | 当前版 |
+| `codec_state.py` | 把 `configure` / `play` / `select_mic` 各种调用组合各跑一遍再全片读回，用在"两边寄存器差 6 个"的时候分清是谁写的 | 当前版 |
+| `codec_jack.py` | 按名字读 `0x4000`~`0x4029`，再看 `0x40E0`~`0x40EF` 状态位，判断 codec 认为耳机插没插、DAC 和耳机功放有没有上电。**写好了但一直没跑** | 待跑 |
+| `dma_audio_diag.py` | 不走 PYNQ 的 DMA 类，直接读写寄存器，把 S2MM 和 MM2S 分开看：状态跳变连同时刻打出来 | 临时 |
+| `dma_s2mm_sweep.py` | S2MM 最小参数扫描，看 `DMAIntErr` 是不是绑在某个长度/地址上 | 临时 |
+
 
 ### 主机侧跑
 
@@ -43,6 +62,14 @@
 | `pynq_console_cmd.py` | 往串口发**一条**命令并把回显抓回来。命令一律写成单行 | 当前版 |
 | `put.py` | 走 base64 把一个小文件推到板上（SFTP 那条路不通）。`--exec` 加可执行位 | 当前版 |
 | `soak_notebook.py` | 反复走 notebook 那条路并数"多少次里挂一次" | **已被 `next_round.py` 取代**，留作参考 |
+| `board_ssh.py` | 从 Windows 跑板上的命令 / 传文件（paramiko，密码登录；这台机器没有 sshpass，公钥也没配）。`--put` 传完会在板上再算一次 md5，对不上就报错退出 | 当前版 |
+| `board_run.py` | 跑一条板上命令，回显**按字节**原样打回来。板上输出是 UTF-8、Windows 控制台是 GBK，直接 `print` 会成乱码 | 当前版 |
+| `push_dma_exp.py` | 把 DMA 那套位流和探针推到 `/home/xilinx/dma_exp/`，走 base64，逐个核 md5 | 当前版 |
+
+⚠️ **`--put` 给 `/home/xilinx/jupyter_notebooks/` 会被拒（Permission denied）：那个目录是
+root 所有的。** 先传到 `/dev/shm/`，再 `--sudo "cp /dev/shm/x /home/xilinx/jupyter_notebooks/x"`。
+另外 Git Bash 会把 `/home/...` 这样的参数当路径改写成本机的 `C:/Program Files/Git/home/...`，
+调这个脚本时要带 `MSYS_NO_PATHCONV=1`。
 
 两个串口脚本（`pynq_serial_capture.py` / `pynq_console_cmd.py`）**抢同一个 COM 句柄**，
 同一时刻只能开一个。PowerShell 版的同类工具在 `skill/checkers/pynq_serial_*.ps1`，

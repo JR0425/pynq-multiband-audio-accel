@@ -11,9 +11,14 @@
 | `fir_stream_shell.v` | 流式外壳：AXI-Stream 从口到主口，内部只做 valid/ready，没有 AXI 逻辑 |
 | `fir_axis_monitor.v` | 直通监视器，在 DMA 与外壳之间各串一个，供抓取器采样 |
 | `fir_wave_cap.v` | 自写抓取器：每拍一条 32 位记录，输入输出各 1024 字 BRAM，PS 经 AXI 读回 |
+| `i2s_duplex.v` | 自写 I2S 主端：自己产生 bclk / lrclk，收发两侧各接一个轴 FIFO。后面四颗实验位流的共同底座 |
+| `axis_fifo.v` | 上面那个 FIFO，读写两侧各自复位 |
+| `fir_pl_direct.v` | 全 PL 直连顶：I2S 收 → 前端 → 压缩 → I2S 发，音频一个字节都不出 PL |
+| `i2s_duplex_dbg.v` | 诊断版：在 `i2s_duplex` 里塞进内置 440 Hz 音源、片内自收和翻转计数，出 `i2sdbg.bit` |
 
 前四个的上板结果在 `data/results/rtl_vs_hls.md` §9；后两个只用于出时序图，
-**不出任何数字**（监视器让组合路径多一级）。
+**不出任何数字**（监视器让组合路径多一级）。最后四个和 `fir_pl.bit` / `fir_dma*.bit` /
+`i2sdbg.bit` 五颗位流是一组，数字与口径见 `data/results/dma_pl_direct_20261025.md`。
 
 ## 跑之前
 
@@ -34,7 +39,19 @@ bash sim/rtl_sim/run_xsim_drc4.sh            # tb_fir_drc4.v，只测压缩单�
 bash sim/rtl_sim/run_xsim_stream.sh          # tb_fir_stream_shell.v，AXI-Stream 外壳
 bash sim/rtl_sim/run_xsim_long.sh 4800       # tb_fir_rtl_shell.v，长块，出板上黄金向量
 bash sim/rtl_sim/run_xsim_wave_cap.sh        # tb_wave_cap.v，抓取器位序
+bash sim/rtl_sim/run_xsim_duplex.sh          # tb_i2s_duplex.v，自写 I2S 收发，判 PASS/FAIL
+bash sim/rtl_sim/run_xsim_pl.sh              # tb_fir_pl_direct.v，诊断台，只打内部相位快照
 ```
+
+`run_xsim_duplex.sh` 是那四颗 DMA / PL 直连位流的第一道门：同一个录音 FIFO 灌 20 帧，
+收侧把 `sdata_o` 解回来，判逐字相同、TLAST 落在每帧第二个字、左右声道各自解对、
+ovf/und 一直是 0。**改过 `i2s_duplex.v` 或 `axis_fifo.v` 先跑这一条再上板。**
+
+`run_xsim_pl.sh` **不出 PASS/FAIL**，它是台诊断台：把板上 2026-10-25 观察到的时序
+（flush 20 ms 后立刻放行，数据不出；中间停一下再放行就正常）原样喂进去，按秒打一次
+`ph` / `v_sr` / 两个 FIFO 水位 / 各级握手计数。判读方法是看 `run+20us` 之后
+`out_vld` 和 `fifo_wr` 还涨不涨，不涨的话 `ph` 指到哪一级就是哪一级卡住。
+它需要 `fir_mb_fe` 的系数表，脚本会把 `coeffs_lp*_n193.mem` 拷进工作目录。
 
 `fir_lp` 分三次跑而不是在一个 testbench 里例化三次，是因为系数表按文件名读，
 三份一起例化会抢同一个文件。三个低通的截止频率分别是 500 / 1000 / 2000 Hz。
@@ -87,7 +104,7 @@ check 脚本；不一致时返回非 0。
 | 文件 | 作用 |
 | --- | --- |
 | `synth_mb.tcl`、`impl_mb.tcl` | 多频段前端的 OOC 综合与布局布线（时序/资源数字的来源） |
-| `tb_fir_lp.v`、`tb_fir_mb_fe.v`、`tb_fir_drc4.v`、`tb_fir_rtl_shell.v`、`tb_fir_stream_shell.v`、`tb_wave_cap.v` | 对应上面各条 `run_*` 脚本的测试台 |
+| `tb_fir_lp.v`、`tb_fir_mb_fe.v`、`tb_fir_drc4.v`、`tb_fir_rtl_shell.v`、`tb_fir_stream_shell.v`、`tb_wave_cap.v`、`tb_i2s_duplex.v`、`tb_fir_pl_direct.v` | 对应上面各条 `run_*` 脚本的测试台 |
 | `ref_f32_lp*.txt` | 浮点参考（用来看定点化损失了多少，不参与逐位比对） |
 | `ref_out_lp*.txt` / `rtl_out_lp*.txt` | 上面的输出比对文件 |
 | `xsim_work*/` | xsim 工作目录，已进 `.gitignore`，删了会重生成 |

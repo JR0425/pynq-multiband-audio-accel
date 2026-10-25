@@ -5,7 +5,7 @@
 `scripts/` 下分两组，跑演示只用得到第一组。
 
 - **演示入口**：`run_live.sh`（实时通路）、`run_webui.sh` + `fir_webui.py` + `page.html`（浏览器界面）、`fir_live.py`、`fir_core.py`、`fir_selftest.py`、`fir_tune.py`、`fir_audio_loop.py`、`gain_ab_live.sh`、`wdrc_ab_live.sh`、`hearing_tone.py`、`mic_level.py`、`mic_live.py`。
-- **开发探针**：`cap_probe*.py`（14 个，2026-10-10 ~ 10-15，用于定位麦克风通路和符号扩展 bug）、`audio_duplex_probe.py`、`audio_overhead_probe.py`、`fir_chunk_sweep.py`、`mic_watch.py`、`acoustic_lat.py`、`robustness.py`、`wdrc_curve.py`、`compare_cpu_fpga.py`、`verify_*.py`、`replay_own_overlay_tone.py`、`audio_stream_test.py`、`rtl_*.py`（5 个，2026-10-25，只测自研 RTL 的三颗实验位流）。
+- **开发探针**：`cap_probe*.py`（14 个，2026-10-10 ~ 10-15，用于定位麦克风通路和符号扩展 bug）、`audio_duplex_probe.py`、`audio_overhead_probe.py`、`fir_chunk_sweep.py`、`mic_watch.py`、`acoustic_lat.py`、`robustness.py`、`wdrc_curve.py`、`compare_cpu_fpga.py`、`verify_*.py`、`replay_own_overlay_tone.py`、`audio_stream_test.py`、`rtl_*.py`（5 个，2026-10-25，只测自研 RTL 的三颗实验位流）、`dma_audio_probe.py`、`dma_fir_loop.py`、`pl_direct_probe.py`、`pl_listen.py`、`core_dump.py`（2026-10-25 晚，测 DMA 与全 PL 直连那五颗，见下）。
 
 它们留在 `scripts/` 而不单开目录，是因为 `data/results/` 下的原始结果文件按这个路径引用它们。`cap_probe6.py` 和 `cap_probe7.py` 已在头部声明作废：测量方法有缺陷，结论被 `cap_probe11.py` 取代。
 
@@ -32,6 +32,37 @@
 - 探针：`scripts/rtl_probe.py`（块模式）、`rtl_dma_probe.py`（DMA 版，`--stream N` 做连发）、`rtl_dual_probe.py`（两个 overlay 同进程并排出图）、`rtl_wave_probe.py`（抓取版出 `report/img/wave_timing.png`）、`rtl_edge.py`（n=0 / n>8192 的越界守卫）。
 - **跑法**：把位流和同名 `.hwh` 拷到板上**同一个目录**再在该目录里跑脚本（`Overlay()` 只认同名文件，地址靠 hwh 解析）。这套东西不进 `/home/xilinx/jupyter_notebooks/` 的演示副本。
 - 数字一律引 `fir_rtl_dma.bit`（WNS +0.267 ns）；抓取版多了监视器，只用来画图。两版的拍数差 1 拍是计时终点不同，不是核变了。全部实测记录见 `data/results/rtl_vs_hls.md` §9、日志 `report/llm_collab_log/2026-10-25_rtl_on_board.md`。
+
+### 把音频数据从 PS 手里挪开的五颗（2026-10-25 晚）
+
+同样**不是演示用的**，出货演示仍然只有 `fir.bit`。这一组的共同底座是自写的
+`i2s_duplex`（`src/rtl/i2s_duplex.v` + `axis_fifo.v`）—— 自己产生 bclk/lrclk、
+自己收发，不再经过厂商那颗 `audio_codec_ctrl`。
+
+| 位流 | 结构 | 用途 | WNS |
+|---|---|---|---|
+| `overlay/fir_dma.bit` | 自写 I2S + `axi_dma`，不含核 | 量 DMA 这条路的结构地板 | +1.514 ns |
+| `overlay/fir_dma_tx9.bit` | 同上，播放 FIFO 1024 → 512 字 | 对照「延迟是从哪来的」；积压余量不够，没保留这一版 | +0.739 ns |
+| `overlay/fir_dma_core.bit` | 同上再加出货那颗 v25 核 | 核插进 PS 的循环里，量口到耳延迟 | +0.135 ns |
+| `overlay/fir_pl.bit` | `i2s_duplex` + `fir_mb_fe` + `fir_drc4`，音频全程不出 PL | 全 PL 直连 | +0.027 ns |
+| `overlay/i2sdbg.bit` | 同上，加内置 440 Hz 音源 + 片内自收 + 翻转计数 | 诊断仪器：证明 `sdata_o` 上确实有波形 | +0.675 ns |
+
+- 构建脚本：`overlay/build_audio_dma.tcl`（`FIR_AUDIO_DMA_WITH_FIR=0/1` 选含不含核，
+  `FIR_AUDIO_DMA_TX_AW` 选播放 FIFO 深度）、`overlay/build_audio_pl.tcl`
+  （`FIR_PL_TX_TARGET` 选播放 FIFO 水位）、`overlay/build_audio_i2sdbg.tcl`。
+- 每颗配套 `*.hwdef`、`*.hwh`、`*_timing.rpt`、`*_util.rpt`。五颗的时序全部收敛
+  （0 条失败端点）；`fir_pl` 的 +0.027 ns 余量很薄，再改它之前先看时序。
+- 探针：`scripts/dma_audio_probe.py`（a/b/c/d 四段验收）、`dma_fir_loop.py`
+  （带核的整条链路，**必须** `chrt -f 60`）、`pl_direct_probe.py`（全 PL，只读状态）、
+  `pl_listen.py`（人耳听）、`core_dump.py`（两块位流的核输出逐位对拍）、
+  `run_dma_live.sh`（一条命令起 DMA 实时链路）。位定义看各探针头部，不要照抄。
+- **跑法**：位流和同名 `.hwh` 拷到板上**同一个目录**再在该目录里跑（`Overlay()` 只认同名文件）。
+- `fir_pl_direct` 只有 `ctrl` / `stat`，**没有增益寄存器** —— 四段增益和 DRC 参数都是
+  编译期模块参数，网页验配那一整套驱动不了它。
+- 数字、口径与尚未成立的部分见 `data/results/dma_pl_direct_20261025.md`。
+  **这五颗都没有做过人耳验收**：当晚连出货的 `fir.bit` 都放不出声，原因记在那份文档 §5。
+- 仿真：`bash sim/rtl_sim/run_xsim_duplex.sh`（`i2s_duplex` 单元仿真，判 PASS/FAIL）、
+  `bash sim/rtl_sim/run_xsim_pl.sh`（`fir_pl_direct` 诊断台，只打内部相位快照）。
 
 - `scripts/fir_core.py`：核的寄存器级驱动（AXI-Lite 控制、AXI4-Master 数据搬运）。
 - `scripts/fir_audio_loop.py`：麦克风 → 核 → 耳机回环，每次一块。这还是基于块的路径，不是实时那条。
@@ -65,7 +96,7 @@
 - **板挂修复是系统服务，不是拷文件。** 用 `sudo sh /home/xilinx/install_ksoftirqd_rt.sh` 装一次（脚本在 `board/scripts/`）。它安装 `ksoftirqd-rt.service` 和 `ksoftirqd-rt-refresh.timer`。用 `systemctl is-active ksoftirqd-rt.service`、`systemctl is-active ksoftirqd-rt-refresh.timer` 和 `chrt -p $(pgrep -f '^ksoftirqd/0$')` → `SCHED_FIFO 50` 验证。**SD 卡重刷后要再装一遍**；不装的话实时通路约一分钟后 panic。
 - **`scripts/fir_webui.py` 和 `scripts/run_webui.sh` 是新的（2026-10-20）**，当天已拷到 `/home/xilinx/jupyter_notebooks/`。用 `sh /home/xilinx/jupyter_notebooks/run_webui.sh` 启动；脚本会自行 `sudo` 提权，因为页面的开始按钮要拉起了 `fir_live.py`。停页面服务用 Ctrl-C —— 那**不会**停掉音频。走 SSH 的话要分离启动（`setsid nohup sh run_webui.sh > /dev/shm/webui.log 2>&1 < /dev/null &`），否则通道会一直挂到超时。注意板子地址是 **192.168.2.99**；`192.168.2.1` 是笔记本自己的静态地址，那台机的 8080 端口被另一个本地服务占用，所以打错 URL 会返回 `Access Error: 404 -- Not Found`。
 
-板上 `overlay/fir.bit`、`overlay/audio.bit`、`scripts/fir_live.py`、`scripts/mic_level.py`、`scripts/mic_live.py` 和 `libaudio_stream.so` 截至 2026-10-24 都是最新的（md5 核对过，不是假定）。`audio_stream.cpp` 2026-10-13 的改动只动了注释，现有 `.so` 仍然正确。`overlay/fir.bit` / `fir.hwh` 于 2026-10-19 用 WDRC 核（49 拍，`v21_wdrc`）重建过，2026-10-23 又用 `v25_env_indep`（36 拍）重建；位流 md5 `5aa079f29e8d66c21d1d34f1302c3695`，仓库里的副本和板上的一致；`scripts/fir_core.py`、`scripts/fir_live.py`、`scripts/fir_selftest.py`、`scripts/fir_chunk_sweep.py`、`scripts/compare_cpu_fpga.py`、`scripts/audio_duplex_probe.py` 和 `scripts/fir_audio_loop.py` 已于 2026-10-19 重拷并与仓库哈希一致。新寄存器 `drc_attack`（0x58）和 `drc_release`（0x60）只有更新后的驱动会写，那里留 0 就保持旧的无记忆行为。
+板上 `overlay/fir.bit`、`overlay/audio.bit`、`scripts/fir_live.py`、`scripts/mic_level.py`、`scripts/mic_live.py` 和 `libaudio_stream.so` 截至 2026-10-24 都是最新的（md5 核对过，不是假定）。2026-10-25 又同步了两项：`scripts/page.html`（换成仪器面板配色，**只动了样式和排版，脚本逻辑一行没改**）和 `scripts/fir_selftest.py`（多了一个 `--bit` 参数，默认仍是 `fir.bit`，用来把同一份自检跑到 `fir_dma_core.bit` 上），两者 md5 都已核对与仓库一致。`/home/xilinx/jupyter_notebooks/` 是 root 所有的，用 `board_ssh.py --put` 直接写会被拒 —— 先传到 `/dev/shm/` 再 `sudo cp`。`audio_stream.cpp` 2026-10-13 的改动只动了注释，现有 `.so` 仍然正确。`overlay/fir.bit` / `fir.hwh` 于 2026-10-19 用 WDRC 核（49 拍，`v21_wdrc`）重建过，2026-10-23 又用 `v25_env_indep`（36 拍）重建；位流 md5 `5aa079f29e8d66c21d1d34f1302c3695`，仓库里的副本和板上的一致；`scripts/fir_core.py`、`scripts/fir_live.py`、`scripts/fir_selftest.py`、`scripts/fir_chunk_sweep.py`、`scripts/compare_cpu_fpga.py`、`scripts/audio_duplex_probe.py` 和 `scripts/fir_audio_loop.py` 已于 2026-10-19 重拷并与仓库哈希一致。新寄存器 `drc_attack`（0x58）和 `drc_release`（0x60）只有更新后的驱动会写，那里留 0 就保持旧的无记忆行为。
 
 ## 证据边界
 

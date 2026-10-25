@@ -49,3 +49,5 @@ WDRC）、`v25_env_indep`（36 拍，出货）。
 - 资源和拍数：`data/results/impl_metrics.md`（实测）和 `hls_synth_metrics.md`（估算）
 - 加速比：`data/results/accel_cpu_vs_fpga.md`
 - 时序验收：`board/overlay/fir_timing.rpt`（出货位流的 WNS +0.533 ns、0 条失败端点）
+- DMA / 全 PL 直连那五颗位流（`fir_dma*` / `fir_pl` / `i2sdbg`）的结构、延迟和适用范围：
+  `data/results/dma_pl_direct_20261025.md`；它们的构建脚本不在本目录，在 `board/overlay/`
