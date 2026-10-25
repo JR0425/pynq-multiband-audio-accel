@@ -33,6 +33,7 @@ ksoftirqd 饿死」那条路。
 
 import argparse
 import os
+import signal
 import sys
 import time
 
@@ -95,6 +96,7 @@ class Tuner:
         self.rel = [0.0] * 4
         self.bypass = bool(bypass)
         self._last = None
+        self._status_last = None
         self._t_poll = 0.0
         self._t_status = 0.0
         self._t_start = None
@@ -187,7 +189,8 @@ class Tuner:
     def status_due(self, now):
         return now - self._t_status >= STATUS_SEC
 
-    def publish(self, now, n, blk_sec, in_rms, out_rms, lat_ms, err=None):
+    def publish(self, now, n, blk_sec, in_rms, out_rms, lat_ms, err=None,
+                l=None, nbuf=None, io_ms=None, dsp_ms=None):
         if now - self._t_status < STATUS_SEC:
             return
         self._t_status = now
@@ -198,28 +201,51 @@ class Tuner:
         audio = n * blk_sec
         wall = now - self._t_start
         lost = int(max(0.0, wall - audio) / blk_sec)
+        st = {
+            "t": now,
+            "n": n,
+            "pid": os.getpid(),
+            "running": True,
+            "ok": None,
+            "gain_db": list(self.gain_db),
+            "gain_applied_db": [20.0 * float(np.log10(max(x, 1e-9) / 256.0))
+                                for x in self.gain_cur],
+            "bypass": self.bypass,
+            "attack_ms": list(self.atk),
+            "release_ms": list(self.rel),
+            "in_rms": float(np.sqrt(np.mean(np.square(self._in_hist)))),
+            "out_rms": float(np.sqrt(np.mean(np.square(self._out_hist)))),
+            "rt": (audio / wall) if wall > 0 else 0.0,
+            "lost_blocks": lost,
+            "lat_ms": round(lat_ms, 2),
+            "error": err,
+        }
+        if l is not None:
+            st["l"] = int(l)
+            st["nbuf"] = int(nbuf or 0)
+        if io_ms is not None:
+            st["io_ms"] = float(io_ms)
+        if dsp_ms is not None:
+            st["dsp_ms"] = float(dsp_ms)
+        if self._status_last is not None:
+            self._status_last.update(st)
+            st = self._status_last
+        else:
+            self._status_last = st
         try:
-            write_status({
-                "t": now,
-                "n": n,
-                "pid": os.getpid(),
-                "running": True,
-                "ok": None,
-                "gain_db": list(self.gain_db),
-                "gain_applied_db": [20.0 * float(np.log10(max(x, 1e-9) / 256.0))
-                                    for x in self.gain_cur],
-                "bypass": self.bypass,
-                "attack_ms": list(self.atk),
-                "release_ms": list(self.rel),
-                "in_rms": float(np.sqrt(np.mean(np.square(self._in_hist)))),
-                "out_rms": float(np.sqrt(np.mean(np.square(self._out_hist)))),
-                "rt": (audio / wall) if wall > 0 else 0.0,
-                "lost_blocks": lost,
-                "lat_ms": round(lat_ms, 2),
-                "error": err,
-            })
+            write_status(st)
         except OSError:
             pass          # 写不出去不该把音频带下水
+
+    def finish(self):
+        """收到停止信号后把最后一个状态改成 running=False，网页才会收起"正在跑"。"""
+        st = dict(self._status_last or {})
+        st.update({"t": time.time(), "pid": os.getpid(),
+                   "running": False, "ok": True, "error": None})
+        try:
+            write_status(st)
+        except OSError:
+            pass
 
 
 def main():
@@ -230,6 +256,9 @@ def main():
                     help="一个块的立体声帧数。默认 240（4.9 ms）：块长直接进"
                          "端到端延迟，480 帧时一块就要 9.8 ms，还没算积压")
     ap.add_argument("--secs", type=float, default=60.0)
+    ap.add_argument("--live", action="store_true",
+                    help="网页演示用：一直跑到收到 SIGINT，不打印每块的表，"
+                         "状态文件里把 l/nbuf/io_ms/dsp_ms 也写给网页")
     ap.add_argument("--bypass", action="store_true",
                     help="关掉压缩（直通）。核对「过核」这一步有没有接错时用")
     ap.add_argument("--tx-low", type=int, default=576,
@@ -261,7 +290,7 @@ def main():
     print("  核  fir_multiband_0  @%s" % hex(ol.ip_dict["fir_multiband_0"]["phys_addr"]))
 
     return live(dma, ctrl, stat, fir, args.frames, args.secs, args.bypass,
-                args.tx_low, args.prof)
+                args.tx_low, args.prof, live_mode=args.live)
 
 
 # ---------------------------------------------------------------- overlay 取句柄
@@ -281,7 +310,8 @@ def _overlay():
 
 # ---------------------------------------------------------------- 主循环
 
-def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False):
+def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False,
+         live_mode=False):
     print("\n== 整条实时链路（过核）话筒 → DDR → 核 → DDR → 耳机 ==")
 
     nw = frames * 2
@@ -305,7 +335,7 @@ def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False):
     time.sleep(0.002)
     P.set_ctrl(ctrl, bits)
 
-    nblk = int(secs * FS / frames)
+    nblk = (1 << 30) if live_mode else int(secs * FS / frames)
     proc, pend, fir_ms = [], [], []
     psl = []                     # PS 真正花在这块上的时间（算嘴到耳用这一个）
     cap_seen, tx_seen = [], []
@@ -313,6 +343,14 @@ def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False):
     ovf_idx, ovf_max = [], 0
     tuner = Tuner(bypass)
     clear_status()               # 不删的话网页会先把上一趟的数字当成现在的
+    # 网页点「停止」发的是 SIGINT。主循环就在主线程里，用标志位退出 ——
+    # 这样等最后一块放完、关流、把 running=False 写回去这几步还能照常跑。
+    stop = [False]
+
+    def _on_int(_signum, _frame):
+        stop[0] = True
+
+    signal.signal(signal.SIGINT, _on_int)
     blk_ms = frames / P.FS_ACT * 1000.0
     # 核的组延迟按**字**算：左右声道不拆，96 个字 = 48 帧
     gd_ms = FirMultiband.GROUP_DELAY / 2.0 / P.FS_ACT * 1000.0
@@ -366,7 +404,7 @@ def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False):
         gw[name] = d
         if d > gmax.get(name, 0.0):
             gmax[name] = d
-        if d > 0.003:
+        if d > 0.003 and not live_mode:
             # 打到墙上（perf_counter 是 CLOCK_MONOTONIC，跨进程同一个时基），
             # 好和另一颗核上的抖动探针按时刻对起来
             print("  [慢] %.3f  %-10s %.2f ms" % (time.perf_counter(), name, d * 1e3))
@@ -376,7 +414,7 @@ def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False):
 
     i = 1
     dbg_left = 8             # 只打前 8 块有丢字的，打完就闭嘴
-    while i < nblk:
+    while i < nblk and not stop[0]:
         k = i % NBUF
         c = time.process_time()
         w = time.perf_counter()
@@ -486,7 +524,10 @@ def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False):
             tuner.publish(t_p, i, frames / P.FS_ACT,
                           _rms(fin[k]), _rms(fout[k]),
                           blk_ms + dt * 1000.0 + gd_ms
-                          + st["tx_lvl"] / 2.0 / P.FS_ACT * 1000.0)
+                          + st["tx_lvl"] / 2.0 / P.FS_ACT * 1000.0,
+                          l=frames, nbuf=NBUF,
+                          io_ms=float(np.median(proc[-64:])),
+                          dsp_ms=float(np.median(fir_ms[-64:])))
         _acc("pub", c)
         _w("pub", w)
 
@@ -500,18 +541,18 @@ def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False):
 
         # 离群块：把这一块的墙钟分段打出来。只打印不常发生的那些，
         # 平时的开销就是每个分段两次 perf_counter。
-        if proc[-1] > 5.0:
+        if proc[-1] > 5.0 and not live_mode:
             print("  [离群] 块 %d 交块用了 %.1f ms：" % (i, proc[-1])
                   + "  ".join("%s %.2f" % (n, gw[n] * 1e3) for n in ORIG if n in gw))
         # 一开始丢字的那几块，分段全打出来 —— 300 秒那趟垮的时候只看得到
         # 累计计数，看不出是哪个分段先慢下来的。
-        elif (d_ovf or d_und) and dbg_left > 0:
+        elif (d_ovf or d_und) and dbg_left > 0 and not live_mode:
             dbg_left -= 1
             print("  [首丢] 块 %d 交块 %.2f ms  tx %d cap %d："
                   % (i, proc[-1], st["tx_lvl"], st["cap_lvl"])
                   + "  ".join("%s %.2f" % (n, gw[n] * 1e3) for n in ORIG if n in gw))
 
-        if i % max(1, nblk // 15) == 0 or d_ovf or d_und:
+        if not live_mode and (i % max(1, nblk // 15) == 0 or d_ovf or d_und):
             print("  %6d  %8.2f  %6.3f  %7d  %7d  %8d %7d"
                   % (i, proc[-1], fir_ms[-1], st["tx_lvl"], st["cap_lvl"],
                      d_ovf, d_und))
@@ -520,6 +561,7 @@ def live(dma, ctrl, stat, fir, frames, secs, bypass, tx_low=480, prof=False):
     P.mm2s_wait(dma, timeout=2.0)         # 等最后一块真的放完
     total = time.perf_counter() - t0
     P.set_ctrl(ctrl, 0)
+    tuner.finish()
 
     if not proc:
         P.check("跑起来了", False, "一块都没跑完")

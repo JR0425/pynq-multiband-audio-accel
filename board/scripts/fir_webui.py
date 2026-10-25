@@ -68,6 +68,10 @@ REC_PREFIX = os.path.join(REC_DIR, "take")
 REC_NAMES = ("take_in.wav", "take_out.wav")
 REC_MAX_SEC = 120                       # 两个数组各 48000×120×2B ≈ 11.5 MB
 LAST_PATH  = "/dev/shm/fir_webui_last.json"
+# 「演示版 + DMA」那一档：位流和脚本在 dma_exp 目录里（是查"数据不经过 PS"
+# 时留下的），走 DMA 收发、核插在 PS 的循环里，实测端到端 14.4~14.8 ms。
+DMA_DIR    = os.environ.get("FIR_DMA_DIR", "/home/xilinx/dma_exp")
+DMA_SCRIPT = os.path.join(DMA_DIR, "dma_fir_loop.py")
 FS         = 48000.0
 GD         = 96                          # 核的群延迟，画图时先补掉
 
@@ -631,7 +635,8 @@ def _hearing_guard():
     return None
 
 
-def _start(src, l=None, nbuf=None, rec=None, cap_sec=None, wav=None):
+def _start(src, l=None, nbuf=None, rec=None, cap_sec=None, wav=None,
+           ver="fir"):
     with LOCK:
         p = PROC["p"]
         if p is not None and p.poll() is None:
@@ -686,6 +691,20 @@ def _start(src, l=None, nbuf=None, rec=None, cap_sec=None, wav=None):
         if wav:
             env["LIVE_SRC"] = "wav"
             env["LIVE_WAV"] = wav
+
+        if ver == "dma":
+            if rec:
+                return False, "DMA 这一档没有录音缓冲，先取消勾选「录音」再启动", ""
+            if wav:
+                return False, "DMA 这一档只走麦克风，音源请选麦克风", ""
+            # dma_fir_loop 每块都 sleep，不需要实时优先级也能跑；但它自己算
+            # 一块 4.9 ms、PS 时间偶尔到 4.7 ms，套 chrt -f 60 才不会被打断。
+            cmd = ["/usr/bin/chrt", "-f", "60", sys.executable,
+                   DMA_SCRIPT, "--live"]
+            run_cwd = DMA_DIR
+        else:
+            cmd = [sys.executable, os.path.join(HERE, "fir_live.py")]
+            run_cwd = HERE
         try:
             lg = open(LIVE_LOG, "wb")
         except OSError as e:
@@ -704,9 +723,8 @@ def _start(src, l=None, nbuf=None, rec=None, cap_sec=None, wav=None):
                 # （nohup/setsid），SIGINT 被继承成“忽略”，直接 Popen 的话
                 # fir_live 在 interpreter 起来之前收到停止信号会被丢掉。
                 PROC["p"] = subprocess.Popen(
-                    ["/bin/sh", "-c", 'trap - INT; exec "$0" "$@"',
-                     sys.executable, os.path.join(HERE, "fir_live.py")],
-                    cwd=HERE, env=env, stdout=lg, stderr=subprocess.STDOUT,
+                    ["/bin/sh", "-c", 'trap - INT; exec "$0" "$@"'] + cmd,
+                    cwd=run_cwd, env=env, stdout=lg, stderr=subprocess.STDOUT,
                     start_new_session=True)
             except OSError as e:
                 return False, "起不来：%s" % e, ""
@@ -724,6 +742,9 @@ def _start(src, l=None, nbuf=None, rec=None, cap_sec=None, wav=None):
         time.sleep(2.0)
         if p.poll() is not None:
             return False, "它起跑就退了（退出码 %s）" % p.returncode, _log_tail(1600)
+        if ver == "dma":
+            return (True, "起来了，pid %d，演示版 + DMA（端到端约 14.6 ms）"
+                    % p.pid, "")
         return (True, "起来了，pid %d，音源 %s，缓冲 %.1f ms（L=%d × %d）"
                 % (p.pid, src, nbuf_used * l_used / 48.0, l_used, nbuf_used), "")
     finally:
@@ -1016,7 +1037,8 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"ok": False,
                                 "msg": "找不到 %s —— 先勾上「录音」跑一趟，录下来才能放" % wav}, 400)
                     return
-            ok, msg, tail = _start(src, l, nbuf, rec, cap_sec, wav)
+            ver = str(d.get("ver") or "fir")
+            ok, msg, tail = _start(src, l, nbuf, rec, cap_sec, wav, ver)
             self._json({"ok": ok, "msg": msg, "log": tail})
         elif p == "/api/hearing/tone":
             why = _hearing_guard()

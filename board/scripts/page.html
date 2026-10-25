@@ -288,6 +288,7 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
     <option value="360,2">低延迟 16 ms</option>
     <option value="480,3">常规 31 ms</option>
     <option value="1920,4">对照 160 ms</option>
+    <option value="dma">演示版 + DMA 14.6 ms</option>
   </select>
   <label class="reclab" id="rec-lab" title="这一趟进核/出核各存一个 wav，停止后可以下载">
     <input type="checkbox" id="rec-chk">录音
@@ -1125,10 +1126,17 @@ $("#btn-start").addEventListener("click", async () => {
   setBadge("busy", "正在起…");
   $("#btn-start").disabled = true; $("#btn-stop").disabled = true;
   try {
-    const [latL, latN] = $("#lat-sel").value.split(",").map(Number);
+    const latVal = $("#lat-sel").value;
     const [srcKind, srcWav] = $("#src-sel").value.split(":");
-    const body = {src: srcKind, l: latL, nbuf: latN};
-    if (srcKind === "wav") body.wav = srcWav;
+    let body;
+    if (latVal === "dma"){
+      /* DMA 这一档只走麦克风，块长固定 240 帧，不走 L/NBUF 那套 */
+      body = {src: "mic", ver: "dma"};
+    } else {
+      const [latL, latN] = latVal.split(",").map(Number);
+      body = {src: srcKind, l: latL, nbuf: latN};
+      if (srcKind === "wav") body.wav = srcWav;
+    }
     const wantRec = $("#rec-chk").checked;
     if (wantRec){ body.rec = "/tmp/take"; body.cap_sec = 120; }
     const r = await postJSON("/api/start", body);
