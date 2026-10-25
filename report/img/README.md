@@ -122,3 +122,21 @@
 
 ---
 
+## RTL 那几张
+
+报告 §3.4.4 与 `data/results/rtl_vs_hls.md` 引用这三张。
+
+- `rtl-dual_timings.png` —— 块模式 `fir_rtl.bit` 与连续流 `fir_rtl_dma.bit` 各自单独加载、
+  跑同一份 4800 点音源的拍数对比（14407 / 14408）和逐位差异（0 LSB）。
+
+- `rtl-dual_outputs.png` —— 两版输出的并排波形，按 96 采样群延迟对齐后逐点相同。
+
+- `wave_timing.png` —— 抓取器在板上抓的 AXI-Stream 握手时序，1024 拍 @100 MHz = 10.24 µs。
+  上半：块头，`in_valid` 常高、`in_ready` 每 3 拍给一次，342 次握手间隔全是 3 拍；
+  下半：块尾，输入 TLAST 与输出 TLAST 只差 8 拍。
+  **96 采样群延迟体现在数值上**（前 96 个输出采样为 0），**不体现在拍数上**，
+  别按「输出比输入晚 288 拍」去读这张图。
+  生成：`board/scripts/rtl_wave_probe.py` + `fir_rtl_dma_cap.bit`（这颗位流只出图不出数）。
+
+---
+

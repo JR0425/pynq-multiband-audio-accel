@@ -22,7 +22,7 @@
 module tb_fir_mb_fe;
 
     localparam integer ACCW   = 40;
-    localparam integer MAXLEN = 4096;
+    localparam integer MAXLEN = 8192;
 
     reg clk = 1'b0;
     reg rst = 1'b1;

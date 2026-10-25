@@ -34,10 +34,12 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 - 同芯片 ARM vs PL 加速比：**16.7 倍**（2026-10-23 板上实测，测的是当前出货版 `v25_env_indep`，原始输出 `data/results/compare_cpu_fpga_run_20261023.txt`）。Zynq PS 侧的 ARM 每采样 **6.117 µs**（3.41× 实时），PL 里的核 **0.367 µs**（56.77× 实时；理论 0.360 µs = 36 拍 @ 100 MHz）。2026-10-22 那次的 **12.5 倍**是 `v21_wdrc`（49 拍）的数，2026-10-08 的 **19.5 倍**是 `v19`（31 拍）的数，都别和现在这颗混用。引用这个数必须带四条说明 —— 两边精度不同（float64 vs Q1.15）、CPU 那边是 scipy 的 C 实现、核的耗时里含每块约 60 µs 的 Python 开销（占长块实测不到 10%）、两边每采样都是 579 次有效乘法。全文见 `data/results/accel_cpu_vs_fpga.md`。
 - 早期还测过一个开源参考 overlay。结果在 `data/results/reference_overlay_metrics.md`，和自研核无关，别混着引用。
 - Python / HLS / RTL 三实现对比已经做完，同一负载、同一精度契约、同一 10 ns 约束，表在
-  `data/results/rtl_vs_hls.md`。自研 RTL 分两块：`src/rtl/fir_lp.v`（单低通）和
-  `src/rtl/fir_mb_fe.v`（3 个低通 + 相减 + 4 段综合），xsim 逐位等于整数参考模型；两块都
-  没有 DRC、每段增益和 AXI 外壳。范围和限制也见该文件，跑法见
-  `sim/rtl_sim/README.md`。
+  `data/results/rtl_vs_hls.md`。自研 RTL 从单低通一路补到和出货核同功能：`src/rtl/fir_mb_fe.v`
+  （3 个低通 + 相减 + 4 段综合，每采样 3 拍）、`fir_drc4.v`（四段压缩）、`fir_rtl_shell.v`
+  （AXI-Lite + BRAM 块模式外壳）、`fir_stream_shell.v`（AXI-Stream 外壳）都上了板，
+  块模式 14407 拍、DMA 版 14408 拍，两版逐位相同；65535 点连发 25.7 M 采样/秒。
+  另有一颗只出握手时序图的抓取位流。**这三颗位流不在演示通路上、也不替代 `fir.bit`**，
+  范围和限制见该文件 §9，跑法见 `sim/rtl_sim/README.md` 和 `board/README.md`。
 
 ## 目录结构
 
@@ -45,9 +47,9 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 | --- | --- |
 | `src/python/` | Python 基线、系数与测试数据导出、比对与分析工具 |
 | `src/hls/` | HLS 核与 C 测试台 |
-| `src/rtl/` | 自研 RTL：`fir_lp.v`（单低通）与 `fir_mb_fe.v`（多频段前端；都没有 DRC / 每段增益 / AXI 外壳） |
+| `src/rtl/` | 自研 RTL：前端、四段压缩、两种 AXI 外壳、握手监视器与抓取器；索引见 `sim/rtl_sim/README.md` |
 | `sim/hls_csim/` | C 仿真的测试台与 FIR 系数文件 |
-| `sim/rtl_sim/` | RTL 仿真的 testbench、参考模型与逐位比对脚本，跑法见该目录的 `README.md` |
+| `sim/rtl_sim/` | RTL 仿真的 testbench、参考模型、黄金向量与逐位比对脚本，跑法见该目录的 `README.md` |
 | `build/` | 构建脚本、HLS 指令文件、各版本综合与实现报告；索引见 `build/README.md` |
 | `board/` | PYNQ 笔记本、整机 overlay（`overlay/fir.bit`）、核驱动、板级脚本；索引见 `board/README.md` |
 | `data/audio/` | 测试音频与生成的音频 |
@@ -106,6 +108,8 @@ python src/python/compare_golden_vs_hw.py
 从麦克风录音、过核、再放出来（一块一块处理）；`board/scripts/fir_live.py` 跑麦克风 → 核 → 耳机的实时通路（2026-10-15 已端到端跑通并能听到处理声，见上）；
 `board/scripts/fir_selftest.py` 做直通和分块连续性检验；
 `board/scripts/compare_cpu_fpga.py` 在同一块板子上量 ARM 基线与核的对比（2026-10-23 板上实测 **16.7 倍**，见 `data/results/accel_cpu_vs_fpga.md`）。
+
+`overlay/fir_rtl.bit`、`fir_rtl_dma.bit`、`fir_rtl_dma_cap.bit` 是 2026-10-25 的自研 RTL 实验位流（块模式 / DMA + AXI-Stream / 只出握手时序图），由 `overlay/build_rtl*.tcl` 构建，探针是 `board/scripts/rtl_*.py`。它们**不在演示通路上**，出货演示仍只有 `fir.bit`；位定义和跑法见 `board/README.md`。
 
 `overlay/ps_only.bit` 是更早的板级放音产物，PL 里是空的。
 `overlay/audio.bit` 是更早的「我们自己建的工程能出声」里程碑产物，只有音频 codec。

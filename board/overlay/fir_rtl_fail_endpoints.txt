@@ -1,0 +1,48 @@
+# 整机（PS7+AXI+FE+DRC）实现后的 44 个 setup 失败端点
+# 来源：get_timing_paths -max_paths 100 -nworst 1 -slack_lesser_than 0 -delay_type max
+#       open_checkpoint impl_1/fir_rtl_wrapper_routed.dcp
+# 格式：slack_ns  端点
+-0.140  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[0]/D
+-0.101  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[20]/D
+-0.095  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[14]/D
+-0.094  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[1]/D
+-0.093  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[16]/D
+-0.086  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[18]/D
+-0.084  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[2]/D
+-0.080  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[23]/D
+-0.078  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[17]/D
+-0.077  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[15]/D
+-0.075  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[12]/D
+-0.073  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[4]/D
+-0.064  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[6]/D
+-0.062  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[8]/D
+-0.059  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[20]/D
+-0.058  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[5]/D
+-0.057  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[13]/D
+-0.052  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[10]/D
+-0.051  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[21]/D
+-0.047  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[2]/D
+-0.047  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[9]/D
+-0.046  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[4]/D
+-0.046  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[7]/D
+-0.045  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[8]/D
+-0.045  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[12]/D
+-0.039  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[21]/D
+-0.037  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[11]/D
+-0.037  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[19]/D
+-0.035  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[0]/D
+-0.034  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[3]/D
+-0.033  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[3]/D
+-0.031  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[9]/D
+-0.030  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[14]/D
+-0.028  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[16]/D
+-0.028  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[6]/D
+-0.028  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[5]/D
+-0.027  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[13]/D
+-0.020  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[15]/D
+-0.020  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b3/p_gr_reg[1]/D
+-0.018  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[7]/D
+-0.017  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b2/p_gr_reg[17]/D
+-0.016  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b0/p_gr_reg[6]/D
+-0.011  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b0/p_gr_reg[4]/D
+-0.009  fir_rtl_i/fir_rtl_shell_0/inst/u_drc/u_b0/p_gr_reg[14]/D

@@ -1,7 +1,19 @@
-# sim/rtl_sim —— 自研 RTL 的仿真与逐位对拍
+# sim/rtl_sim —— 自研 RTL 的仿真、逐位对拍与板上黄金向量
 
-对应源码在 `src/rtl/`：`fir_lp.v`（单个低通）和 `fir_mb_fe.v`（多频段前端：
-3 个低通轮转 + 相减 + 4 段综合）。两块都**没有** DRC、每段增益和 AXI 外壳。
+对应源码在 `src/rtl/`：
+
+| 模块 | 作用 |
+| --- | --- |
+| `fir_lp.v` | 单个 195 抽头低通。历史版本，前端取代了它，逐抽头对系数表那一环还在用 |
+| `fir_mb_fe.v` | 多频段前端：3 个低通轮转 + 相减 + 4 段综合 |
+| `fir_drc4.v` | 四段各一套「验配增益 + 包络压缩」，定点契约照 `src/hls/fir_types.h` |
+| `fir_rtl_shell.v` | 块模式外壳：AXI-Lite 寄存器 + 双口 BRAM，LOAD / RUN / DRAIN 三段 |
+| `fir_stream_shell.v` | 流式外壳：AXI-Stream 从口到主口，内部只做 valid/ready，没有 AXI 逻辑 |
+| `fir_axis_monitor.v` | 直通监视器，在 DMA 与外壳之间各串一个，供抓取器采样 |
+| `fir_wave_cap.v` | 自写抓取器：每拍一条 32 位记录，输入输出各 1024 字 BRAM，PS 经 AXI 读回 |
+
+前四个的上板结果在 `data/results/rtl_vs_hls.md` §9；后两个只用于出时序图，
+**不出任何数字**（监视器让组合路径多一级）。
 
 ## 跑之前
 
@@ -15,12 +27,30 @@ python tools/ref_model_int.py      # 整数参考模型 → ref_acc_* / ref_out_
 ## 跑仿真
 
 ```bash
-bash sim/rtl_sim/run_xsim.sh       # tb_fir_lp.v，三个低通各跑一遍
-bash sim/rtl_sim/run_xsim_mb.sh    # tb_fir_mb_fe.v，多频段前端
+bash sim/rtl_sim/run_xsim.sh                 # tb_fir_lp.v，三个低通各跑一遍
+bash sim/rtl_sim/run_xsim_mb.sh              # tb_fir_mb_fe.v，多频段前端
+bash sim/rtl_sim/run_xsim_shell.sh           # tb_fir_rtl_shell.v，块模式外壳，1000 点
+bash sim/rtl_sim/run_xsim_drc4.sh            # tb_fir_drc4.v，只测压缩单元
+bash sim/rtl_sim/run_xsim_stream.sh          # tb_fir_stream_shell.v，AXI-Stream 外壳
+bash sim/rtl_sim/run_xsim_long.sh 4800       # tb_fir_rtl_shell.v，长块，出板上黄金向量
+bash sim/rtl_sim/run_xsim_wave_cap.sh        # tb_wave_cap.v，抓取器位序
 ```
 
 `fir_lp` 分三次跑而不是在一个 testbench 里例化三次，是因为系数表按文件名读，
 三份一起例化会抢同一个文件。三个低通的截止频率分别是 500 / 1000 / 2000 Hz。
+其余几份都只认固定的相对文件名（`in_q15.mem`、`coeffs.mem`），同样一次跑一个。
+
+`run_xsim_long.sh` 的参数：
+
+```bash
+run_xsim_long.sh <点数> [音源 wav 绝对路径] [起始偏移] [黄金目录后缀]
+```
+
+- 不给音源就用 `in_q15.mem`，黄金目录是 `golden_n4800/`。
+- `DRC=1` 环境变量打开压缩路径。
+- 第 4 个参数用来并存不同音源，例如
+  `DRC=1 bash run_xsim_long.sh 4800 <abs>/ab_board_in.wav 62131 _loud`
+  写进 `golden_n4800_drc_loud/`。音源必须给绝对路径 —— 脚本会先 cd 进工作目录。
 
 ## 比对
 
@@ -33,6 +63,21 @@ python sim/rtl_sim/check_mb.py     # fir_mb_fe：9 路中间量 + 输出，逐�
 输出 —— 输出是「右移 17 + 饱和」之后的，低 17 位的信息已经丢掉，
 只看输出分不清「乘法错一点」和「移位量写错」。
 
+外壳那几份的对拍直接写在 testbench 里（跑完自己读 `ref_*` 比），没有单独的
+check 脚本；不一致时返回非 0。
+
+## 黄金向量（板上对拍用）
+
+| 目录 | 音源 | 模式 | 用途 |
+| --- | --- | --- | --- |
+| `golden_n4800/` | `in_q15.mem`（noisy_voice） | 仅前端 | 块模式与 DMA 版的 4800 点逐位基准 |
+| `golden_n4800_drc_loud/` | `ab_board_in.wav` 偏移 62131 | 压缩 | 压缩器**真的启动**的那份；`quiet` 那份门限都没进，测不出错 |
+| `golden_n4800_drc_quiet/` | noisy_voice | 压缩 | 只证明直通没坏、定点取整对 |
+
+每个目录里是 `in_q15.mem` + `rtl_fe_out.txt`（仿真出来的期望输出）。板上探针
+`board/scripts/rtl_*.py` 从同目录读这两个文件。**别用 `quiet` 那份判压缩对不对**：
+包络没进门限，8 级流水写错两处时它照样 1000/1000 全对。
+
 ## 结果
 
 逐位全等，结论和范围说明在 `data/results/rtl_vs_hls.md`。
@@ -41,6 +86,10 @@ python sim/rtl_sim/check_mb.py     # fir_mb_fe：9 路中间量 + 输出，逐�
 
 | 文件 | 作用 |
 | --- | --- |
-| `synth_mb.tcl`、`impl_mb.tcl` | 多频段前端的综合与实现脚本 |
+| `synth_mb.tcl`、`impl_mb.tcl` | 多频段前端的 OOC 综合与布局布线（时序/资源数字的来源） |
+| `tb_fir_lp.v`、`tb_fir_mb_fe.v`、`tb_fir_drc4.v`、`tb_fir_rtl_shell.v`、`tb_fir_stream_shell.v`、`tb_wave_cap.v` | 对应上面各条 `run_*` 脚本的测试台 |
 | `ref_f32_lp*.txt` | 浮点参考（用来看定点化损失了多少，不参与逐位比对） |
 | `ref_out_lp*.txt` / `rtl_out_lp*.txt` | 上面的输出比对文件 |
+| `xsim_work*/` | xsim 工作目录，已进 `.gitignore`，删了会重生成 |
+
+整机（PS7 + 互连 + 外壳 + 前端 + DRC）的构建不在这里，走 `board/overlay/build_rtl*.tcl`。
