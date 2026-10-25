@@ -371,6 +371,10 @@ tune_last = [None]                                      # 上一次读到的旋�
 t_poll = [0.0]
 t_status = [0.0]
 t_start = [time.time()]                                 # 主循环和状态文件都要用
+# 「丢块」和「实时率」从**第一块处理完**开始记账。进程起来到第一块之间那些
+# 准备时间（建缓冲、第一次碰硬件）不是丢掉的音频，算进去会让界面上一开局就
+# 挂两三个丢块，然后靠晶振快 0.16% 慢慢追平 —— 实测要 30~50 秒才归零。
+t_zero = [None]
 applied_log = []     # 每块**实际**用了什么参数，自检按它逐块重算
 events = []          # 从实时线程里攒下来的话，交给主线程打印
                      # （dsp 线程不许 print —— 它带着 SCHED_FIFO，卡在 I/O 上会丢音）
@@ -538,8 +542,9 @@ def publish_status(now, running=True, ok=None):
     **实时倍率 / 丢块数**（判断这条通路还活着）。
     """
     n = n_blocks[0]
-    audio_sec = n * block_sec
-    wall = now - t_start[0]
+    audio_sec = max(n - 1, 0) * block_sec
+    base = t_zero[0] if t_zero[0] is not None else t_start[0]
+    wall = now - base
     lost = int(max(0.0, wall - audio_sec) / block_sec)
     write_status({
         "t": now,
@@ -555,7 +560,7 @@ def publish_status(now, running=True, ok=None):
         "release_ms": list(rel_ms[0]),
         "in_rms": _win_rms(in_rms),
         "out_rms": _win_rms(out_rms),
-        "rt": (audio_sec / wall) if wall > 0 else 0.0,
+        "rt": (audio_sec / wall) if wall > block_sec * 0.5 else 1.0,
         "lost_blocks": lost,
         # 当前跑的是哪一档。演示要分辨"16.2 ms 那档"和"回退的稳定档"，
         # 不看这两行就只能靠猜。lat_ms 是块缓冲那一部分（≈ 实测数字延迟，
@@ -987,6 +992,8 @@ def stage_dsp():
         first = False
         t_proc.append(dt)
         n_blocks[0] += 1
+        if t_zero[0] is None:
+            t_zero[0] = t_now
 
         # 出核的转成 24 位交织立体声，**提前摆进 b_out** —— io 那边一拿到这个槽
         # 就直接把 b_out 交给 C，中间不做任何转换。必须在 q2.put(i) 之前做完。
