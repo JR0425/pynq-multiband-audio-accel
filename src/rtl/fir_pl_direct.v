@@ -133,13 +133,41 @@ module fir_pl_direct #(
      * 取高 16 位就是去低 8 位的那一刀。 */
     assign fe_din = cap_tdata[31:16];
 
+    /* ================= 每帧只喂一个采样（2026-10-27 修） =================
+     *
+     * i2s_duplex 的接收侧**每帧写两个字**（先 L 后 R，见 i2s_duplex.v 的
+     * cap_st 1/2）。原来的写法把每一个字都当采样喂进前端，于是：
+     *
+     *   ① 前端实际跑在 97.7 kHz，四个分频点在物理上全部翻倍
+     *      （500/1000/2000 → 1k/2k/4k）；1 kHz 的单音会落到"2 kHz 以上"
+     *      那一段里去；
+     *   ② 左右声道被交错塞进同一条 193 抽头延迟线。
+     *
+     * 10-25 那条验收记录（`und` 60 秒不涨 = 播放侧按 97.7 k 字/秒供数）
+     * 就是 ① 的直接证据。板子一直哑着，所以耳朵没机会发现。
+     *
+     * 现在：L 那一个字进前端，R 那个字**照弹不喂**（不弹会堵住 FIFO）。
+     * 帧率 48.83 kHz ⇒ 前端 3 拍/采样只占 2048 拍里的 3 拍，余量不变。
+     *
+     * 为什么用"翻转"而不是让 i2s_duplex 多给一个声道标志：这个模块的
+     * 上游只有一个源，且 flush 之后第一个字必然是 L；万一 FIFO 溢出错开
+     * 一个，L/R 内容本来就相同，翻转错位无副作用。加端口要动 fir_dma
+     * 那条已经在跑的链路，不值。
+     */
+    reg rx_ch;                   // 0 = 下一个字是 L（喂前端），1 = R（丢掉）
+
     /* 输入节流：播放 FIFO 水位 + 输出 FIFO 占用 到目标值就停手。
      * run=0 时也不收 —— 那时候 i2s_duplex 不往外放，收了只会把播放 FIFO 灌满。 */
     wire [OUT_AW:0] ofifo_cnt;
     wire            room = run && ((tx_lvl + ofifo_cnt) < TX_TARGET);
 
-    assign cap_tready = room && fe_din_ready;
-    assign fe_din_vld = cap_tvalid && cap_tready;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n || flush) rx_ch <= 1'b0;
+        else if (cap_tvalid && cap_tready) rx_ch <= ~rx_ch;
+    end
+
+    assign cap_tready = rx_ch ? 1'b1 : (room && fe_din_ready);
+    assign fe_din_vld = cap_tvalid && cap_tready && !rx_ch;
 
     fir_mb_fe u_fe (
         .clk       (clk),
@@ -191,13 +219,56 @@ module fir_pl_direct #(
     assign ofifo_cnt = owptr - orptr;
 
     wire ofifo_full = (ofifo_cnt == OUT_DEPTH);
-    wire ofifo_wr   = out_vld && !ofifo_full;
     wire ofifo_rd   = ply_tvalid && ply_tready;
 
     wire [15:0] ofifo_q = ofifo[orptr[OUT_AW-1:0]];
 
+    /* ---- 一个采样写两份（2026-10-27 与上面的取一修配套） ----
+     * i2s_duplex 的发送侧每帧从 FIFO 取两个字（hold0 / hold1）。收侧现在每帧
+     * 只产一个采样，所以这里必须把一个采样写两遍；否则每帧少一个字，`und`
+     * 会一直涨，声音是断续的。
+     *
+     * 用 2 位计数而不是"写一次立刻再写一次"：写使能是寄存的，同一个 always
+     * 块里连写两拍会让第二拍的数据来源在 `dup_half` 翻转后变成新采样。
+     *
+     * 以后做双耳（B5）时，两份分别写 drc_l / drc_r 即可，结构不用改。 */
+    reg [15:0] dup_q;
+    reg [1:0]  dup_left;      // 还剩几份没写
+    reg        dup_wr;
+    reg        dup_drop;      // 一对没写出去（正常恒 0）
+    wire [15:0] ofifo_din;
+
+    assign ofifo_wr  = dup_wr;
+    assign ofifo_din = dup_q;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n || flush) begin
+            dup_q    <= 16'd0;
+            dup_left <= 2'd0;
+            dup_wr   <= 1'b0;
+            dup_drop <= 1'b0;
+        end else begin
+            dup_wr   <= 1'b0;
+            dup_drop <= 1'b0;
+            if (dup_left != 2'd0) begin
+                if (!ofifo_full) begin
+                    dup_wr   <= 1'b1;
+                    dup_left <= dup_left - 2'd1;
+                end
+            end
+            if (out_vld) begin
+                if (dup_left == 2'd0) begin
+                    dup_q    <= out_q;
+                    dup_left <= 2'd2;
+                end else begin
+                    dup_drop <= 1'b1;     // 上一对还没写完又来一个（不该发生）
+                end
+            end
+        end
+    end
+
     always @(posedge clk) begin
-        if (ofifo_wr) ofifo[owptr[OUT_AW-1:0]] <= out_q;
+        if (ofifo_wr) ofifo[owptr[OUT_AW-1:0]] <= ofifo_din;
     end
 
     always @(posedge clk or negedge rst_n) begin
@@ -233,8 +304,8 @@ module fir_pl_direct #(
         if (!rst_n) begin
             oovf_cnt <= 16'd0;
         end else begin
-            if (out_vld && ofifo_full) oovf_cnt <= oovf_cnt + 16'd1;
-            if (ctrl[8])               oovf_cnt <= 16'd0;
+            if (dup_drop) oovf_cnt <= oovf_cnt + 16'd1;
+            if (ctrl[8])  oovf_cnt <= 16'd0;
         end
     end
 
