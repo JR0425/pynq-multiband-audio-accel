@@ -30,7 +30,9 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:var(--bg);color:var(--text);
   font:14px/1.5 "Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
-  -webkit-font-smoothing:antialiased}
+  -webkit-font-smoothing:antialiased;
+  /* 文字加粗：只描边不改字重，字形变粗但宽度不变，排版与整体尺寸不受影响 */
+  -webkit-text-stroke:.38px currentColor;paint-order:stroke fill}
 .num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 canvas{display:block;width:100%}

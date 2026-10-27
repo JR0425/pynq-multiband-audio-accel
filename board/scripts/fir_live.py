@@ -156,22 +156,20 @@
                       例：-6,0,6,12 = 低频压 6 dB、1~2 kHz 不动、高频抬 12 dB。
                       量程 ±42 dB（Q7.8 定的，超出直接报错不静默削）。
                       界面上拖过滑杆之后会盖掉它 —— 这个只管开机那一下。
-    LIVE_VOLUME=62    播放音量（0~62）。**不给就用音源自己的默认：麦克风 40、
-                      wav 62。**
-                      ⚠️ 这个"麦克风给 40"当初是照着"耳机→空气→麦克风声学反馈、
-                      环路增益过 1 就啸叫"设的 —— **那条解释 2026-10-13 已被 probe8/9
-                      否掉**（见下）。留 40 只是保守取值，不是因为它能防住自激。
-                      自激是真的：边录边放时进核的信号会在 ~0.7 秒里贴满量程，
-                      而且**和音量、话筒增益、耳机功放开关都无关**。
-                      **怎么判断正在自激**：状态文件里的 in_rms 贴到 20000 以上、
-                      而且你不说话它也不掉 —— 正常说话大概是 300~2000。
-                      真自激了先摘耳机，再 Ctrl-C。（2026-10-10 之前这个口的输入
-                      还带一个 31% 满量程的直流偏置，静音时 in_rms 也读 10000 上下，
-                      已由 adc_to_i16 去掉。）
+    LIVE_VOLUME=54    播放音量（0~63；0 = −57 dB，63 = +6 dB，每格 1 dB）。
+                      **不给就用 54（约 −3 dB），麦克风和 wav 同一个默认**，
+                      和预录 A/B 那条（fir_audio_loop.py）一致 —— 两条路来回切
+                      时响度不跳。要更响往上加；音箱和麦克风摆得近时留点余量。
+                      自激（2026-10-13 已查清与音量无关，是读法假象）：
+                      状态文件里 in_rms 贴到 20000 以上、而且你不说话它也不掉，
+                      正常说话大概是 300~2000。
     LIVE_PIN=0        关掉绑核（默认绑：io→cpu0，dsp→cpu1）
     LIVE_RT_IO=20     搬样线程的 SCHED_FIFO 优先级（0=不开实时）
     LIVE_RT_DSP=10    过核线程的（0=不开）
-    LIVE_SWITCH=0.0005  Python 线程切换间隔（秒）
+    LIVE_SWITCH=0.00001 Python 线程切换间隔（秒）。**别往上调**：搬样线程
+                      每块只有约 0.09 ms 余量，这个值就是它每次抢回 GIL 最多
+                      等多久。0.0005 时 16 ms 档网页开着 35 秒丢 19 块，
+                      0.00001 时 90 秒 0 块。
     LIVE_POLL=0.05    多久看一次旋钮文件（秒）。0.05 = 20 Hz，够跟手。
     LIVE_RAMP=4       新增益分几块走到位（4 块 = 40 ms）。给 1 = 直接跳变，会咔。
     LIVE_STATUS=0.1   多久写一次状态文件（秒）。界面靠它画电平表。
@@ -244,12 +242,20 @@ PIN = os.environ.get("LIVE_PIN", "1") not in ("0", "", "no")
 SRC = os.environ.get("LIVE_SRC", "mic").lower()
 # LIVE_DIAG=1 时把收到的原始数据打前几块出来（查"电平为什么贴顶"用）
 DIAG = os.environ.get("LIVE_DIAG", "0") not in ("0", "", "no")
-# 麦克风音源默认给 40（不是满 62）。这个默认值当初是照"耳机→空气→麦克风声学反馈、
-# 环路增益过 1 就啸叫"设的 —— **那条解释 2026-10-13 已被 probe8/9 否掉**（自激和音量、
-# 话筒增益、耳机功放开关都无关）。留 40 只是保守取值，不是因为它能防住自激。
-# （踩过：音量 45 + 每段增益里有 +16 dB，麦克风立刻贴满量程。）
+# 播放音量：0 = −57 dB，63 = +6 dB。
+# 2026-10-26 改：原来麦克风给 40（−17 dB）、wav 给 62（+5 dB），两条路差 22 dB ——
+# 演示时实时那头听着很小、一放录音就炸。现在两边统一 54（−3 dB），
+# 和预录 A/B 那条 fir_audio_loop.py 同一个值。LIVE_VOLUME 可以覆盖。
 _v = os.environ.get("LIVE_VOLUME")
-VOLUME = int(_v) if _v is not None else (40 if SRC == "mic" else 62)
+VOLUME = int(_v) if _v is not None else 54
+
+# 开场静音：话筒偏置上电那一下，ADC 会先收到一段直流冲击。
+# 2026-10-26 实测（录 10 秒静音）：0→0.22 秒涨到约 24600（−2.5 dBFS），到 1 秒才落回稳态。
+# 输出在 0 dB 时这就是一声很响的"砰"。只在 mic 音源生效 —— wav 音源没有这一段，
+# 而且开场 1 秒正是要放的内容。
+FADE_MUTE = int(1.0 * 48000)
+FADE_RAMP = int(0.1 * 48000)
+fade_n = [0]
 
 # 压缩参数。出厂默认（阈值 0.1 / 比 0.7）对分成四段之后的信号几乎没作用 ——
 # 每一段只剩总能量的一小块，够不到 0.1。这组是按实测电平重定的，
@@ -749,11 +755,7 @@ ol = Overlay(BIT)
 audio = ol.audio_codec_ctrl_0
 audio.configure()
 audio.set_volume(VOLUME)
-print("   音量 %d（上限 62）"
-      "%s" % (VOLUME,
-              "；麦克风音源，没显式给 LIVE_VOLUME 所以用了保守的 40" if (SRC == "mic"
-                                          and os.environ.get("LIVE_VOLUME") is None)
-              else ""))
+print("   音量 %d（约 %+d dB，上限 63 = +6 dB）" % (VOLUME, VOLUME - 57))
 
 k = FirMultiband(ol.fir_multiband_0.mmio)
 
@@ -847,6 +849,7 @@ else:
     # 要再调增益就动 R8/R9（0x0E/0x0F）：0xB3 = +26.25 dB，0xFF = +35.25 dB。
     # （旧注释里那一串 probe6/7/8 的推理已整条作废，详见 cap_probe11.py 文件头。）
     print("   音源：麦克风（PYNQ 原样两级增益，约 +46 dB）")
+    print("   开场：前 1.0 秒静音 + 100 ms 淡入（话筒偏置上电的直流冲击）")
 
 
 # ---------------- 两条线程 ----------------
@@ -999,6 +1002,16 @@ def stage_dsp():
         # 就直接把 b_out 交给 C，中间不做任何转换。必须在 q2.put(i) 之前做完。
         t_p = time.perf_counter()
         np.copyto(b_out, i16_to_i32_stereo(np.asarray(cout, dtype=np.int16)))
+        # 开场 1 秒静音 + 100 ms 淡入，盖掉话筒偏置上电的直流冲击（见 FADE_MUTE）。
+        # 改的是 b_out 而不是 cout：逐位自检比的是 cap_out，动它会让自检对不上。
+        if SRC == "mic" and fade_n[0] < FADE_MUTE + FADE_RAMP:
+            if fade_n[0] < FADE_MUTE:
+                b_out[:] = 0
+            else:
+                g = np.clip((fade_n[0] + np.arange(L) - FADE_MUTE) / float(FADE_RAMP),
+                            0.0, 1.0)
+                np.multiply(b_out, np.repeat(g, 2), out=b_out, casting="unsafe")
+            fade_n[0] += L
         out_rms.append(rms(cout[::16].astype(np.float64)))
         in_rms.append(rms(cin[::16].astype(np.float64)))
         t_prep.append(time.perf_counter() - t_p)
@@ -1033,12 +1046,11 @@ def stage_dsp():
         maybe_scope(t_now, cin, cout)
 
 
-# 线程切换间隔。原来是 0.0005（0.5 ms）——"块才 10 ms，调细点"。
-# 但实测那一版每一段 Python 都贵得离谱（两行 numpy 要 1.6 ms），
-# 怀疑是间隔太细：**每 0.5 ms 强制把 GIL 交给另一个核再要回来一趟**。
-# 搬样那个 C 调用是持 GIL 释放的（cffi ABI 模式），本来就不靠这个间隔让路，
-# 所以放到几毫秒反而更省。这里做成可调的，好扫一遍。
-sys.setswitchinterval(float(os.environ.get("LIVE_SWITCH", "0.0005")))
+# 线程切换间隔。搬样那条 C 调用是释放 GIL 的（cffi ABI 模式），回来时要重新抢，
+# 抢不到就等 —— 这个值就是它最多等多久。16 ms 档每块只剩约 0.09 ms 余量，
+# 0.5 ms 的等待是余量的 6 倍。2026-10-26 实测（网页开着、L=360/NBUF=2）：
+# 0.0005 时 35 秒丢 19 块；0.00001 时 90 秒 0 块。往上调之前先想清楚。
+sys.setswitchinterval(float(os.environ.get("LIVE_SWITCH", "0.00001")))
 
 # 实时优先级：搬样那条给高一点（它零余量），过核那条给低一点（它只占 10%）。
 # 设 0 就关掉（比如怀疑它把系统卡住了的时候）。

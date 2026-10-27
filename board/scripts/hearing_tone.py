@@ -15,7 +15,7 @@ webui 要起实时之前先把它杀掉，句柄随进程退出一起释放。
     "quit"          → 退出
 
 电平定义：-20 dBFS = 满量程幅度的 10%。
-音量取 HEAR_VOLUME（默认 40，和 fir_live.py 麦克风音源的默认音量一致），
+音量取 HEAR_VOLUME（默认 54，和 fir_live.py、fir_audio_loop.py 的默认音量一致），
 这样测听时听到的响度和之后实时通路是同一档。
 
 用法（只由 fir_webui.py 起，不手工跑）：
@@ -30,7 +30,7 @@ import sys
 import wave
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-VOLUME = int(os.environ.get("HEAR_VOLUME", "40"))
+VOLUME = int(os.environ.get("HEAR_VOLUME", "54"))
 FS = 48000
 TONE_PATH = "/dev/shm/hear_tone.wav"
 

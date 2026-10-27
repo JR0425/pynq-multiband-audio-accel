@@ -50,7 +50,10 @@ from fir_core import FirMultiband
 BITFILE = "fir.bit"
 FS = 48000.0
 REC_SECONDS = 3.0
-VOLUME = 62                      # 62 是上限（源码写 "[0,63)"）
+# 0 = −57 dB、63 = +6 dB。默认 54（−3 dB），和实时那条 fir_live.py 的默认相同 ——
+# 原来这里是 62（+5 dB），而实时那条麦克风只用 40（−17 dB），演示时来回切换差 22 dB。
+# 要临时改：LIVE_VOLUME=48 python3 fir_audio_loop.py
+VOLUME = int(os.environ.get("LIVE_VOLUME", "54"))
 CHUNK = int(os.environ.get("CHUNK", "8000"))   # 核 m_axi 的 -depth 是 8192，留一点余量
 
 # 存到 **Jupyter 的根目录**里，不是 /home/xilinx —— 两者差一层，
