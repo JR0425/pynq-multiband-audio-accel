@@ -35,6 +35,7 @@ BASE_DBG   = 0x43C30000
 CTRL_RUN   = 1 << 0
 CTRL_DRC   = 1 << 1
 CTRL_FLUSH = 1 << 2
+CTRL_TONE  = 1 << 3
 CTRL_CLR   = 1 << 8
 
 # 核的组延迟 96 字 = 48 帧；声学延迟实测 1.23 ms（PLAN 里那次数出来的）
@@ -89,15 +90,25 @@ def rd_stat(stat, stat2, dbg=None):
 
 
 def snap_text(v):
-    """dbg1 的位定义（见 fir_pl_direct.v）。"""
-    return ("ph=%d rst=%d rst@din=%d out_ever=%d room=%d tready=%d tvalid=%d ofifo=%d"
-            % (v & 3, (v >> 2) & 1, (v >> 3) & 1, (v >> 4) & 1, (v >> 5) & 1,
-               (v >> 6) & 1, (v >> 7) & 1, (v >> 8) & 0x3F))
+    """dbg1 的位定义，照 fir_pl_direct.v 的拼接顺序（2026-10-28 校正）：
+
+        dbg1 = {18'b0, u_fe.ph, ofifo_cnt[5:0], cap_tvalid, cap_tready,
+                room, out_ever, rst_at_din, fe_rst}
+
+    也就是 bit0 = fe_rst …… bit13:12 = 前端相位。旧版解码表把 ph 当成 v&3，
+    读出来的 rst / room 全是错位的，别再照它判断。
+    """
+    return ("fe_rst=%d rst@din=%d out_ever=%d room=%d tready=%d tvalid=%d "
+            "ofifo=%d ph=%d"
+            % (v & 1, (v >> 1) & 1, (v >> 2) & 1, (v >> 3) & 1,
+               (v >> 4) & 1, (v >> 5) & 1, (v >> 6) & 0x3F,
+               (v >> 12) & 3))
 
 
 def main():
     secs = float(arg("--secs", "60"))
     drc = arg("--drc", "1") not in ("0", "no", "false")
+    tone = arg("--tone", "0") not in ("0", "no", "false")
     bit = arg("--bit", "/home/xilinx/dma_exp/fir_pl.bit")
 
     if not os.path.exists(bit):
@@ -120,13 +131,14 @@ def main():
     # flush 一次：两侧 FIFO 清空、前端复位。**flush 和 run 必须同时给** ——
     # 先 flush 成 run=0 再放行的话，这中间录音 FIFO 会把这段时间的声音全收下，
     # 放行后这段积压永久加在延迟上（块模式那个"中性平衡"的坑就是这个）。
-    base = CTRL_RUN | (CTRL_DRC if drc else 0)
+    base = CTRL_RUN | (CTRL_DRC if drc else 0) | (CTRL_TONE if tone else 0)
     ctrl.write(0, base | CTRL_FLUSH)
     time.sleep(0.02)
     ctrl.write(0, base | CTRL_CLR)   # 松开 flush，顺手清计数器
     time.sleep(0.005)
     ctrl.write(0, base)
-    print("== 放行：ctrl=0x%02X（run=1 drc_en=%d）==" % (base, 1 if drc else 0))
+    print("== 放行：ctrl=0x%02X（run=1 drc_en=%d tone_en=%d）=="
+          % (base, 1 if drc else 0, 1 if tone else 0))
 
     t0 = time.time()
     tick = t0
@@ -136,7 +148,9 @@ def main():
     tx_sum = cap_sum = 0.0
     n = 0
     prev = rd_stat(stat, stat2, dbg)
+    prev_p = dict(prev)
     print("   时间   ovf   und   tx   cap  oovf  peak    din   dout   (每秒)")
+    rates = []
     while time.time() - t0 < secs:
         time.sleep(0.05)
         d = rd_stat(stat, stat2, dbg)
@@ -149,8 +163,10 @@ def main():
             first = d
         if time.time() - tick >= 1.0:
             tick += 1.0
-            din_d  = (d["din"]  - prev["din"])  & 0xFFFF
-            dout_d = (d["dout"] - prev["dout"]) & 0xFFFF
+            din_d  = (d["din"]  - prev_p["din"])  & 0xFFFF
+            dout_d = (d["dout"] - prev_p["dout"]) & 0xFFFF
+            rates.append((din_d, dout_d))
+            prev_p = dict(d)
             print("  %5.1f  %5d %5d  %4d  %4d  %4d  %4d  %5d  %5d"
                   % (time.time() - t0, d["ovf"], d["und"], d["tx"], d["cap"],
                      d["oovf"], d["tx_peak"], din_d, dout_d))
@@ -188,7 +204,20 @@ def main():
     ok &= (d["oovf"] == 0)
     if d["ovf"] or d["und"]:
         ok = False
-    print("\n%s" % ("[OK] 没有丢字、没有断流" if ok else "[FAIL] 有丢字或断流，看上面"))
+
+    # 光看 ovf/und 是"假绿灯"：数据全是 0 的时候它们也是 0。
+    # 所以再核一条喂入速率 —— 每帧应该正好 1 个采样进前端。
+    if rates and dbg is not None:
+        dn = sum(r[0] for r in rates[1:]) / max(1, len(rates) - 1)
+        dd = sum(r[1] for r in rates[1:]) / max(1, len(rates) - 1)
+        good = 0.9 * FS_ACT <= dn <= 1.1 * FS_ACT
+        print("  前端喂入 %.0f/s、吐出 %.0f/s（应 ≈ %.0f/s，每帧 1 个采样）  %s"
+              % (dn, dd, FS_ACT, "[OK]" if good else "[FAIL]"))
+        print("  注：这两条只说明有没有字经过，不说明字里有没有信号；"
+              "话筒有没有声音要另外测。")
+        ok &= good
+
+    print("\n%s" % ("[OK] 没有丢字、没有断流" if ok else "[FAIL] 看上面"))
 
     # 收尾：停住 PL，别让耳机一直有声音
     ctrl.write(0, 0)

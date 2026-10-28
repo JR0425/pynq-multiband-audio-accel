@@ -139,29 +139,25 @@ def i2c_wr(reg, val):
 def codec_unmute():
     """把耳机输出打开 —— config_audio_codec 不写这几条，出货版是 play() 补的。
 
-    2026-10-25 逐字节对寄存器对出来的。两边（出货版 configure+play vs 我们的
-    pll+codec）唯一的持久差异就是这三处：
+    2026-10-28 用 codec_diff.py 直接差分出来的**精确值**（configure() 之后
+    dump 一遍，Audio.play() 正在跑的时候再 dump 一遍，逐寄存器比）：
 
-        0x4023  0xE7 ← 0xE5     耳机左声道音量
-        0x4024  0xE7 ← 0xE5     耳机右声道音量
-        0x401C  0x01 ← 0x00     播放混音器左
-        0x401E  0x01 ← 0x00     播放混音器右
+        0x401C  0x21 ← 0x00     播放混音器左
+        0x401E  0x41 ← 0x00     播放混音器右
+        0x4023  0xF3 ← 0xE5     耳机左（音量码 60，bit1=1 不静音）
+        0x4024  0xF3 ← 0xE5     耳机右
 
-    0x4023/0x4024 的位定义（Linux 驱动 adau1761.c，寄存器名 PLAY_HP_x_VOL）：
-        bit[7:2] 音量（0xE5 里是 57，和 PYNQ 的默认 volume 一致）
-        bit1     静音开关，1 = 不静音
-        bit0     HP 模式
-    也就是说 config 把音量设成 57 了，但一直是静音的，play() 才打开 bit1。
+    2026-10-25 那版写的是 0x01/0x01/0xE7/0xE7，**值是错的**：0x401C 停在
+    0x01 时耳机照样不响，所以起作用的不是 bit0（左是 bit5、右是 bit6）。
+    这就是"PL 直连版一直无声"的真正原因 —— 数据、时钟、发送器全是对的，
+    卡在 codec 的播放混音器从来没被打开过。
 
-    0x40E0/0x40E8 每次读都在变，是状态位不是配置位，不在这里处理。
+    0x40DF/0x40E0/0x40E7/0x40E8 play() 也会动，但每次读都在变，是状态位
+    不是配置位，不在这里处理。
     """
-    for reg in (0x401C, 0x401E):
-        i2c_wr(reg, 0x01)
-    for reg in (0x4023, 0x4024):
-        v = i2c_rd(reg)
-        if v is None:
-            raise RuntimeError("读不到 codec 寄存器 0x%04X" % reg)
-        i2c_wr(reg, v | 0x02)
+    for reg, val in ((0x401C, 0x21), (0x401E, 0x41),
+                     (0x4023, 0xF3), (0x4024, 0xF3)):
+        i2c_wr(reg, val)
 
 
 # ---------------------------------------------------------------- overlay

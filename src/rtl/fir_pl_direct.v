@@ -34,7 +34,8 @@
 module fir_pl_direct #(
     parameter integer TX_TARGET = 128,   // 播放 FIFO 水位目标（字），直接进延迟
     parameter integer OUT_AW    = 5,     // 输出 FIFO 深度 = 2^OUT_AW 字
-    parameter integer RST_CYC   = 8      // flush 松开后再给前端几拍复位
+    parameter integer RST_CYC   = 8,     // flush 松开后再给前端几拍复位
+    parameter integer OUT_GAIN  = 8      // 输出固定增益（8 = +18 dB），饱和
 ) (
     input  wire        clk,
     input  wire        rst_n,
@@ -209,6 +210,58 @@ module fir_pl_direct #(
     wire signed [15:0] out_q   = ctrl[1] ? drc_y    : fe_dout;
     wire               out_vld = ctrl[1] ? drc_y_vld : fe_dout_vld;
 
+    /* ================= 内部测试音（ctrl[3]，2026-10-28 加） =================
+     *
+     * 为什么要它：话筒那一路实测只有 −75 dBFS（ADC 本身就没信号），
+     * 于是"前端 → 压缩 → 输出"这一段在板子上永远听不出对错 —— 输入是静音，
+     * 输出当然是静音，健康计数器也全都正常，没法区分"链路通"和"数据是 0"。
+     *
+     * ctrl[3]=1 时用 PL 内部产生的 440 Hz 方波（±8000，约 −12 dBFS）顶替前端输出，
+     * 一个字节都不经过 ADC。听到声音就说明：播放 FIFO、i2s_duplex 发送、
+     * codec 播放混音器、耳机功放、引脚这一整条在**这颗位流上**是通的。
+     *
+     * 相位累加器挂在 out_vld 上（每帧一次），所以频率严格按帧率算，
+     * 和 ADC 那条路无关；切换瞬间可能有一下咔，测试用不介意。
+     */
+    reg  [16:0] tone_acc;
+    reg         tone_sq;
+    localparam integer TONE_INC  = 440;        // 440 Hz
+    localparam integer FS_NOM    = 48828;      // 48.828 kHz（100 MHz / 2048）
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            tone_acc <= 17'd0;
+            tone_sq  <= 1'b0;
+        end else if (out_vld) begin
+            if (tone_acc + TONE_INC >= FS_NOM) begin
+                tone_acc <= tone_acc + TONE_INC - FS_NOM;
+                tone_sq  <= ~tone_sq;
+            end else begin
+                tone_acc <= tone_acc + TONE_INC;
+            end
+        end
+    end
+
+    localparam signed [15:0] TONE_AMP = 16'sd8000;
+
+    /* ================= 输出固定增益（2026-10-28 加） =================
+     *
+     * 板上实测：四段都是 0 dB（前端单位增益），对着话筒说话只有 −25 dBFS 上下，
+     * 送进耳机几乎听不见（吹气这种宽带大声能听见、说话听不见），
+     * 听上去就像"根本没接话筒"。
+     *
+     * 这里先给一个编译期固定档 +18 dB（OUT_GAIN=8），饱和到 int16 全量程，
+     * 把说话推到能听清。等 AXI-Lite 寄存器接进来，这个常数换成运行期可调的
+     * 四段 GAIN（见 桌面\PYNQ音频项目\PL直连_寄存器表.md 的 GAIN[0..3]）。
+     */
+    wire signed [31:0] g_mul = out_q * OUT_GAIN;
+    wire signed [15:0] g_sat = (g_mul >  32'sd32767) ?  16'sd32767 :
+                               (g_mul < -32'sd32768) ? -16'sd32768 :
+                               g_mul[15:0];
+
+    wire signed [15:0] out_q_mux = ctrl[3] ? (tone_sq ? TONE_AMP : -TONE_AMP)
+                                           : g_sat;
+
     /* ================= 输出 FIFO ================= */
     /* 前端输出没有 ready，而 i2s_duplex 的播放入口可能有一拍不 ready
      * （TX FIFO 满）。中间垫一级小的，顺便把 valid 从一个脉冲变成可保持的。 */
@@ -258,7 +311,7 @@ module fir_pl_direct #(
             end
             if (out_vld) begin
                 if (dup_left == 2'd0) begin
-                    dup_q    <= out_q;
+                    dup_q    <= out_q_mux;
                     dup_left <= 2'd2;
                 end else begin
                     dup_drop <= 1'b1;     // 上一对还没写完又来一个（不该发生）

@@ -43,7 +43,13 @@ set pre_tcl [file join $script_dir coeff_pre.tcl]
 if {![file exists $pre_tcl]} { error "缺 $pre_tcl" }
 
 file mkdir $build_dir
-cd $build_dir
+# 注意：**不能** cd 进 $build_dir 再 create_project -force 到同一个目录 —— 那等于
+# 把当前目录删掉重建，Windows 下进程的 CWD 会变成已失效的目录，之后 Vivado 内部
+# 任何相对路径 source 都会报
+#     couldn't read file "init.tcl": No error
+# 报错里那句 "No error" 就是这个症状（系统调用其实返回了 ERROR_SUCCESS）。
+# 停在父目录最安全，所有路径本来也都是绝对路径。
+cd [file dirname $build_dir]
 
 create_project -force audio_pl $build_dir -part $part_name
 
@@ -284,20 +290,24 @@ set hwh_path  [file join $script_dir $out_name.hwh]
 write_hwdef -force -file $hwdef_zip
 write_bitstream -force [file join $script_dir $out_name.bit]
 
+# 从 .hwdef（是个 zip）里抠出 .hwh。
+# 注意：判据只能看"文件写出来了没有"，不能看 exit code —— Vivado 的 exec 环境里
+# python 常常返回非 0 却已经把文件写好（2026-10-28 因此误报过一轮失败）。
 set unzip_ok 0
-foreach py {python python3 py C:/Users/XIA/miniconda3/python.exe} {
+foreach py {C:/Users/XIA/miniconda3/python.exe python3 python py} {
   if {$unzip_ok} break
-  if {![catch {
+  catch {
     exec $py -c {
 import sys, zipfile
 z = zipfile.ZipFile(sys.argv[1])
 n = [x for x in z.namelist() if x.endswith('.hwh')][0]
 open(sys.argv[2], 'wb').write(z.read(n))
 } $hwdef_zip $hwh_path
-  }]} { set unzip_ok 1 }
+  }
+  if {[file exists $hwh_path] && [file size $hwh_path] > 0} { set unzip_ok 1 }
 }
-if {!$unzip_ok || [file size $hwh_path] == 0} {
-  error "拆 hwh 失败（$hwh_path 是空的）"
+if {!$unzip_ok} {
+  error "拆 hwh 失败（$hwh_path 不存在或为空），hwdef 在 $hwdef_zip"
 }
 
 report_timing_summary -quiet -file [file join $script_dir ${out_name}_timing.rpt]
