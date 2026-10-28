@@ -99,7 +99,10 @@ def main():
         print("[4b] no fir_pl_regs in this bitstream -> gains stay at 0 dB")
         print("     (mic path will be very quiet; only the tone is reliable)")
     else:
-        print("[4b] write flat +18 dB into GAIN[0..3]  (fir_pl_regs @ 0x%08X)" % base)
+        print("[4b] RAMP_DIV=5 + flat +18 dB into GAIN[0..3]  (fir_pl_regs @ 0x%08X)" % base)
+        # div=5: 指数斜坡，时间常数 32 采样 ≈ 0.7 ms —— 增益切换听不出咔。
+        # 默认 0 是一步到位，拖增益会"咔"一声，网页后端也应写 5。
+        regs.write(0x170, 5)
         set_gain(regs, GAIN_18DB)
 
     ctrl = ol.gpio_ctrl.mmio
