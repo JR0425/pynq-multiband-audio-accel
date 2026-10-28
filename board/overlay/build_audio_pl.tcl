@@ -110,7 +110,7 @@ set_property -dict [list \
 
 # ---- 寄存器总线 ----
 set axi_ic [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_ic]
-set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {5}] $axi_ic
+set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {6}] $axi_ic
 
 set gpio_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 gpio_ctrl]
 set_property -dict [list \
@@ -185,12 +185,44 @@ connect_bd_intf_net -intf_net axi_ic_m00 [get_bd_intf_pins axi_ic/M00_AXI] [get_
 connect_bd_intf_net -intf_net axi_ic_m01 [get_bd_intf_pins axi_ic/M01_AXI] [get_bd_intf_pins gpio_stat/S_AXI]
 connect_bd_intf_net -intf_net axi_ic_m02 [get_bd_intf_pins axi_ic/M02_AXI] [get_bd_intf_pins gpio_stat2/S_AXI]
 connect_bd_intf_net -intf_net axi_ic_m03 [get_bd_intf_pins axi_ic/M03_AXI] [get_bd_intf_pins gpio_dbg/S_AXI]
+# ---- 波表 BRAM：板上 WAV 音源（2026-10-28 批 1）----
+# PS 经 axi_bram_ctrl 持续填充 WAV（环形,16 位样本放 [31:16]）,
+# B 口给 fir_pl_direct 按采样节拍读。16384 字 × 32 位 = 64 KB（表口径）。
+set ply_bram [create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 ply_bram]
+set_property -dict [list \
+  CONFIG.Memory_Type {True_Dual_Port_RAM} \
+  CONFIG.Write_Width_A {32} \
+  CONFIG.Write_Depth_A {16384} \
+  CONFIG.Use_Byte_Write_Enable {false} \
+  CONFIG.Enable_B {Use_ENB_Pin} \
+  CONFIG.Register_PortA_Enable_of_Memory_Primitives {false} \
+  CONFIG.Register_PortB_Enable_of_Memory_Primitives {false} \
+] $ply_bram
+set ply_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.1 ply_ctrl]
+set_property -dict [list CONFIG.SINGLE_PORT_BRAM {0} CONFIG.DATA_WIDTH {32}] $ply_ctrl
+connect_bd_intf_net [get_bd_intf_pins ply_ctrl/BRAM_PORTA] [get_bd_intf_pins ply_bram/BRAM_PORTA]
+connect_bd_net [get_bd_pins ps7_0/FCLK_CLK0]           [get_bd_pins ply_bram/clkb]
+connect_bd_net [get_bd_pins fir_pl_direct_0/ply_en]    [get_bd_pins ply_bram/enb]
+connect_bd_net [get_bd_pins fir_pl_direct_0/ply_addr]  [get_bd_pins ply_bram/addrb]
+connect_bd_net [get_bd_pins ply_bram/doutb]            [get_bd_pins fir_pl_direct_0/ply_rdata]
+
+# 播放控制来自寄存器（ply_ctl[0] en、[1] loop；ply_len = 波表字数）
+connect_bd_net [get_bd_pins fir_pl_regs_0/ply_ctl] [get_bd_pins fir_pl_direct_0/ply_ctl]
+connect_bd_net [get_bd_pins fir_pl_regs_0/ply_len] [get_bd_pins fir_pl_direct_0/ply_len]
+
 puts "==== fir_pl_regs_0 的 AXI 接口 ===="
 foreach ip [get_bd_intf_pins -quiet fir_pl_regs_0/*] { puts "  intf $ip" }
 if {[catch {
   connect_bd_intf_net -intf_net axi_ic_m04 [get_bd_intf_pins axi_ic/M04_AXI]                       [get_bd_intf_pins fir_pl_regs_0/S_AXI]
 } _e]} {
   puts "### M04 连接失败: $_e"
+  error $_e
+}
+
+if {[catch {
+  connect_bd_intf_net -intf_net axi_ic_m05 [get_bd_intf_pins axi_ic/M05_AXI]                       [get_bd_intf_pins ply_ctrl/S_AXI]
+} _e]} {
+  puts "### M05 连接失败: $_e"
   error $_e
 }
 
@@ -207,17 +239,23 @@ connect_bd_net [get_bd_pins gain_slice/Dout]           [get_bd_pins fir_pl_direc
 connect_bd_net [get_bd_pins fir_pl_regs_0/ramp_div_b0] [get_bd_pins fir_pl_direct_0/ramp_div]
 connect_bd_net [get_bd_pins fir_pl_direct_0/ramp_busy] [get_bd_pins fir_pl_regs_0/ramp_busy_b0]
 
+# ---- 观察量接真信号（2026-10-28 批 1）：env/gr/peak 不再是假线 ----
+connect_bd_net [get_bd_pins fir_pl_direct_0/env_b0]   [get_bd_pins fir_pl_regs_0/env_b0]
+connect_bd_net [get_bd_pins fir_pl_direct_0/gr_b0]    [get_bd_pins fir_pl_regs_0/gr_b0]
+connect_bd_net [get_bd_pins fir_pl_direct_0/peak_in]  [get_bd_pins fir_pl_regs_0/peak_in]
+connect_bd_net [get_bd_pins fir_pl_direct_0/peak_out] [get_bd_pins fir_pl_regs_0/peak_out]
+
 # ---- 只读输入：先接 0，等电平表/抓取做出来再换 ----
 connect_bd_net [get_bd_pins fir_pl_direct_0/stat0] [get_bd_pins fir_pl_regs_0/stat0]
 connect_bd_net [get_bd_pins fir_pl_direct_0/stat1] [get_bd_pins fir_pl_regs_0/stat1]
 connect_bd_net [get_bd_pins fir_pl_direct_0/stat2] [get_bd_pins fir_pl_regs_0/stat2]
+
+
 foreach pin {smp_cnt frm_cnt ply_rd ply_und lvl_in_lo lvl_in_hi lvl_out_lo lvl_out_hi              mpo_cnt scope_seq} {
   connect_bd_net [get_bd_pins z32/dout] [get_bd_pins fir_pl_regs_0/$pin]
 }
-foreach pin {peak_in peak_out mpo_peak} {
-  connect_bd_net [get_bd_pins z16/dout] [get_bd_pins fir_pl_regs_0/$pin]
-}
-foreach pin {env_b0 gr_b0 env_b1 gr_b1} {
+connect_bd_net [get_bd_pins z16/dout]  [get_bd_pins fir_pl_regs_0/mpo_peak]
+foreach pin {env_b1 gr_b1} {
   connect_bd_net [get_bd_pins z128/dout] [get_bd_pins fir_pl_regs_0/$pin]
 }
 connect_bd_net [get_bd_pins z13/dout] [get_bd_pins fir_pl_regs_0/scope_wr]
@@ -237,12 +275,13 @@ set clk_pins [list \
                [get_bd_pins axi_ic/M01_ACLK] \
                [get_bd_pins axi_ic/M02_ACLK] \
                [get_bd_pins axi_ic/M03_ACLK] \
-                              [get_bd_pins axi_ic/M04_ACLK] \
+                              [get_bd_pins axi_ic/M04_ACLK]                               [get_bd_pins axi_ic/M05_ACLK] \
                               [get_bd_pins fir_pl_regs_0/clk] \
                [get_bd_pins gpio_ctrl/s_axi_aclk] \
                [get_bd_pins gpio_stat/s_axi_aclk] \
                [get_bd_pins gpio_stat2/s_axi_aclk] \
                [get_bd_pins gpio_dbg/s_axi_aclk] \
+                              [get_bd_pins ply_ctrl/s_axi_aclk] \
                [get_bd_pins fir_pl_direct_0/clk] ]
 
 set rst_pins [list \
@@ -254,12 +293,12 @@ set rst_pins [list \
                [get_bd_pins axi_ic/M01_ARESETN] \
                [get_bd_pins axi_ic/M02_ARESETN] \
                [get_bd_pins axi_ic/M03_ARESETN] \
-                              [get_bd_pins axi_ic/M04_ARESETN] \
+                              [get_bd_pins axi_ic/M04_ARESETN]                               [get_bd_pins axi_ic/M05_ARESETN] \
                               [get_bd_pins fir_pl_regs_0/rst_n] \
                [get_bd_pins gpio_ctrl/s_axi_aresetn] \
                [get_bd_pins gpio_stat/s_axi_aresetn] \
                [get_bd_pins gpio_stat2/s_axi_aresetn] \
-               [get_bd_pins gpio_dbg/s_axi_aresetn] \
+               [get_bd_pins gpio_dbg/s_axi_aresetn]                               [get_bd_pins ply_ctrl/s_axi_aresetn] \
                [get_bd_pins fir_pl_direct_0/rst_n] ]
 
 connect_bd_net {*}$clk_pins
@@ -312,6 +351,10 @@ assign_bd_address -offset 0x43C30000 -range 0x00010000 \
 assign_bd_address -offset 0x43C40000 -range 0x00001000 \
   -target_address_space [get_bd_addr_spaces ps7_0/Data] [seg_of_pin fir_pl_regs_0/S_AXI] -force
 
+# 波表 BRAM：16384 字 × 4 B = 64 KB（环形,PS 持续填）
+assign_bd_address -offset 0x43C50000 -range 0x00010000 \
+  -target_address_space [get_bd_addr_spaces ps7_0/Data] [seg_of_pin ply_ctrl/S_AXI] -force
+
 puts "==== ADDR MAP ===="
 foreach s [get_bd_addr_segs -of_objects [get_bd_addr_spaces ps7_0/Data]] {
   puts "  [get_property NAME $s]  offset=[get_property offset $s]  range=[get_property range $s]"
@@ -328,7 +371,11 @@ foreach w $want {
     error "ADDR MAP 缺 $w,现有:$have"
   }
 }
-puts "### ADDR MAP OK ($want)"
+# 批 1 加的波表 BRAM 从机（段名带 mem0 后缀,提前写死容易错,按"至少 6 个从机"判）
+if {[llength $have] < 6} {
+  error "ADDR MAP 只有 [llength $have] 个从机,少了 ply_ctrl 的段。现有:$have"
+}
+puts "### ADDR MAP OK ($have)"
 
 regenerate_bd_layout
 validate_bd_design

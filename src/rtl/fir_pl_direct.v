@@ -65,6 +65,23 @@ module fir_pl_direct #(
     output wire [31:0] dbg0,
     output wire [31:0] dbg1,
 
+    /* ---- 2026-10-28 批 1：观察量 + 板上 WAV 音源 ----
+     * env_b0/gr_b0：四段包络/衰减量（Q2.22，24 位符号扩展到 32），段0 在低位。
+     *   bank1 那套是批 2 双耳的事，现在只有一份 DRC，寄存器侧读 env_b1/gr_b1 恒 0。
+     * peak_in/peak_out：每 768 采样（16 ms @48 kHz）窗内 |max|，窗末锁存。
+     * ply_*：波表 BRAM 的 B 口（只读）。PS 经 axi_bram_ctrl 把 WAV 写进去
+     *   （16 位样本放 [31:16]，与发送字同格式），ply_ctl[0]=en、[1]=loop，
+     *   ctrl[5]=1 时它是音源（替代麦克风），地址按采样节拍递增。 */
+    output wire [127:0] env_b0,
+    output wire [127:0] gr_b0,
+    output wire [15:0]  peak_in,
+    output wire [15:0]  peak_out,
+    output wire [13:0]  ply_addr,
+    output wire         ply_en,
+    input  wire [31:0]  ply_rdata,
+    input  wire [31:0]  ply_ctl,
+    input  wire [31:0]  ply_len,
+
     /* I2S pads */
     output wire        bclk,
     output wire        lrclk,
@@ -139,8 +156,30 @@ module fir_pl_direct #(
     wire signed [39:0] ylp0, ylp1, ylp2, acc_raw;
 
     /* 录音字是 24 位补码（[23:0]，[31:24] 是符号扩展），核要 int16，
-     * 取高 16 位就是去低 8 位的那一刀。 */
-    assign fe_din = cap_tdata[31:16];
+     * 取高 16 位就是去低 8 位的那一刀。
+     * 2026-10-28 批 1：ctrl[5]=1 且 ply_ctl[0]=1 时音源切波表 BRAM。
+     * cap_tvalid 的节拍恒定（codec 一直收，静音时也是 48.8 k 字/s），
+     * 所以 vld 不用换源，只换"值"。 */
+    wire signed [15:0] mic_sample = cap_tdata[31:16];
+    wire signed [15:0] ply_sample = ply_rdata[31:16];
+    wire               ply_sel   = ctrl[5] && ply_ctl[0];
+    assign fe_din = ply_sel ? ply_sample : mic_sample;
+
+    /* ---- WAV 播放引擎：16384 字**环形缓冲**（寄存器表口径），PS 持续填充 ----
+     * 地址 14 位自然环回（16384 = 2^14），不用 ply_len——PS 侧追着写，
+     * RTL 只管按采样节拍读。BRAM 读 1 拍延迟，但地址每 3 拍才变一次，
+     * 读数稳定对应当前地址。!en / flush / !rst_n 时地址归零。
+     * 曲子有多长取决于 PS 填得多快（Python bulk 写 32 KB/0.3 s，余量足）。 */
+    reg  [13:0] ply_cnt;
+    wire        ply_adv = fe_din_vld && ply_sel;
+    always @(posedge clk) begin
+        if (!rst_n || flush || !ply_ctl[0])
+            ply_cnt <= 14'd0;
+        else if (ply_adv)
+            ply_cnt <= ply_cnt + 14'd1;    /* 2^14 自然环回 */
+    end
+    assign ply_en   = ply_sel;
+    assign ply_addr = ply_cnt;
 
     /* ================= 每帧只喂一个采样（2026-10-27 修） =================
      *
@@ -233,6 +272,8 @@ module fir_pl_direct #(
         .busy   (ramp_busy)
     );
 
+    wire [95:0] drc_env, drc_gr;   /* 四段包络/衰减观察（4×24） */
+
     fir_drc4 u_drc (
         .clk    (clk),
         .rst    (fe_rst),
@@ -246,14 +287,64 @@ module fir_pl_direct #(
         .gain2  (g2_cur),
         .gain3  (g3_cur),
         .y      (drc_y),
-        .y_vld  (drc_y_vld)
+        .y_vld  (drc_y_vld),
+        .env_o  (drc_env),
+        .gr_o   (drc_gr)
     );
+
+    /* env/gr 打包：四段 Q2.22（24 位）符号扩展到 32，段0 在最低 32 位。
+     * bank1 那份（env_b1/gr_b1）批 2 双耳时再加第二份 DRC。 */
+    wire signed [23:0] e0 = drc_env[23:0];
+    wire signed [23:0] e1 = drc_env[47:24];
+    wire signed [23:0] e2 = drc_env[71:48];
+    wire signed [23:0] e3 = drc_env[95:72];
+    wire signed [23:0] w0 = drc_gr[23:0];
+    wire signed [23:0] w1 = drc_gr[47:24];
+    wire signed [23:0] w2 = drc_gr[71:48];
+    wire signed [23:0] w3 = drc_gr[95:72];
+    assign env_b0 = {{8{e3[23]}}, e3, {8{e2[23]}}, e2, {8{e1[23]}}, e1, {8{e0[23]}}, e0};
+    assign gr_b0  = {{8{w3[23]}}, w3, {8{w2[23]}}, w2, {8{w1[23]}}, w1, {8{w0[23]}}, w0};
+
+    /* ---- 峰值表：每 768 采样（16 ms）窗内 |max|，窗末锁存 ----
+     * 进侧看 fe_dout（处理前），出侧看 out_q（处理后）——评委一眼看出
+     * "增益把小声抬上来了、压缩把大声按住了"。 */
+    wire signed [15:0] out_q;   /* 前向声明，定义在下面（drc/直通 mux） */
+    localparam integer PK_WIN = 768;
+    reg  [9:0]  pk_cnt;
+    reg  [15:0] pk_in_acc, pk_out_acc;
+    reg  [15:0] peak_in_r, peak_out_r;
+    wire [15:0] din_abs  = fe_dout[15] ? (~fe_dout + 16'sd1) : fe_dout;
+    wire [15:0] dout_abs = out_q[15]   ? (~out_q   + 16'sd1) : out_q;
+    wire        pk_tick  = (pk_cnt == PK_WIN[9:0] - 10'd1);
+    always @(posedge clk) begin
+        if (!rst_n || flush) begin
+            pk_cnt     <= 10'd0;
+            pk_in_acc  <= 16'd0;
+            pk_out_acc <= 16'd0;
+            peak_in_r  <= 16'd0;
+            peak_out_r <= 16'd0;
+        end else if (fe_din_vld) begin
+            if (pk_tick) begin
+                peak_in_r  <= (din_abs  > pk_in_acc)  ? din_abs  : pk_in_acc;
+                peak_out_r <= (dout_abs > pk_out_acc) ? dout_abs : pk_out_acc;
+                pk_cnt     <= 10'd0;
+                pk_in_acc  <= 16'd0;
+                pk_out_acc <= 16'd0;
+            end else begin
+                pk_cnt     <= pk_cnt + 10'd1;
+                pk_in_acc  <= (din_abs  > pk_in_acc)  ? din_abs  : pk_in_acc;
+                pk_out_acc <= (dout_abs > pk_out_acc) ? dout_abs : pk_out_acc;
+            end
+        end
+    end
+    assign peak_in  = peak_in_r;
+    assign peak_out = peak_out_r;
 
     /* 直取 ctrl[1]，不锁存：压缩器一直在跟踪包络（in_vld 不看 drc_en），
      * 所以中途切只是"过压缩"和"不过压缩"两个值换一下，会有一声轻微的跳变，
      * 不会把状态搞乱。锁存反而更糟 —— 复位期间 ctrl[1] 通常是 0，
      * 之后想改 drc_en 就再也改不了了。 */
-    wire signed [15:0] out_q   = ctrl[1] ? drc_y    : fe_dout;
+    assign        out_q   = ctrl[1] ? drc_y    : fe_dout;
     wire               out_vld = ctrl[1] ? drc_y_vld : fe_dout_vld;
 
     /* ================= 内部测试音（ctrl[3]，2026-10-28 加） =================

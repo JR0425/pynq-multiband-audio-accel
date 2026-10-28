@@ -102,7 +102,11 @@ module fir_drc4_chan #(
      * 换增益等价于换输入电平，包络本来就该跟着变）。 */
     input  wire signed [15:0]    gain_i,
     output reg  signed [DW-1:0]  yv,
-    output reg                   yv_vld
+    output reg                   yv_vld,
+    /* 2026-10-28 批 1 观察口：把包络和当前衰减量引出去给寄存器采样。
+     * 纯 wire 转发，不动任何主通路逻辑/时序。 */
+    output wire signed [DW-1:0]  env_o,
+    output wire signed [DW-1:0]  gr_o
 );
 
     localparam integer SH_ACC = FRAC_ACC - FRAC_DRC;   // Q8.32 → Q2.22 是右移 10
@@ -157,6 +161,8 @@ module fir_drc4_chan #(
 
     /* 包络状态：每段一份，跨块保持，rst 清 */
     reg signed [DW-1:0] env_r;
+
+    assign env_o = env_r;
 
     /* ---------------- 级 3：包络增量 (a − env) × 步进 ---------------- */
     /* env 是 24 位有符号、a 也是，差最多 25 位；步进用**全宽** DW 位。
@@ -213,6 +219,7 @@ module fir_drc4_chan #(
     wire signed [DW-1:0] gr   = p_epos6 ? satd(p_grs) : {DW{1'b0}};
 
     reg signed [DW-1:0] p_gr;
+    assign gr_o = p_gr;    /* 用寄存后那份，和参与减法的同拍 */
     reg signed [DW-1:0] p_a6;
     reg signed [DW-1:0] p_gain6;
     reg                 p_neg6;
@@ -364,7 +371,10 @@ module fir_drc4 #(
     input  wire signed [15:0]    gain2,
     input  wire signed [15:0]    gain3,
     output reg  signed [15:0]    y,
-    output reg                   y_vld
+    output reg                   y_vld,
+    /* 2026-10-28 批 1：四段包络/衰减量观察口，4×DW 位打包（段0 在最低位） */
+    output wire [DW*4-1:0]       env_o,
+    output wire [DW*4-1:0]       gr_o
 );
 
     function automatic signed [15:0] sat16;
@@ -385,21 +395,25 @@ module fir_drc4 #(
     fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
                     .THR(THR0), .RATIO(RATIO0), .ATK(ATK0), .REL(REL0))
     u_b0 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band0),
+            .env_o(env_o[0*DW +: DW]), .gr_o(gr_o[0*DW +: DW]),
             .gain_i(gain0), .yv(yv0), .yv_vld(v0));
 
     fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
                     .THR(THR1), .RATIO(RATIO1), .ATK(ATK1), .REL(REL1))
     u_b1 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band1),
+            .env_o(env_o[1*DW +: DW]), .gr_o(gr_o[1*DW +: DW]),
             .gain_i(gain1), .yv(yv1), .yv_vld(v1));
 
     fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
                     .THR(THR2), .RATIO(RATIO2), .ATK(ATK2), .REL(REL2))
     u_b2 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band2),
+            .env_o(env_o[2*DW +: DW]), .gr_o(gr_o[2*DW +: DW]),
             .gain_i(gain2), .yv(yv2), .yv_vld(v2));
 
     fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
                     .THR(THR3), .RATIO(RATIO3), .ATK(ATK3), .REL(REL3))
     u_b3 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band3),
+            .env_o(env_o[3*DW +: DW]), .gr_o(gr_o[3*DW +: DW]),
             .gain_i(gain3), .yv(yv3), .yv_vld(v3));
 
     /* drc_t(Q2.22) 加到 acc_t(Q8.32)：小数位差 10，左移 10。
