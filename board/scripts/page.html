@@ -1301,8 +1301,111 @@ function applyTune(t){
       '<div style="font-weight:700;letter-spacing:.3px;margin-bottom:6px;color:#9fc5ff">' +
       'PL 直连 · 观察量（真信号）</div>' +
       '<div id="pl-obs">等待数据…</div>' +
-      '<div style="opacity:.6;margin-top:6px" id="pl-note"></div>';
+      '<div style="opacity:.6;margin-top:6px" id="pl-note"></div>' +
+      '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #22314a">' +
+        '<label style="cursor:pointer"><input type="checkbox" id="pl-dual"> 双耳（右耳独立处方）</label>' +
+        '<span id="pl-dual-note" style="opacity:.55;margin-left:8px">关掉时右耳 = 左耳</span>' +
+        '<div id="pl-dual-rows" style="display:none;margin-top:6px"></div>' +
+      '</div>';
     main.insertBefore(panel, main.firstChild);
+    wireDual();
+  }
+
+  /* ------------------------------------------------------------------
+   * 双耳：右耳一套独立增益
+   *
+   * 板上是两份 DRC（左 u_drc_l / 右 u_drc_r），后端约定：tune 里没有 b1
+   * 就把 bank0 镜像到 bank1；有 b1 就各写各的。所以这里的开关只做一件事
+   * —— 决定发给 /api/tune 的 JSON 里带不带 b1。
+   *
+   * tuneBody 是上面那段脚本里的全局函数，这里包一层（不能改原函数，
+   * 第一/二档还在用它）。
+   * ------------------------------------------------------------------ */
+  let dualOn = false;
+  let b1 = null;
+
+  function ensureB1(){
+    if (!b1){
+      const g = (typeof S !== "undefined" && S.tune && S.tune.gain_db)
+        ? S.tune.gain_db.slice() : [0, 0, 0, 0];
+      b1 = { gain_db: g };
+    }
+    return b1;
+  }
+
+  function syncDual(){
+    const host = document.getElementById("pl-dual-rows");
+    if (!host || !b1) return;
+    const rows = host.querySelectorAll("input[type=range]");
+    rows.forEach((sl, i) => {
+      const v = Number(b1.gain_db[i] || 0);
+      sl.value = v;
+      const out = sl.parentNode.querySelector(".pl-b1v");
+      if (out) out.textContent = (v > 0 ? "+" : "") + v.toFixed(1) + " dB";
+    });
+  }
+
+  function buildDualUI(){
+    const host = document.getElementById("pl-dual-rows");
+    if (!host || host.dataset.built) return;
+    host.dataset.built = "1";
+    ["①", "②", "③", "④"].forEach((tag, i) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:10px;margin:3px 0";
+      row.innerHTML =
+        '<span style="width:76px;opacity:.8">右耳 ' + tag + '</span>' +
+        '<input type="range" min="-24" max="42" step="0.5" value="0" style="flex:1">' +
+        '<span class="pl-b1v" style="width:66px;text-align:right"></span>';
+      host.appendChild(row);
+      const sl = row.querySelector("input");
+      sl.addEventListener("input", () => {
+        ensureB1().gain_db[i] = Number(sl.value);
+        const out = row.querySelector(".pl-b1v");
+        out.textContent = (sl.value > 0 ? "+" : "") + Number(sl.value).toFixed(1) + " dB";
+        scheduleTune();
+      });
+      sl.addEventListener("change", flushTune);
+    });
+    syncDual();
+  }
+
+  function wireDual(){
+    const cb = document.getElementById("pl-dual");
+    if (!cb) return;
+    cb.addEventListener("change", () => {
+      dualOn = cb.checked;
+      const rows = document.getElementById("pl-dual-rows");
+      const note = document.getElementById("pl-dual-note");
+      if (rows) rows.style.display = dualOn ? "block" : "none";
+      if (note) note.textContent = dualOn ? "右耳走自己的一套" : "关掉时右耳 = 左耳";
+      if (dualOn){
+        ensureB1();
+        if (typeof S !== "undefined" && S.tune) b1.gain_db = S.tune.gain_db.slice();
+        buildDualUI();
+        syncDual();
+      }
+      flushTune();
+    });
+
+    /* 包一层 tuneBody：开双耳时补 b1，关掉时原样不带 */
+    const orig = window.tuneBody;
+    if (typeof orig === "function" && !window.__plBodyPatched){
+      window.__plBodyPatched = true;
+      window.tuneBody = function(){
+        const t = orig();
+        if (dualOn){
+          const b = ensureB1();
+          t.b1 = {
+            gain_db: b.gain_db.slice(),
+            thr_db: (t.thr_db || []).slice(),
+            ratio: (t.ratio || []).slice(),
+            attack_ms: (t.attack_ms || []).slice(),
+            release_ms: (t.release_ms || []).slice(),
+          };
+        }
+        return t;
+      };
+    }
   }
 
   function hideBlockOnly(){

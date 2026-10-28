@@ -121,9 +121,13 @@ def _four(v, lo, hi, dflt):
 
 
 def sanitize_tune(body):
-    """页面 → 文件。字段名、范围与第一档逐条对齐，换算仍然留给 fir_pl_live。"""
+    """页面 → 文件。字段名、范围与第一档逐条对齐，换算仍然留给 fir_pl_live。
+
+    2026-10-29：多了可选的 b1（右耳处方）。没带 b1 就是"两只耳朵一样"，
+    后端会把 bank0 镜像到 bank1；带了就各写各的。范围钳制跟左耳同一套。
+    """
     t = body or {}
-    return {
+    out = {
         "gain_db":    [round(x, 2) for x in _four(t.get("gain_db"), R_GAIN[0], R_GAIN[1], 0.0)],
         "thr_db":     [round(x, 2) for x in _four(t.get("thr_db"), R_THR[0], R_THR[1], -10.0)],
         "ratio":      [round(x, 4) for x in _four(t.get("ratio"), R_RATIO[0], R_RATIO[1], 0.5)],
@@ -131,6 +135,22 @@ def sanitize_tune(body):
         "release_ms": [round(x, 2) for x in _four(t.get("release_ms"), R_REL[0], R_REL[1], 100.0)],
         "bypass":     bool(t.get("bypass")),
     }
+    b = t.get("b1")
+    if isinstance(b, dict):
+        # 缺哪项就用左耳的值顶上，避免"只给增益"时右耳被写成 0
+        out["b1"] = {
+            "gain_db":    [round(x, 2) for x in _four(b.get("gain_db", out["gain_db"]),
+                                                     R_GAIN[0], R_GAIN[1], 0.0)],
+            "thr_db":     [round(x, 2) for x in _four(b.get("thr_db", out["thr_db"]),
+                                                     R_THR[0], R_THR[1], -10.0)],
+            "ratio":      [round(x, 4) for x in _four(b.get("ratio", out["ratio"]),
+                                                     R_RATIO[0], R_RATIO[1], 0.5)],
+            "attack_ms":  [round(x, 2) for x in _four(b.get("attack_ms", out["attack_ms"]),
+                                                     R_ATK[0], R_ATK[1], 5.0)],
+            "release_ms": [round(x, 2) for x in _four(b.get("release_ms", out["release_ms"]),
+                                                     R_REL[0], R_REL[1], 100.0)],
+        }
+    return out
 
 
 def status_age(st):
@@ -403,6 +423,13 @@ def selftest():
     chk("release 钳到 [0,500]", t.get("release_ms") == [100.0, 0.0, 500.0, 100.0], t.get("release_ms"))
     chk("bypass 转 bool", t.get("bypass") is True)
     chk("写进去能读回", (get("/api/tune")[1] or {}).get("tune") == t)
+
+    print("== 3b. 右耳处方 b1 ==")
+    code, j = post("/api/tune", {"gain_db": [30] * 4, "b1": {"gain_db": [0, 6, 12, 18]}})
+    tb = (j.get("tune") or {}).get("b1") or {}
+    chk("b1 保留并被钳制", tb.get("gain_db") == [0.0, 6.0, 12.0, 18.0], tb.get("gain_db"))
+    chk("b1 缺的字段继承左耳", tb.get("thr_db") == [-10.0] * 4, tb.get("thr_db"))
+    chk("不带 b1 时文件里没有 b1", "b1" not in (post("/api/tune", {"gain_db": [30] * 4})[1].get("tune") or {}))
 
     print("== 4. 短列表会补齐 ==")
     code, j = post("/api/tune", {"gain_db": [12]})
