@@ -20,6 +20,17 @@ bash sim/run_all_checks.sh
 
 ## B. 上板（需要板子 + 耳机，白天做）
 
+**懒人版（推荐）**：一条命令把 B1/B2/B3/B3b 全跑完，最后打一张 PASS/FAIL 表。
+
+```bash
+bash tools/board_debug/board_accept.sh              # 会从耳机放 3 秒 440 Hz
+bash tools/board_debug/board_accept.sh --quiet      # 只验寄存器，不出声
+bash tools/board_debug/board_accept.sh --skip-push  # 位流已经是这版就不重推
+```
+
+下面 B1 起是分步的细节，出问题时照着单独跑。
+
+
 ### B1 推位流
 
 ```bash
