@@ -36,6 +36,7 @@ base overlay 的音频通路怎么用，换个音频题目照样成立。
 | `hls-csim-setup`<br>`pitfalls/hls_csim_setup.md` | `open_project` 报 `contains illegal character ':'`；测试台找不到输入文件；每轮 csim 等太久 | 工程名不写路径；输入用绝对路径；先本机 g++ 验语法 | 每轮等待从分钟级降到秒级 | 要综合或实现数据（那是 csynth/impl） |
 | `hls-synthesis-directives`<br>`pitfalls/hls_synthesis_and_directives.md` | 给流水线 FIR 选优化指令；加了指令数字没变 | 指令写 Tcl；先限乘法分配；别对嵌套循环用 unroll | 本项目的核按这些结论选型，OOC 结果为 36 拍 @ 100 MHz | 数据类型问题（见下一行） |
 | `hls-fixed-point-types`<br>`pitfalls/hls_fixed_point_types.md` | 定点还是浮点；定点反而更慢更大；选位宽 | 只看布局布线实测，csynth 估算会判错方向 | Q1.15 定点核 36 拍；"饱和 LUT"曾被误判成定点开销，实测纠正 | 还没跑布局布线时 |
+| `vivado-windows-batch-build`<br>`pitfalls/vivado_windows_build.md` | 批处理构建随机报 `couldn't read file ...`，每次点到的文件都不一样；加了自动重试反而更差；重试报 OK 但产物时间戳不动 | 先数进程：是不是有两个构建循环、两个 vivado；再看报错里有没有 `: No error`（那是 CWD 被删）；最后核对"成功"判据是不是 grep 了脚本自己的回显 | 3600 次打开 12 个脚本 0 失败证明文件系统无辜；单实例重跑 `create_bd_design` 一次过、validate 也过 | 编译本身报语法错（那是代码问题）；单次偶发失败（重试壳本来就该吸收） |
 | `audio-algorithm-prompts`<br>`prompts/audio_algorithm_prompt.md` | 让模型设计滤波器、出频谱图、实现 DRC | 套模板，注意模板里标出的参数陷阱 | 本项目算法初版由这些提示词产出，随后人工修正 | 要参数本身——唯一定义处是 `src/python/band_design.py` |
 | `hls-testbench-template`<br>`templates/hls_testbench_template.md` | 新起一个 HLS 测试台，先要骨架 | 复制骨架，按接口填端口 | 本项目 `src/hls/fir_tb.cpp` 由它起步 | 改现有测试台（真实接口在 `fir_tb.cpp`） |
 
@@ -60,6 +61,8 @@ base overlay 的音频通路怎么用，换个音频题目照样成立。
 | `pynq-headset-mic-detection`<br>`pitfalls/headset_mic_detection.md` | 音箱有声但麦没声；领夹麦在笔记本能用、插板子不行；四段耳机直插能用、加转接头就不行 | 先并一个 32 Ω 负载，再按"每次只换一样"隔离 | 领夹麦 + 老耳机当负载 → 二合一 → 板子，首次录到真人声 | 走 `Line-in` 口（不经过 U41）；只是偶尔要插拔几次才有声 |
 | `audio-data-consistency`<br>`pitfalls/audio_data_consistency.md` | 板子输出和 Python 基线各自都对但一比就不像；新接的音源采样率不同 | 先统一采样率，再定比对两端是什么 | 一次 1.6 倍的虚高加速比被这条查出来，改成 1.4 倍 | 只是浮点误差级别的差异 |
 | `audio-processing-bugs`<br>`pitfalls/audio_processing_bugs.md` | 频谱 0 Hz 处一根巨峰；输出时长和输入不符；两条线看着只有一条 | 去直流、按原长度切片、正确的 FFT 归一化 | 三个症状各对应一次真实事故 | 问题在硬件通路上 |
+| `pynq-codec-i2c-access`<br>`pitfalls/pynq_codec_i2c.md` | codec 寄存器全读回同一个常数（0x00 或 0x01）；写入报成功但回读不变；`0x4023` 读到 0x01 而不是 0xE5/0xF3 | **先确认 PL 配置了没有**（地址脚由 PL 驱动），再按 load→读→init→读→验 bit1 的顺序走；被写拧就断电重上电 | 出货 overlay 下拿到 `0x4014=20 0x4019=33 0x4023=E5`，`codec_init()` 后变 `0x401C=21 0x401E=41 0x4023=F3`；顺带纠正早期写错的 unmute 值 `0x01/0x01/0xE7` | 只是音量偏小（那是增益问题）；I2C 总线本身不通（先 i2cdetect） |
+| `pl-internal-tone-diagnosis`<br>`pitfalls/pl_internal_tone_diagnosis.md` | 处理后的音频没声但计数器全绿；分不清"输入是静音"还是"输出链路断"；没有示波器却要判断引脚有没有波形 | 在 PL 里造 440 Hz 方波顶替处理链输出（一个控制位、不动既有通路），听到即证明播放链路全通 | 一条测试音把怀疑范围从"整条链"砍到"音源侧"；同一颗位流里 `0x0B` 响、`0x03` 吹气响，两段同时成立 | 连测试音也不响（那才轮到电气层）；需要精确测频响/THD（这只做定性） |
 
 ## 每条是从哪次失败里总结出来的
 
