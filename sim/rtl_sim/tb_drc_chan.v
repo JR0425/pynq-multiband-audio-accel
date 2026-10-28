@@ -213,6 +213,24 @@ module tb_drc_chan;
 
     integer errs_a, k_passthru_bad;
 
+    /* 一组参数跑一遍。WDRC（atk|rel != 0）按 0 失配判，无记忆按 ±1 判。
+     * 抽出来是为了后面的参数扫描 —— 报告里那张对拍表就是这一串。 */
+    task automatic one_case(input signed [23:0] t_, r_, k_, e_,
+                            input integer tol_, p_n, input [255:0] label);
+        begin
+            thr = t_; ratio = r_; atk = k_; rel = e_; tol = tol_;
+            do_reset;
+            play(p_n);
+            if (errs == 0)
+                $display("  PASS  %0s  (thr=%0d ratio=%0d atk=%0d rel=%0d, %0d 采样, tol=%0d)",
+                         label, t_, r_, k_, e_, n_out, tol_);
+            else
+                $display("  FAIL  %0s  %0d 处失配 (thr=%0d ratio=%0d atk=%0d rel=%0d)",
+                         label, errs, t_, r_, k_, e_);
+            errs_a = errs_a + errs;
+        end
+    endtask
+
     initial begin
         band = 0; gain = 16'sd256;
         thr = 24'sd419456; ratio = 24'sd2936064;
@@ -262,6 +280,20 @@ module tb_drc_chan;
             $display("  FAIL  模型/输入不符 %0d 处，RTL/模型不符 %0d 处",
                      k_passthru_bad, errs);
         errs_a = errs_a + errs + k_passthru_bad;
+
+        /* ---------- 模式 D：参数扫描 ----------
+         * 上面三条各只覆盖一组参数。这里换 7 组，覆盖：
+         *   ① 出厂值  ② 高门限（永不压缩）③ 低门限 + 大比率  ④ 快攻慢放
+         *   ⑤ 慢攻快放  ⑥ 无记忆 + 不同门限  ⑦ ratio 极小（几乎限幅）
+         * 每组都对比行为模型；WDRC 要逐位一致，无记忆按 ±1。 */
+        $display("=== 模式 D：参数扫描（7 组）===");
+        one_case(24'sd419456,  24'sd2936064, 24'sd17408, 24'sd896,   0, 400, "factory");
+        one_case(24'sd3000000, 24'sd2936064, 24'sd17408, 24'sd896,   0, 400, "high-thr");
+        one_case(24'sd1048576, 24'sd3774873, 24'sd17408, 24'sd896,   0, 400, "low-thr+big-ratio");
+        one_case(24'sd2097152, 24'sd2097152, 24'sd65536, 24'sd256,   0, 400, "fast-atk/slow-rel");
+        one_case(24'sd2097152, 24'sd2097152, 24'sd256,   24'sd65536, 0, 400, "slow-atk/fast-rel");
+        one_case(24'sd1048576, 24'sd2936064, 24'sd0,     24'sd0,     1, 400, "memoryless");
+        one_case(24'sd419430,  24'sd4190208, 24'sd17408, 24'sd896,   0, 400, "ratio~1/32");
 
         if (errs_a == 0) $display("=== 全部通过 ===");
         else             $display("=== 有失配 ===");
