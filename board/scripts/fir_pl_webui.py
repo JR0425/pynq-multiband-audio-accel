@@ -34,6 +34,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -56,6 +57,17 @@ R_THR = (-60.0, 0.0)
 R_RATIO = (0.0, 0.95)
 R_ATK = (0.0, 50.0)
 R_REL = (0.0, 500.0)
+
+# 第一次打开页面时给什么。三个 DRC 参数 = 寄存器出厂值（419456 / 2936064 /
+# 17408 / 896 换算成 dB、ratio、ms），增益用演示口径 +30 dB。
+DEFAULT_TUNE = {
+    "gain_db": [30.0, 30.0, 30.0, 30.0],
+    "thr_db": [-20.0, -20.0, -20.0, -20.0],
+    "ratio": [0.7, 0.7, 0.7, 0.7],
+    "attack_ms": [5.0, 5.0, 5.0, 5.0],
+    "release_ms": [100.0, 100.0, 100.0, 100.0],
+    "bypass": False,
+}
 
 
 # ---------------------------------------------------------------- 文件协议
@@ -130,9 +142,48 @@ def status_age(st):
     return round(time.time() - t, 2)
 
 
+IIO_DIR = "/sys/bus/iio/devices/iio:device0"      # Zynq XADC，CPU 温度
+
+
+def _read_txt(path):
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except Exception:
+        return ""
+
+
+def _board_health():
+    """和第一档 `fir_webui._health()` 同样的几个量，页面那块才不会是"—"。
+    读不到就返回 None，不要瞎编。"""
+    temp = None
+    try:
+        raw = int(_read_txt(IIO_DIR + "/in_temp0_raw").strip())
+        off = int(_read_txt(IIO_DIR + "/in_temp0_offset").strip())
+        sca = float(_read_txt(IIO_DIR + "/in_temp0_scale").strip())
+        temp = round((raw + off) * sca / 1000.0, 1)
+    except (OSError, ValueError):
+        temp = None
+    mem = None
+    try:
+        m = re.search(r"MemAvailable:\s+(\d+)", _read_txt("/proc/meminfo"))
+        if m:
+            mem = int(int(m.group(1)) / 1024)
+    except Exception:
+        mem = None
+    up = None
+    try:
+        up = int(float(_read_txt("/proc/uptime").split()[0]))
+    except Exception:
+        up = None
+    load = _read_txt("/proc/loadavg").split()[:3] or None
+    return temp, mem, up, load
+
+
 def health():
     st = _read_json(STATUS_PATH)
     age = status_age(st)
+    temp_c, mem_mb, up_s, load = _board_health()
     bit_ok = os.path.exists(BIT_PATH)
     try:
         bit_mb = round(os.path.getsize(BIT_PATH) / 1048576.0, 2) if bit_ok else None
@@ -149,6 +200,12 @@ def health():
         "run": read_run(),
         "stale_s": STALE_S,
         "obs": "peak/env/gr are real signals" if st and st.get("env") else "no obs",
+        # 页面右上角那块"板子健康"要这几个字段，和第一档同名同义
+        "temp_c": temp_c,
+        "mem_avail_mb": mem_mb,
+        "uptime_s": up_s,
+        "load": load,
+        "guard": None,
     }
 
 
@@ -196,7 +253,13 @@ class Handler(BaseHTTPRequestHandler):
                 st["mode"] = "pl"
                 return self._json(st)
             if p == "/api/tune":
-                return self._json(_read_json(TUNE_PATH))
+                # 结构必须和第一档一致：{"ok": true, "tune": {...}}。
+                # 页面初始化是 `if (r.ok && r.tune) applyTune(r.tune); else flushTune()`
+                # —— 少了这层包装它会走 flushTune，把页面自带的默认值（增益 0 dB、
+                # 门限 −10 dBFS）写回来，演示一上来就是"听不见"。
+                # 文件不存在时也不要给 null，给「寄存器出厂值 + 演示增益」。
+                return self._json({"ok": True,
+                                   "tune": _read_json(TUNE_PATH) or dict(DEFAULT_TUNE)})
             if p == "/api/scope":
                 # 抓取缓冲是 RTL 里的桩（C3/C4 未做），这里不编数据骗页面
                 return self._json({"ok": False,
@@ -315,7 +378,12 @@ def selftest():
     print("== 2. 没有后端时 ==")
     code, j = get("/api/status")
     chk("status 无文件 -> ok=false", j.get("ok") is False and j.get("running") is False)
-    chk("tune 无文件 -> null", get("/api/tune")[1] is None)
+    j = get("/api/tune")[1]
+    t0 = j.get("tune") if isinstance(j, dict) else None
+    chk("tune 无文件 -> ok/tune 包装 + 演示默认",
+        j.get("ok") is True and isinstance(t0, dict)
+        and t0.get("gain_db") == [30.0] * 4
+        and t0.get("thr_db") == [-20.0] * 4 and t0.get("ratio") == [0.7] * 4, t0)
     code, j = get("/api/health")
     chk("health.ok=false", j.get("ok") is False and j.get("mode") == "pl")
     chk("health 报告位流存在", j.get("bit", {}).get("exists") is True)
@@ -334,7 +402,7 @@ def selftest():
     chk("attack 钳到 [0,50]", t.get("attack_ms") == [5.0, 50.0, 0.0, 5.0], t.get("attack_ms"))
     chk("release 钳到 [0,500]", t.get("release_ms") == [100.0, 0.0, 500.0, 100.0], t.get("release_ms"))
     chk("bypass 转 bool", t.get("bypass") is True)
-    chk("写进去能读回", get("/api/tune")[1] == t)
+    chk("写进去能读回", (get("/api/tune")[1] or {}).get("tune") == t)
 
     print("== 4. 短列表会补齐 ==")
     code, j = post("/api/tune", {"gain_db": [12]})
@@ -359,6 +427,8 @@ def selftest():
     chk("status 带 age/stale", j.get("age") is not None and j.get("stale") is False)
     code, j = get("/api/health")
     chk("health.ok=true", j.get("ok") is True, j.get("status_age_s"))
+    need_keys = {"temp_c", "mem_avail_mb", "uptime_s", "load", "guard", "bit", "run"}
+    chk("health 带页面要的字段", need_keys <= set(j), sorted(need_keys - set(j)))
     code, j = post("/api/start")
     chk("start 能看到 backend_alive", j.get("backend_alive") is True)
 
