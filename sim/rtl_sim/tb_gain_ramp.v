@@ -39,6 +39,12 @@ module tb_gain_ramp;
             @(posedge clk);
             #1;
             tick = 0;
+            /* 真实链路里 tick = fe_dout_vld，前端 3 拍吐一个采样，
+             * tick 间隔 ≥ 2 拍。2026-10-28 斜坡改成两级流水后这成了硬前提
+             * （step 寄存拍与 c 加法拍之间 c 不动）；TB 原来 tick 几乎常高
+             * （间隔 1 拍），那个节奏在硬件上根本不会发生。 */
+            repeat (2) @(posedge clk);
+            #1;
         end
     endtask
 
@@ -47,6 +53,20 @@ module tb_gain_ramp;
         repeat (4) @(posedge clk);
         rst_n = 1;
         repeat (2) @(posedge clk);
+
+        /* ---------- 上电阶段：c 从 0（静音防爆音）爬到默认 256 ----------
+         * 2026-10-28 起上电不再是"复位直接装载 256"，而是从 0 逐采样爬。
+         * 注意 >>>div 是指数收敛（每步走剩余的 1/2^div，64 采样是时间常数
+         * 不是收敛步数），所以这里等 busy 落零，不数固定步数。 */
+        i = 0;
+        while (busy !== 1'b0 && i < 2000) begin
+            step_once;
+            i = i + 1;
+        end
+        if (c0 !== 16'sd256) begin
+            $display("FAIL 上电收敛后 c0=%0d（期望 256）", c0);
+            errs = errs + 1;
+        end
 
         /* ---------- 判据 1：256 → 2032 ---------- */
         $display("=== 判据 1：256 → 2032（0 dB → +18 dB），div=6 ===");

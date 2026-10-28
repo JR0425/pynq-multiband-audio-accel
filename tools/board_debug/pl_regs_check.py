@@ -3,7 +3,7 @@
 新位流（带 fir_pl_regs @ 0x43C40000）上板后先跑这个。它证明四件事：
 
   1. AXI4-Lite 从机活着          —— 读 ID（0x504C0002）
-  2. 出厂默认值对                —— GAIN[0..3] = 256（0 dB），RAMP_DIV = 6
+  2. 出厂默认值对                —— GAIN[0..3] = 256（0 dB），RAMP_DIV = 0
   3. 写进去能读回来              —— 写 4 个不同增益，逐条回读
   4. 斜坡真的在爬且会停          —— 写 +18 dB 后立刻读 RAMP_BUSY=1，
                                     等 100 ms 再读 =0（div=6 时约 6.5 ms 爬完）
@@ -23,8 +23,11 @@ ID_EXPECT = 0x504C0002
 
 BANK0 = 0x100
 OFF_GAIN = 0x00
-OFF_RAMP_DIV = 0x70
-OFF_RAMP_BUSY = 0x74
+# 2026-10-28 纠正：+0x70/+0x74 是 **bank 内相对偏移**（寄存器表 v25 的约定），
+# 不是控制区的绝对 0x070/0x074。bank0 的真实地址 = 0x100 + 0x70 = 0x170。
+# 早先读 0x070 读到恒 0，差点误判成"RAMP 寄存器写不进去"——RTL 一直是对的。
+OFF_RAMP_DIV = BANK0 + 0x70      # = 0x170
+OFF_RAMP_BUSY = BANK0 + 0x74     # = 0x174
 GAIN_0DB = 256
 
 
@@ -51,6 +54,13 @@ def main():
     r = MMIO(base, 0x1000)
     bad = 0
 
+    # 2026-10-28 教训：Overlay() 重配 PL 后 ctrl=0（run 没开），前端没有采样
+    # 节拍，斜坡的 tick 永远不来 —— busy 会一直挂着，判据全歪。先开 run。
+    cname, cbase = find_ip(ol, "gpio_ctrl")
+    if cbase is not None:
+        MMIO(cbase, 0x1000).write(0, 0x03)   # bit0 run | bit1 drc_en
+        time.sleep(0.2)
+
     rid = r.read(0x000)
     ok = rid == ID_EXPECT
     bad += 0 if ok else 1
@@ -58,9 +68,9 @@ def main():
 
     gains = [r.read(BANK0 + OFF_GAIN + 4 * i) & 0xFFFF for i in range(4)]
     div = r.read(OFF_RAMP_DIV) & 0xFFFF
-    ok = gains == [GAIN_0DB] * 4 and div == 6
+    ok = gains == [GAIN_0DB] * 4 and div == 0
     bad += 0 if ok else 1
-    print("[3] default GAIN = %s (expect [256,256,256,256])  RAMP_DIV = %d (expect 6)  %s"
+    print("[3] default GAIN = %s (expect [256,256,256,256])  RAMP_DIV = %d (expect 0)  %s"
           % (gains, div, "OK" if ok else "FAIL"))
 
     # 写四个不同值：0 / +6 / +12 / +18 dB

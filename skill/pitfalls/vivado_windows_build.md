@@ -45,7 +45,7 @@ ERROR: [Common 17-217] Failed to load feature 'ipintegrator'
 - 加了"失败自动重试"之后成功率反而下降
 - 重试脚本报 `OK`，但产物时间戳没变
 
-## 三个真实原因（按发生率排）
+## 四个真实原因（按发生率排）
 
 ### 1. 两个构建循环同时在跑（最容易中，也最像"环境玄学"）
 
@@ -129,6 +129,71 @@ if {[file exists $hwh] && [file size $hwh] > 0} { set ok 1 }
 同理，**"成功"也不能 grep 脚本自己回显的标记**：`build_audio_pl.tcl` 里的
 `puts "### DONE"` 会连同被回显的 tcl 源码一起出现在日志里，`grep '### DONE'`
 恒为真。判据要加"产物真的被这一轮重写过"（`[ $BIT -nt $MARK ]`）。
+
+### 4. FlexNet license 加载随机失败（`create_bd_design` 报随机文件不存在）
+
+**症状**：`create_bd_design` 挂，报
+
+```
+couldn't read file "E:/Xilinx/Vivado/2020.2/data/rsb/busdef/interrupt_signal/busdef.tcl":
+    no such file or directory
+ERROR: [BD 41-69] Error sourcing TCL script
+    (in namespace eval "::xilinx.com_signal_interrupt_1.0" script line 1)
+```
+
+**每轮点到的文件都不一样**（`AXIMM/busdef.tcl`、`testbench.tcl`、
+`interrupt_signal/busdef.tcl`、`mig_utils.tcl`，还有 `[Ip 78-90] Error in
+initialization of Rule object`），而**这些文件一个个都在、都能读**。
+最恶劣的一种变体干脆只有一行，还在 **stderr** 里：
+
+```
+ERROR: [Common 17-217] Failed to load feature 'ipintegrator'.
+```
+
+**真因：FlexNet license/feature 加载随机失败。** 同一个 feature 名（core /
+ipservices / ipintegrator）随机失败的案例在 AMD 官方论坛和社区都有记录，
+结论一致：**重跑就好，纯随机**。2026-10-28 在这上面烧了整整一天（先冤枉并发、
+再冤枉 build 目录残留、一度怀疑到内核过滤驱动），全部作废。
+
+**为什么查了一天**：三条路全被堵——
+1. `grep -m1 '^ERROR'` 只看 stdout，17-217 在 **stderr**，被吞（这是最大的坑；
+   构建壳后来改成 `> log 2>&1` 才看见）；
+2. 随机性让人永远能找到"这次和上次不一样"的环境差异（目录、CWD、TMP……），
+   每一个都能自圆其说；
+3. 成功过的轮次（比如手动复测的那几次）让人觉得"修好了"，失败又推翻。
+
+**修法**：不要修，**重试吸收**。`build/run_pl_build.sh` 的重试壳改对成功判据后，
+round 1 挂 license、round 2 一路过到出位流（16:14），全程无人值守。
+两个配套动作：
+- 日志必须 **stderr 合流**（`> "$LOG" 2>&1`），失败信息打 `grep -E '^(ERROR|CRITICAL)'`
+  全部命中行，别只打第一条；
+- 每轮换全新工程目录（`FIR_PL_BUILD_DIR`），`taskkill` 后的 Windows 句柄残留
+  会让复用目录不可靠 —— 这不是根因，但让重试更稳。
+
+**别做的事**：不要重装 Vivado、不要关杀软、不要查内核过滤驱动、不要怀疑 E 盘、
+**更不要试图"定位随机性"**——它是 license 管理器的固有毛病，重试是唯一正解。
+
+### 5. `CRITICAL WARNING` 不阻断构建（地址忘分配，位流白编）
+
+给 BD 挂了新从机 `fir_pl_regs_0`，`connect_bd_intf_net` 接好、validate 过了，
+但忘了 `assign_bd_address`。validate 只给：
+
+```
+CRITICAL WARNING: [BD 41-1356] Slave segment </fir_pl_regs_0/s_axi/reg0>
+    is not assigned into address space </ps7_0/Data>
+```
+
+它是 **WARNING 不是 ERROR**——BD 照样保存、HDL 照样生成、位流照样编出来、
+"成功判据"照样打绿灯。上板后 PS 读这个地址直接总线错，从位流外表完全看不出来。
+2026-10-28 这条告警在日志里躺了三轮没被看见。
+
+**修法两件套**（`build_audio_pl.tcl` 已加）：
+1. `assign_bd_address` 一条不少；
+2. 分配完**主动数一遍** `get_bd_addr_segs`，五个从机缺任何一个就 `error` ——
+   把"WARNING 级别的接线遗漏"升级成"构建失败"。
+
+**教训**：`validate` 通过 ≠ 接线正确。每次改 BD，都要对着日志把 CRITICAL WARNING
+清零，或者像上面那样把关键不变量写成断言。
 
 ## 怎么证明"不是文件系统/杀软/磁盘"
 

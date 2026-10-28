@@ -303,10 +303,32 @@ assign_bd_address -offset 0x43C20000 -range 0x00010000 \
 assign_bd_address -offset 0x43C30000 -range 0x00010000 \
   -target_address_space [get_bd_addr_spaces ps7_0/Data] [seg_of_pin gpio_dbg/S_AXI] -force
 
+# fir_pl_regs 只译码 12 位地址(0x000-0x27F 在用),4 KB 就够。
+# 2026-10-28 补：之前只挂了 M04 却没给地址,validate 一直报
+#   CRITICAL WARNING: [BD 41-1356] Slave segment </fir_pl_regs_0/s_axi/reg0>
+#   is not assigned into address space </ps7_0/Data>
+# 它是 CRITICAL WARNING 不是 ERROR,所以 BD_ONLY 照样"通过",位流照样编得出来 ——
+# 但 PS 读 0x43C40000 会直接总线错。**告警必须归零,不能靠 exit code 判。**
+assign_bd_address -offset 0x43C40000 -range 0x00001000 \
+  -target_address_space [get_bd_addr_spaces ps7_0/Data] [seg_of_pin fir_pl_regs_0/S_AXI] -force
+
 puts "==== ADDR MAP ===="
 foreach s [get_bd_addr_segs -of_objects [get_bd_addr_spaces ps7_0/Data]] {
   puts "  [get_property NAME $s]  offset=[get_property offset $s]  range=[get_property range $s]"
 }
+# 五个从机一个都不能少。少一个也只会是 CRITICAL WARNING,不会中断构建,
+# 所以这里主动数一遍,缺了就停 —— 免得又编出一块"寄存器写不进去"的位流。
+set want {SEG_gpio_ctrl_Reg SEG_gpio_stat_Reg SEG_gpio_stat2_Reg SEG_gpio_dbg_Reg SEG_fir_pl_regs_0_reg0}
+set have {}
+foreach s [get_bd_addr_segs -of_objects [get_bd_addr_spaces ps7_0/Data]] {
+  lappend have [get_property NAME $s]
+}
+foreach w $want {
+  if {[lsearch -exact $have $w] < 0} {
+    error "ADDR MAP 缺 $w,现有:$have"
+  }
+}
+puts "### ADDR MAP OK ($want)"
 
 regenerate_bd_layout
 validate_bd_design

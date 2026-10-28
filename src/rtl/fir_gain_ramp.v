@@ -46,6 +46,13 @@ module fir_gain_ramp (
 
     reg signed [15:0] c0, c1, c2, c3;
 
+    /* 上电 = 0（静音），由第一个 clr / 写寄存器 / tick 爬到目标。
+     * 不能再用复位装载 tgt：异步复位装非零值会被综合器拉进数据链，
+     * 正是那颗 -3.5 ns 长链的起点。Xilinx 上电按 initial 装载，同 fir_pl_regs。 */
+    initial begin
+        c0 = 16'sd0; c1 = 16'sd0; c2 = 16'sd0; c3 = 16'sd0;
+    end
+
     /* 17 位够用：两个 16 位有符号相减，范围 ±65535 */
     wire signed [16:0] d0 = {tgt0[15], tgt0} - {c0[15], c0};
     wire signed [16:0] d1 = {tgt1[15], tgt1} - {c1[15], c1};
@@ -74,22 +81,46 @@ module fir_gain_ramp (
         end
     endfunction
 
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    /* ================= 两级流水（2026-10-28 时序修复） =================
+     *
+     * 最初一拍串完「减法 → 17 位桶形移位 → 补 1 LSB → 加法 → clamp」，
+     * 19 级逻辑 13.3 ns，100 MHz 域 WNS 打到 -3.5 ns。
+     * 现在拆成两拍：拍 1 只算 step，拍 2 只做加法 + clamp，每段各留 1 级
+     * 寄存器，两级都 ≤10 ns。
+     *
+     * 行为差异只有一个：step 用的是「上一拍的 c」算的。但 tick 是每个采样
+     * 一个脉冲（前端 3 拍一个采样），两次 tick 之间 c 不变，所以 step 永远
+     * 是对的 —— 斜坡的数学一个字没变，只是晚了一拍生效（20 ns，听不见）。
+     * 这也是为什么 d/clr 语义不用动：clr 那拍 go_q 被压掉，下一拍 c 已经
+     * 对齐目标，不会出现「清零拍还往前爬一步」。
+     *
+     * 复位分支从「装载 tgt」改成「装 0」：异步复位若要装非零值，综合器只能
+     * 把 rst 拉进数据路径（每个位一个 LUT），那条 19 级长链的起点就是它；
+     * 装 0 可以直接用 FF 的 CLR，复位彻底退出数据链。上电 c=0 意味着上电
+     * 头 1.3 ms 是静音的（从 0 爬到默认 256），顺便把上电爆音也免了。
+     */
+    reg go_q;
+    reg signed [16:0] s0_q, s1_q, s2_q, s3_q;
+
+    always @(posedge clk) begin
+        go_q <= rst_n && tick && !clr;
+        s0_q <= step_of(d0, sh);
+        s1_q <= step_of(d1, sh);
+        s2_q <= step_of(d2, sh);
+        s3_q <= step_of(d3, sh);
+    end
+
+    always @(posedge clk) begin
+        if (clr) begin
             c0 <= tgt0;
             c1 <= tgt1;
             c2 <= tgt2;
             c3 <= tgt3;
-        end else if (clr) begin
-            c0 <= tgt0;
-            c1 <= tgt1;
-            c2 <= tgt2;
-            c3 <= tgt3;
-        end else if (tick) begin
-            c0 <= clamp16({c0[15], c0} + step_of(d0, sh));
-            c1 <= clamp16({c1[15], c1} + step_of(d1, sh));
-            c2 <= clamp16({c2[15], c2} + step_of(d2, sh));
-            c3 <= clamp16({c3[15], c3} + step_of(d3, sh));
+        end else if (go_q) begin
+            c0 <= clamp16({c0[15], c0} + s0_q);
+            c1 <= clamp16({c1[15], c1} + s1_q);
+            c2 <= clamp16({c2[15], c2} + s2_q);
+            c3 <= clamp16({c3[15], c3} + s3_q);
         end
     end
 
