@@ -175,17 +175,45 @@ MSYS_NO_PATHCONV=1 python tools/board_debug/board_ssh.py --sudo \
 ```bash
 bash build/run_pl_build.sh          # 自带 8 轮重试 + PID 锁
 tail -f tools/board_debug/_tmp/pl_build.log
+
+BD_ONLY=1 bash build/run_pl_build.sh   # 只跑 BD 段（create_bd_design→validate），
+                                       # 1–2 分钟一轮，改 BD 时先用它迭代
 ```
 
 **不要再开第二个。** 两个循环会往同一个 `build/vivado/audio_pl` 做
 `create_project -force`（删目录重建），表现为"随机读不到自己的 tcl 文件"。
 详见 `skill/pitfalls/vivado_windows_build.md`。
 
+### 2026-10-28 晚：`create_bd_design` 连续 12 轮失败（**未解决**）
+
+现象：`couldn't read file "<某个 tcl>": no such file or directory` 或 `: No error`，
+每次点到的文件都不一样，全部是 `E:\Xilinx\Vivado\2020.2\{scripts,data}` 下面的
+（`busdef/AXIMM/busdef.tcl`、`scripts/ipintegrator/{utils,addr,utils_dbg}.tcl`、
+`scripts/xguifrmwork/{init,utils}.tcl`…）。**这些文件都在、都能读。**
+
+这一轮又排掉了三条：
+
+| 嫌疑人 | 怎么验的 | 结果 |
+|---|---|---|
+| 并发（两个循环） | 锁改成带 PID，`tasklist` 确认只有 1 个 vivado | 不是 |
+| CWD（当前目录） | `tools/board_debug/bd_cwd_test.sh`：从 `C:\Windows\Temp` 启动 | 不是 |
+| **TMP/TEMP** | Git Bash 里 `TMP=/tmp`、`TEMP=/tmp`（POSIX 路径，Windows 程序会当成 `\tmp`）——`bd_tmpfix_test.sh` 换成真 Windows 目录 | 不是（仍失败） |
+
+剩下最大的嫌疑是**常驻的内核过滤驱动**（都处于 Running）：
+`MessageTransfer`（完美世界竞技平台，就在 E 盘）、`gameflt`、
+`XunYouFilter`（迅游）、`nnndisfilter`（雷神）。
+
+**最快的解法：重启一次 Windows，然后直接跑 `BD_ONLY=1 bash build/run_pl_build.sh`。**
+（12:44 和 12:53 两次成功都是在机器状态较"新"的时候。）
+
 成功判据（不要 grep `### DONE`，那会命中被回显的 tcl 本身）：
 
 - `tools/board_debug/_tmp/pl_build.rc` 出现 `round N OK`
 - `board/overlay/fir_pl.bit` 的 mtime 比本轮 mark 新
 - 日志里有 `### RESULT` / `### WNS_ns =`
+
+BD 段单独成功的标记：日志里出现 `BD_ONLY：validate 过了就停`，
+且 `ADDR MAP` 里能看到 `SEG_fir_pl_regs_0_Reg offset=0x43C40000`。
 
 ## 出货版不受影响
 
