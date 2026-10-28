@@ -213,3 +213,88 @@ rm -rf build/vivado/<工程名>
 2. 上板跑 `sh run_live.sh 30`，结尾必须是 `[OK ] 960000 / 960000 个采样逐位相同`。
 
 两条都过，才算这次构建可用。
+
+---
+
+## 6. PL 直连版（另一条构建线）
+
+上面的 `rebuild.sh` 出的是**块模式**位流（PS 在环）。PL 直连是另一条线：
+`board/overlay/build_audio_pl.tcl` 从空工程摆 block design，产物是
+`board/overlay/fir_pl.bit` + `fir_pl.hwh`。**两条线的产物不通用**，
+`fir.bit` 里没有 `fir_pl_regs`，`fir_pl.bit` 里没有块模式的 DMA 环。
+
+### 6.1 构建
+
+```bash
+bash build/run_pl_build.sh              # 完整构建（含 BD + 综合 + 实现 + 位流 + hwh）
+BD_ONLY=1 bash build/run_pl_build.sh    # 只验 BD 接线，过了就停，几十秒
+```
+
+脚本自带三样东西，别自己另起一个循环：
+
+- **PID 锁**（`tools/board_debug/_tmp/pl_build.lock`）：只允许一个构建循环；
+- **每轮重试**（8 轮，轮间 60 s）：`create_bd_design` 的随机 rsb 读失败是常态，
+  靠重试吸收，**不要去诊断**；
+- **每轮换一个全新工程目录**（`build/vivado/pl_<轮>_<时间戳>`）：在残留目录上重跑
+  几乎必挂，`rm -rf` 在 Windows 上又可能因为句柄没释放而漏删。
+
+### 6.2 判据：WNS 必须 ≥ 0
+
+脚本最后会打印 `### WNS_ns = ...`。**这一行要人眼看。** 位流编出来不等于能用：
+
+| 版本 | WNS | 说明 |
+|---|---|---|
+| 批 1 | +0.253 ns | 能用 |
+| 批 2 第一版 | −1.612 ns | 529 个失败端点，照样出 bit，但会偶发算错 |
+| 批 2 定版 | +0.136 ns | 能用（余量薄） |
+
+WNS 为负时先看 `board/overlay/fir_pl_timing.rpt` 里第一条 VIOLATED 的起止点，
+再去 RTL 里给那一级加一拍流水。逐级对照见 `docs/PL直连_资源与时序.md`。
+
+### 6.3 上板验收（不需要耳朵的两条）
+
+```bash
+cd tools/board_debug
+MSYS_NO_PATHCONV=1 python board_ssh.py --put ../../board/overlay/fir_pl.bit /home/xilinx/dma_exp/fir_pl.bit
+MSYS_NO_PATHCONV=1 python board_ssh.py --put ../../board/overlay/fir_pl.hwh /home/xilinx/dma_exp/fir_pl.hwh
+
+# ① 寄存器窗口：ID、出厂值、四段写读、斜坡 busy
+MSYS_NO_PATHCONV=1 python board_ssh.py --sudo \
+  "cd /home/xilinx/dma_exp && XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u pl_regs_check.py"
+
+# ② 压缩器动不动：话筒当源（安静房间里量不出东西，会报 PASS(partial)）
+... pl_drc_probe.py
+# ②' 或者用播放环里的 440 Hz 正弦当源（要放音，白天再跑）
+... pl_drc_ply_probe.py
+```
+
+`pl_drc_probe.py` 会先量当前包络再定门限。**如果它报 `PASS(partial)`，
+不是 RTL 坏了**，是话筒没信号（午夜环境噪声只有 −100 dBFS），换 ②' 或白天重跑。
+
+### 6.4 网页第三档
+
+两个进程，必须这个顺序（overlay 只能被一个进程持有）：
+
+```bash
+sudo env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u /home/xilinx/dma_exp/fir_pl_live.py &
+sudo env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u /home/xilinx/dma_exp/fir_pl_webui.py --port 8080
+```
+
+浏览器开 `http://192.168.2.99:8080/`。接口与文件协议见 `docs/PL直连_网页第三档.md`。
+
+### 6.5 坑（2026-10-28 踩的）
+
+**两个构建循环同时在跑，会把对方杀在半路。** 表现是每一轮都报不同的
+"couldn't read file ..."，看着像 rsb 的随机失败，其实是并发。
+起因是"停掉后台任务"只杀了外层 shell，`bash build/run_pl_build.sh` 还在跑：
+
+```bash
+ps -ef | grep "bash build/run_pl_build.sh" | grep -v grep   # 应该只有 1 个
+MSYS_NO_PATHCONV=1 tasklist /FI "IMAGENAME eq vivado.exe"   # 应该没有
+```
+
+**`taskkill` 之后要验尸**，别直接进下一轮（脚本里已经带了这个检查）。
+
+**复用已有工程能省一半时间**：BD 没变、只改了 RTL 时，用
+`build/reuse_batch2.tcl`（把里面的工程路径换成最近一次成功的目录）直跑
+综合→实现，绕开 `create_bd_design`。
