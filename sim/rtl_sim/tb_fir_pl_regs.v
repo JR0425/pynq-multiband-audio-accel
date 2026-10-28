@@ -37,8 +37,9 @@ module tb_fir_pl_regs;
 
     wire [31:0] ctrl;
     wire        clr_pulse;
-    wire [127:0] gain_b0, thr_b0, ratio_b0, atk_b0, rel_b0;
-    wire [127:0] gain_b1, thr_b1, ratio_b1, atk_b1, rel_b1;
+    wire [63:0]  gain_b0, gain_b1;
+    wire [95:0]  thr_b0, ratio_b0, atk_b0, rel_b0;
+    wire [95:0]  thr_b1, ratio_b1, atk_b1, rel_b1;
     wire [15:0] ramp_div_b0, ramp_div_b1;
     wire [2:0]  ear_ctl;
     wire [1:0]  tone_sel;
@@ -137,8 +138,8 @@ module tb_fir_pl_regs;
         axi_read(12'h200, v); chk("GAIN[0] b1", v, 32'd256);
         axi_read(12'h110, v); chk("THR[0]  b0", v, 32'd419456);
         axi_read(12'h120, v); chk("RATIO[0] b0", v, 32'd2936064);
-        axi_read(12'h130, v); chk("ATK[0]  b0", v, 32'd0);
-        axi_read(12'h140, v); chk("REL[0]  b0", v, 32'd0);
+        axi_read(12'h130, v); chk("ATK[0]  b0", v, 32'd17408);
+        axi_read(12'h140, v); chk("REL[0]  b0", v, 32'd896);
         axi_read(12'h170, v); chk("RAMP_DIV b0", v, 32'd0);
         axi_read(12'h048, v); chk("MPO_TH", v, 32'd32767);
         axi_read(12'h04C, v); chk("MPO_REL", v, 32'd896);
@@ -148,7 +149,7 @@ module tb_fir_pl_regs;
         $display("-- ② 写读回 --");
         axi_write(12'h104, 32'd271);
         axi_read (12'h104, v); chk("GAIN[1] b0 rd", v, 32'd271);
-        chk("gain_b0[1] out", gain_b0[63:32], 32'd271);
+        chk("gain_b0[1] out", {16'd0, gain_b0[31:16]}, 32'd271);
         axi_write(12'h124, 32'd2097152);
         axi_read (12'h124, v); chk("RATIO[1] b0 rd", v, 32'd2097152);
         axi_write(12'h234, 32'd17408);
@@ -193,6 +194,27 @@ module tb_fir_pl_regs;
             $display("  FAIL ctrl[8] 没出脉冲（累计 %0d）", clr_cnt);
             fail = fail + 1;
         end else $display("  ok   ctrl[8] 也能出脉冲");
+
+        $display("-- ⑤ 打包端口：四段要各自落到自己的槽位 --");
+        /* 这一段是补的判据。之前只对过 gain_b0[1]，四种参数都写同一个值的时候，
+         * 32 位打包 + 取低 64 位的接法会把 b1/b3 段喂成 0、b2 段喂成 b1 的值，
+         * 单值测试完全看不出来。 */
+        axi_write(12'h100, 32'h0000_0100);       // 256
+        axi_write(12'h104, 32'h0000_0200);       // 512
+        axi_write(12'h108, 32'h0000_0300);       // 768
+        axi_write(12'h10C, 32'h0000_0400);       // 1024
+        chk("gain_b0 段0", {16'd0, gain_b0[15:0]},  32'd256);
+        chk("gain_b0 段1", {16'd0, gain_b0[31:16]}, 32'd512);
+        chk("gain_b0 段2", {16'd0, gain_b0[47:32]}, 32'd768);
+        chk("gain_b0 段3", {16'd0, gain_b0[63:48]}, 32'd1024);
+        axi_write(12'h110, 32'h000A_0001);
+        axi_write(12'h114, 32'h000A_0002);
+        axi_write(12'h118, 32'h000A_0003);
+        axi_write(12'h11C, 32'h000A_0004);
+        chk("thr_b0 段0", {8'd0, thr_b0[23:0]},  32'h000A_0001);
+        chk("thr_b0 段1", {8'd0, thr_b0[47:24]}, 32'h000A_0002);
+        chk("thr_b0 段2", {8'd0, thr_b0[71:48]}, 32'h000A_0003);
+        chk("thr_b0 段3", {8'd0, thr_b0[95:72]}, 32'h000A_0004);
 
         $display("");
         if (fail == 0) $display("PASS 寄存器文件全部通过");

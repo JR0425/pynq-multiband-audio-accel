@@ -10,6 +10,8 @@ MSYS_NO_PATHCONV=1 cmd /c "$(cygpath -w "$XV")" \
     "$(cygpath -w "$ROOT/src/rtl/i2s_duplex.v")" \
     "$(cygpath -w "$ROOT/src/rtl/fir_mb_fe.v")" \
     "$(cygpath -w "$ROOT/src/rtl/fir_drc4.v")" \
+    "$(cygpath -w "$ROOT/src/rtl/fir_gain_ramp.v")" \
+    "$(cygpath -w "$ROOT/src/rtl/fir_pl_regs.v")" \
     "$(cygpath -w "$ROOT/src/rtl/fir_pl_direct.v")" > xvlog.log 2>&1
 grep -iE "^ERROR" xvlog.log && { echo "有错"; exit 1; }
 grep -icE "warning" xvlog.log | sed 's/^/warning 行数: /'

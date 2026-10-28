@@ -73,8 +73,9 @@
  * ================= 和 drc()（无记忆）的关系 =================
  *
  * HLS 里 attack/release 都是 0 时走 drc()，不看包络、每个采样独立压。
- * 本模块检测 ATK==0 && REL==0 时自动切到那条路（不动 env 状态），
- * 和 HLS 的选择完全一样。v25 用的是 wdrc()，这条路留着给 v20_gain 回归。
+ * 本模块检测 ATK==0 && REL==0 时把包络更新改成"写瞬时幅度"，
+ * 等价于不看历史、每个采样独立压，和 HLS 的选择完全一样。
+ * v25 用的是 wdrc()，这条路留着给 v20_gain 回归。
  */
 
 `timescale 1ns / 1ps
@@ -84,12 +85,7 @@ module fir_drc4_chan #(
     parameter integer BW        = 40,
     parameter integer DW        = 24,
     parameter integer FRAC_ACC  = 32,
-    parameter integer FRAC_DRC  = 22,
-    parameter signed [DW-1:0] THR   = 24'sd419456,
-    parameter signed [DW-1:0] RATIO = 24'sd2936064,
-    parameter signed [DW-1:0] ATK   = 24'sd17408,
-    parameter signed [DW-1:0] REL   = 24'sd896,
-    parameter signed [15:0]   GAIN  = 16'sd256   // 只给 testbench / 老实例当默认
+    parameter integer FRAC_DRC  = 22
 ) (
     input  wire                  clk,
     input  wire                  rst,      // 清包络（和 HLS 的 reset 输入同义）
@@ -101,6 +97,17 @@ module fir_drc4_chan #(
      * 这样压缩器的包络状态不受增益变化影响（增益在包络检测之前，
      * 换增益等价于换输入电平，包络本来就该跟着变）。 */
     input  wire signed [15:0]    gain_i,
+    /* 2026-10-28 批 2：DRC 四参数也是运行期端口（Q2.22，24 位有符号）。
+     * thr/ratio 就是 HLS 的对应量；atk/rel 是每采样平滑步进。
+     * **atk 与 rel 同时为 0 = 无记忆压缩**（每个采样独立压，不看包络），
+     * 和 HLS `fir_drc4()` 里 ATK==0 && REL==0 那条分支同一个意思。
+     * 实现上不是另一条数据路，而是把包络改成"瞬时 = 当前 |x|"：
+     * 阈值以上的输出 = thr + (a−thr)·ratio，与 HLS 的 drc() 最多差 1 LSB
+     * （WDRC 那边是 ceil、HLS 写的是 floor），听不出来，对拍要按 ±1 判。 */
+    input  wire signed [DW-1:0]  thr_i,
+    input  wire signed [DW-1:0]  ratio_i,
+    input  wire signed [DW-1:0]  atk_i,
+    input  wire signed [DW-1:0]  rel_i,
     output reg  signed [DW-1:0]  yv,
     output reg                   yv_vld,
     /* 2026-10-28 批 1 观察口：把包络和当前衰减量引出去给寄存器采样。
@@ -113,10 +120,26 @@ module fir_drc4_chan #(
     /* drc_t(Q2.22) × gain_t(Q7.8) = Q9.30；收回 Q2.22 就是右移 30-22 = 8 位。
      * 不是 FRAC_DRC-8（那是把小数点搞反了），写成 14 会让输出整体小 64 倍。 */
     localparam integer SH_GAIN = 8;
-    localparam USE_WDRC = ((ATK != 0) || (REL != 0)) ? 1'b1 : 1'b0;
 
-    localparam signed [DW-1:0]   THR24 = THR;
-    localparam signed [DW-1:0]   OMR24 = ({{(DW-1){1'b0}}, 1'b1} <<< FRAC_DRC) - RATIO;
+    /* ---- 运行期参数（2026-10-28 批 2）----------------------------------
+     * 原来 THR/RATIO/ATK/REL 是 localparam，编译期就把通路选死了。
+     * 现在：
+     *   · omr_r  = 2^FRAC_DRC − ratio_i（"剩余斜率"），**先打一拍**再用 ——
+     *     ratio 很少变，寄存器化之后乘法器输入仍是寄存器，不吃时序；
+     *   · use_wdrc_r = (atk != 0) || (rel != 0)，同样打一拍，用来选包络更新方式。
+     * 两者都不跟 rst 走：它们只是参数的影子，复位期间保持上一次的值无害。 */
+    wire use_wdrc = (atk_i != {DW{1'b0}}) || (rel_i != {DW{1'b0}});
+
+    wire signed [DW:0] omr_w = ({{(DW-1){1'b0}}, 1'b1} <<< FRAC_DRC)
+                             - {{1{ratio_i[DW-1]}}, ratio_i};
+
+    reg  signed [DW-1:0] omr_r;
+    reg                  use_wdrc_r;
+
+    initial begin
+        omr_r      = {DW{1'b0}};
+        use_wdrc_r = 1'b0;
+    end
 
     /* 饱和到 drc_t。输入位宽 48 够装最大的那笔乘积（25×24）。
      * 用窄函数而不是 64 位比较 —— 64 位比较器单独就要两级 CARRY4。 */
@@ -164,85 +187,85 @@ module fir_drc4_chan #(
 
     assign env_o = env_r;
 
-    /* ---------------- 级 3：包络增量 (a − env) × 步进 ---------------- */
+    /* ---------------- 级 3：包络增量 (a − env)，差先打一拍 ---------------- */
     /* env 是 24 位有符号、a 也是，差最多 25 位；步进用**全宽** DW 位。
      * 别为了省位宽把步进截成 15 位 —— ATK=17408 超过 15 位有符号的上限
      * 16383，截完变成 −15360，包络一步都涨不上去，输出却只是"压得不够"，
-     * 看起来像参数没调好。25 × 24 = 49，用 49 位装。 */
+     * 看起来像参数没调好。25 × 24 = 49，用 49 位装。
+     *
+     * 2026-10-28 批 2 收尾：这四件事原来挤在一拍里（p_a → 25 位减法 → 步进
+     * 选择 → DSP 乘法 → p_prod），参数变成寄存器之后综合出来 10.1 ns /
+     * 8 级 CARRY4 + DSP，WNS −1.612 ns、529 个失败端点全是这一条。
+     * 现在把差和步进先打一拍，乘法单独占一拍：流水 9 → 10 级。
+     * 硬件里相邻两段采样隔 2083 拍（48 kHz @100 MHz），多一级不改变任何
+     * 数值 —— 只是把「同一个采样的包络更新」往后挪一拍，数据侧同步挪，
+     * 对拍逐位不变。 */
     wire signed [24:0]   diff = {{1{p_a[23]}}, p_a} - {{1{env_r[23]}}, env_r};
-    wire signed [DW-1:0] step = (diff > 0) ? ATK : REL;
-    wire signed [48:0]   prod = diff * step;
+    wire signed [DW-1:0] step = (diff > 0) ? atk_i : rel_i;
+
+    reg signed [24:0]   p_diff;
+    reg signed [DW-1:0] p_step;
+
+    /* 级 4：乘法（DSP） */
+    wire signed [48:0]   prod = p_diff * p_step;
 
     reg signed [48:0] p_prod;
-    reg signed [DW-1:0] p_a2;
-    reg signed [DW-1:0] p_gain2;
-    reg                 p_neg2;
 
-    /* ---------------- 级 4：env += 增量 ---------------- */
+    /* ---------------- 级 5：env += 增量 ---------------- */
     wire signed [47:0]   inc  = p_prod >>> FRAC_DRC;
     wire signed [47:0]   esum = {{24{env_r[23]}}, env_r} + inc;
     wire signed [DW-1:0] en   = satd(esum);
     wire signed [DW-1:0] enp  = (en < 0) ? {DW{1'b0}} : en;
 
-    reg signed [DW-1:0] p_a3;
-    reg signed [DW-1:0] p_gain3;
-    reg                 p_neg3;
-
-    /* ---------------- 级 5：env − thr ---------------- */
-    wire signed [24:0]   ex  = {{1{env_r[23]}}, env_r} - {{1{THR24[23]}}, THR24};
-    wire                 epos = (env_r > THR24);
+    /* ---------------- 级 6：env − thr ---------------- */
+    wire signed [24:0]   ex  = {{1{env_r[23]}}, env_r} - {{1{thr_i[23]}}, thr_i};
+    wire                 epos = (env_r > thr_i);
 
     reg signed [24:0]   p_ex;
     reg                 p_epos;
-    reg signed [DW-1:0] p_a4;
-    reg signed [DW-1:0] p_gain4;
-    reg                 p_neg4;
 
-    /* ---------------- 级 6：衰减量 gr 的乘法 + 右移 ---------------- */
+    /* ---------------- 级 7：衰减量 gr 的乘法 + 右移 ---------------- */
     /* 25 × 24 = 49 位，用 49 位装，别扩到 64。
      *
      * `>>>22` 和 48 位饱和比较**必须分两拍**。挤在一拍里是整机时序的唯一失败点：
      * 2026-10-25 实测 WNS −0.140 ns、44 个失败端点**全部**是
      * `u_b{0,2,3}/p_gr_reg[*]/D`，路径是 DSP 的 gr_p → 右移 → 48 位比较 → 寄存器，
-     * 12 级 CARRY4、9.921 ns。拆开之后这条降到 6 ns 量级，流水 8 → 9 级。 */
-    wire signed [48:0]   gr_p = p_ex * OMR24;
+     * 12 级 CARRY4、9.921 ns。拆开之后这条降到 6 ns 量级。 */
+    wire signed [48:0]   gr_p = p_ex * omr_r;
     wire signed [47:0]   gr_s = gr_p >>> FRAC_DRC;
 
     reg signed [47:0]    p_grs;      // 移位结果，下一拍再判饱和
     reg                  p_epos6;
 
-    /* 数据侧多出来的那一级（原来 p_a5 和 p_gr 对齐，现在 p_gr 晚一拍，靠 p_a6 追） */
-    reg signed [DW-1:0]  p_a5;
-    reg signed [DW-1:0]  p_gain5;
-    reg                  p_neg5;
-
     wire signed [DW-1:0] gr   = p_epos6 ? satd(p_grs) : {DW{1'b0}};
 
     reg signed [DW-1:0] p_gr;
     assign gr_o = p_gr;    /* 用寄存后那份，和参与减法的同拍 */
-    reg signed [DW-1:0] p_a6;
-    reg signed [DW-1:0] p_gain6;
-    reg                 p_neg6;
 
-    /* ---------------- 级 8：a2 = a − gr，带符号 ----------------
-     * p_gr 比原来晚一拍（移位和饱和拆开了），所以数据侧也跟着多用一级 p_a6。 */
-    wire signed [24:0]   a2w  = {{1{p_a6[23]}}, p_a6} - {{1{p_gr[23]}}, p_gr};
+    /* ---------------- 数据侧延迟线 ----------------
+     * p_a（t+3）之后一共 6 级：
+     *   p_a4 和 p_a3 之后的一拍对齐、p_a5 和 p_ex 同拍、
+     *   p_a6 和 p_grs 同拍、p_a7 和 p_gr 同拍。
+     * 中间那几级没有任何运算，只是为了把 |a| 拖到减法那一拍。 */
+    reg signed [DW-1:0] p_a2, p_a3, p_a4, p_a5, p_a6, p_a7;
+    reg                 p_neg2, p_neg3, p_neg4, p_neg5, p_neg6, p_neg7;
+
+    /* ---------------- 级 9：a2 = a − gr，带符号 ---------------- */
+    wire signed [24:0]   a2w  = {{1{p_a7[23]}}, p_a7} - {{1{p_gr[23]}}, p_gr};
     wire signed [24:0]   a2wc = (a2w < 0) ? 25'sd0 : a2w;
-    wire signed [47:0]   yv_w = p_neg6 ? -{{23{a2wc[24]}}, a2wc}
+    wire signed [47:0]   yv_w = p_neg7 ? -{{23{a2wc[24]}}, a2wc}
                                       : {{23{a2wc[24]}}, a2wc};
 
-    /* legacy：a <= thr 原样放过；否则 sign*(thr + (a-thr)*ratio) */
-    wire signed [48:0] leg_p = {{24{p_a6[23]}}, p_a6} - {{24{THR24[23]}}, THR24};
-    wire signed [48:0] leg_m = leg_p * RATIO;
-    wire signed [48:0] leg_n = ({{25{THR24[23]}}, THR24} <<< FRAC_DRC) + leg_m;
-    wire signed [47:0] leg_y = leg_n >>> FRAC_DRC;
-    wire signed [47:0] yv_l  = (p_a6 <= THR24) ? {{24{p_gain6[23]}}, p_gain6}
-                                               : (p_neg6 ? -leg_y : leg_y);
-    wire signed [47:0] yv_sel = USE_WDRC ? yv_w : yv_l;
+    /* legacy 那条"无记忆"通路已经删掉了（2026-10-28 批 2）：
+     * ATK=REL=0 时把包络改成瞬时值（见下面 env_r 的更新），输出 = thr + (a−thr)·ratio，
+     * 就是 HLS `drc()` 的式子。唯一差别是余数取整方向（这里是 ceil，HLS 写的是 floor），
+     * 最多差 1 LSB —— 对拍按 ±1 判，听不出来。
+     * 这样做的原因是资源与时序：保留两条真通路要多 4 个 24×24 乘法器，
+     * 而且 legacy 那串「乘法 → 移位 → 加法」挤在最后一拍，WNS 只剩 +0.25 ns。 */
 
     /* ---------------- 寄存器 ---------------- */
-    /* 8 位：in_vld 延迟 1..8 拍，yv 在 t+9 有效，所以用 vpipe[7] 对齐 */
-    reg [7:0] vpipe;
+    /* 9 位：in_vld 延迟 1..9 拍，yv 在 t+10 有效，所以用 vpipe[8] 对齐 */
+    reg [8:0] vpipe;
 
     always @(posedge clk) begin
         if (rst) begin
@@ -250,79 +273,85 @@ module fir_drc4_chan #(
             p_band  <= {DW{1'b0}};
             p_gb    <= {DW{1'b0}};
             p_a     <= {DW{1'b0}};
-            p_gain  <= {DW{1'b0}};
             p_neg   <= 1'b0;
+            p_diff  <= 25'sd0;
+            p_step  <= {DW{1'b0}};
             p_prod  <= 49'sd0;
             p_a2    <= {DW{1'b0}};
-            p_gain2 <= {DW{1'b0}};
             p_neg2  <= 1'b0;
             p_a3    <= {DW{1'b0}};
-            p_gain3 <= {DW{1'b0}};
             p_neg3  <= 1'b0;
+            p_a4    <= {DW{1'b0}};
+            p_neg4  <= 1'b0;
+            p_a5    <= {DW{1'b0}};
+            p_neg5  <= 1'b0;
+            p_a6    <= {DW{1'b0}};
+            p_neg6  <= 1'b0;
+            p_a7    <= {DW{1'b0}};
+            p_neg7  <= 1'b0;
             p_ex    <= 25'sd0;
             p_epos  <= 1'b0;
-            p_a4    <= {DW{1'b0}};
-            p_gain4 <= {DW{1'b0}};
-            p_neg4  <= 1'b0;
             p_grs   <= 48'sd0;
             p_epos6 <= 1'b0;
             p_gr    <= {DW{1'b0}};
-            p_a6    <= {DW{1'b0}};
-            p_gain6 <= {DW{1'b0}};
-            p_neg6  <= 1'b0;
-            p_a5    <= {DW{1'b0}};
-            p_gain5 <= {DW{1'b0}};
-            p_neg5  <= 1'b0;
-            vpipe   <= 8'd0;
+            vpipe   <= 9'd0;
             yv      <= {DW{1'b0}};
             yv_vld  <= 1'b0;
         end else begin
+            /* 参数影子：不跟 rst，复位期间保持上一次的值无害 */
+            omr_r      <= omr_w[DW-1:0];
+            use_wdrc_r <= use_wdrc;
+
             /* 级 0..2 */
             p_band <= gb0;
             p_gb   <= gb1;
             p_a    <= aabs;
-            p_gain <= p_gb;
             p_neg  <= p_gb[DW-1];
 
-            /* 级 3 */
-            p_prod  <= prod;
-            p_a2    <= p_a;
-            p_gain2 <= p_gain;
-            p_neg2  <= p_neg;
+            /* 级 3：差与步进打一拍（乘法单独占下一拍） */
+            p_diff <= diff;
+            p_step <= step;
+            p_a2   <= p_a;
+            p_neg2 <= p_neg;
 
-            /* 级 4：只在真采样进来时更新包络。
-             * p_prod 在 t+4 有效，那时 vpipe[3] 正好是 1（in_vld 延迟 3 拍）。
-             * 写成 vpipe[1] 会把上一拍残留的 p_prod 算进去 —— 包络整个错位。 */
-            if (vpipe[3]) env_r <= enp;
-            p_a3    <= p_a2;
-            p_gain3 <= p_gain2;
-            p_neg3  <= p_neg2;
+            /* 级 4：乘法 */
+            p_prod <= prod;
+            p_a3   <= p_a2;
+            p_neg3 <= p_neg2;
 
-            /* 级 5 */
-            p_ex    <= ex;
-            p_epos  <= epos;
-            p_a4    <= p_a3;
-            p_gain4 <= p_gain3;
-            p_neg4  <= p_neg3;
+            /* 级 5：只在真采样进来时更新包络。
+             * p_prod 在 t+5 有效，那时 vpipe[4] 正好是 1（in_vld 延迟 4 拍）。
+             * 写成别的下标会把上一拍残留的 p_prod 算进去 —— 包络整个错位。
+             *
+             * ATK=REL=0（无记忆压缩）时直接写 p_a3 —— 那一拍 p_a3 正好是同
+             * 一个采样的 |a|（p_a 打两拍、p_prod 从 p_diff 出来也是两拍），于是
+             * 包络 = 瞬时幅度，走出来的就是 thr + (a−thr)·ratio。 */
+            if (vpipe[4]) env_r <= use_wdrc_r ? enp : p_a3;
+            p_a4   <= p_a3;
+            p_neg4 <= p_neg3;
 
-            /* 级 6：乘法 + 右移，先存下来 */
+            /* 级 6：env − thr（p_ex 比数据晚一拍，靠 p_a5 对齐） */
+            p_ex   <= ex;
+            p_epos <= epos;
+            p_a5   <= p_a4;
+            p_neg5 <= p_neg4;
+
+            /* 级 7：乘法 + 右移，先存下来 */
             p_grs   <= gr_s;
             p_epos6 <= p_epos;
-            p_a5    <= p_a4;
-            p_gain5 <= p_gain4;
-            p_neg5  <= p_neg4;
-
-            /* 级 7：饱和到 drc_t */
-            p_gr    <= gr;
             p_a6    <= p_a5;
-            p_gain6 <= p_gain5;
             p_neg6  <= p_neg5;
 
-            /* 级 8 */
-            yv     <= satd(yv_sel);
-            yv_vld <= vpipe[7];
+            /* 级 8：饱和到 drc_t */
+            p_gr   <= gr;
+            p_a7   <= p_a6;
+            p_neg7 <= p_neg6;
 
-            vpipe <= {vpipe[6:0], in_vld};
+            /* 级 9 */
+            yv     <= satd(yv_w);
+            yv_vld <= vpipe[8];
+
+            vpipe <= {vpipe[7:0], in_vld};
         end
     end
 
@@ -335,27 +364,7 @@ module fir_drc4 #(
     parameter integer DW        = 24,
     parameter integer FRAC_ACC  = 32,
     parameter integer FRAC_DRC  = 22,
-    parameter integer OUT_SHIFT = 17,
-    parameter signed [DW-1:0] THR0   = 24'sd419456,
-    parameter signed [DW-1:0] RATIO0 = 24'sd2936064,
-    parameter signed [DW-1:0] ATK0   = 24'sd17408,
-    parameter signed [DW-1:0] REL0   = 24'sd896,
-    parameter signed [15:0]   GAIN0  = 16'sd256,
-    parameter signed [DW-1:0] THR1   = 24'sd419456,
-    parameter signed [DW-1:0] RATIO1 = 24'sd2936064,
-    parameter signed [DW-1:0] ATK1   = 24'sd17408,
-    parameter signed [DW-1:0] REL1   = 24'sd896,
-    parameter signed [15:0]   GAIN1  = 16'sd256,
-    parameter signed [DW-1:0] THR2   = 24'sd419456,
-    parameter signed [DW-1:0] RATIO2 = 24'sd2936064,
-    parameter signed [DW-1:0] ATK2   = 24'sd17408,
-    parameter signed [DW-1:0] REL2   = 24'sd896,
-    parameter signed [15:0]   GAIN2  = 16'sd256,
-    parameter signed [DW-1:0] THR3   = 24'sd419456,
-    parameter signed [DW-1:0] RATIO3 = 24'sd2936064,
-    parameter signed [DW-1:0] ATK3   = 24'sd17408,
-    parameter signed [DW-1:0] REL3   = 24'sd896,
-    parameter signed [15:0]   GAIN3  = 16'sd256
+    parameter integer OUT_SHIFT = 17
 ) (
     input  wire                  clk,
     input  wire                  rst,
@@ -370,6 +379,25 @@ module fir_drc4 #(
     input  wire signed [15:0]    gain1,
     input  wire signed [15:0]    gain2,
     input  wire signed [15:0]    gain3,
+    /* 2026-10-28 批 2：四段 DRC 参数（Q2.22，24 位有符号），全部运行期。
+     * 出厂值 = v25：thr 419456 / ratio 2936064 / atk 17408 / rel 896。
+     * atk 与 rel 同时为 0 时切"无记忆"，见 fir_drc4_chan 的注释。 */
+    input  wire signed [DW-1:0]  thr0,
+    input  wire signed [DW-1:0]  thr1,
+    input  wire signed [DW-1:0]  thr2,
+    input  wire signed [DW-1:0]  thr3,
+    input  wire signed [DW-1:0]  ratio0,
+    input  wire signed [DW-1:0]  ratio1,
+    input  wire signed [DW-1:0]  ratio2,
+    input  wire signed [DW-1:0]  ratio3,
+    input  wire signed [DW-1:0]  atk0,
+    input  wire signed [DW-1:0]  atk1,
+    input  wire signed [DW-1:0]  atk2,
+    input  wire signed [DW-1:0]  atk3,
+    input  wire signed [DW-1:0]  rel0,
+    input  wire signed [DW-1:0]  rel1,
+    input  wire signed [DW-1:0]  rel2,
+    input  wire signed [DW-1:0]  rel3,
     output reg  signed [15:0]    y,
     output reg                   y_vld,
     /* 2026-10-28 批 1：四段包络/衰减量观察口，4×DW 位打包（段0 在最低位） */
@@ -392,29 +420,29 @@ module fir_drc4 #(
     wire signed [DW-1:0] yv0, yv1, yv2, yv3;
     wire                 v0,  v1,  v2,  v3;
 
-    fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
-                    .THR(THR0), .RATIO(RATIO0), .ATK(ATK0), .REL(REL0))
+    fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC))
     u_b0 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band0),
             .env_o(env_o[0*DW +: DW]), .gr_o(gr_o[0*DW +: DW]),
-            .gain_i(gain0), .yv(yv0), .yv_vld(v0));
+            .gain_i(gain0), .thr_i(thr0), .ratio_i(ratio0),
+            .atk_i(atk0), .rel_i(rel0), .yv(yv0), .yv_vld(v0));
 
-    fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
-                    .THR(THR1), .RATIO(RATIO1), .ATK(ATK1), .REL(REL1))
+    fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC))
     u_b1 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band1),
             .env_o(env_o[1*DW +: DW]), .gr_o(gr_o[1*DW +: DW]),
-            .gain_i(gain1), .yv(yv1), .yv_vld(v1));
+            .gain_i(gain1), .thr_i(thr1), .ratio_i(ratio1),
+            .atk_i(atk1), .rel_i(rel1), .yv(yv1), .yv_vld(v1));
 
-    fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
-                    .THR(THR2), .RATIO(RATIO2), .ATK(ATK2), .REL(REL2))
+    fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC))
     u_b2 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band2),
             .env_o(env_o[2*DW +: DW]), .gr_o(gr_o[2*DW +: DW]),
-            .gain_i(gain2), .yv(yv2), .yv_vld(v2));
+            .gain_i(gain2), .thr_i(thr2), .ratio_i(ratio2),
+            .atk_i(atk2), .rel_i(rel2), .yv(yv2), .yv_vld(v2));
 
-    fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
-                    .THR(THR3), .RATIO(RATIO3), .ATK(ATK3), .REL(REL3))
+    fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC))
     u_b3 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band3),
             .env_o(env_o[3*DW +: DW]), .gr_o(gr_o[3*DW +: DW]),
-            .gain_i(gain3), .yv(yv3), .yv_vld(v3));
+            .gain_i(gain3), .thr_i(thr3), .ratio_i(ratio3),
+            .atk_i(atk3), .rel_i(rel3), .yv(yv3), .yv_vld(v3));
 
     /* drc_t(Q2.22) 加到 acc_t(Q8.32)：小数位差 10，左移 10。
      * 四段都 ≤ 2^23，<<10 之后 ≤ 2^33，四项相加 ≤ 2^35，40 位装得下。 */

@@ -152,6 +152,13 @@ module fir_rtl_shell #(
     wire signed [15:0] drc_y;
     wire               drc_y_vld;
 
+    /* DRC 四参数在 2026-10-28 批 2 也改成运行期端口了。这两个 shell 不接
+     * 寄存器文件，所以在这里绑回 v25 的出厂值 —— 和端口化之前逐位相同。 */
+    localparam signed [23:0] D_THR = 24'sd419456;    // 3277(Q1.15) << 7
+    localparam signed [23:0] D_RAT = 24'sd2936064;   // 22938(Q1.15) << 7 = 0.7
+    localparam signed [23:0] D_ATK = 24'sd17408;     // 136 << 7 = 5 ms
+    localparam signed [23:0] D_REL = 24'sd896;       // 7 << 7 = 100 ms
+
     fir_drc4 u_drc (
         .clk    (clk),
         .rst    (fe_rst),
@@ -166,6 +173,10 @@ module fir_rtl_shell #(
         .gain1  (16'sd256),
         .gain2  (16'sd256),
         .gain3  (16'sd256),
+        .thr0   (D_THR), .thr1   (D_THR), .thr2   (D_THR), .thr3   (D_THR),
+        .ratio0 (D_RAT), .ratio1 (D_RAT), .ratio2 (D_RAT), .ratio3 (D_RAT),
+        .atk0   (D_ATK), .atk1   (D_ATK), .atk2   (D_ATK), .atk3   (D_ATK),
+        .rel0   (D_REL), .rel1   (D_REL), .rel2   (D_REL), .rel3   (D_REL),
         .y      (drc_y),
         .y_vld  (drc_y_vld)
     );

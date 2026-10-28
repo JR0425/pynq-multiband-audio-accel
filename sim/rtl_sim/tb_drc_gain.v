@@ -17,6 +17,12 @@ module tb_drc_gain;
     reg clk = 0, rst = 1, in_vld = 0;
     reg signed [AW-1:0] b0, b1, b2, b3;
     reg signed [15:0]  g0, g1, g2, g3;
+    /* 2026-10-28 批 2：DRC 四参数也是端口了。这里绑 v25 出厂值，
+     * 参考模块用的是同样的编译期常量，所以判据 1 仍然逐位可比。 */
+    reg signed [23:0]  t0, t1, t2, t3;
+    reg signed [23:0]  r0, r1, r2, r3;
+    reg signed [23:0]  k0, k1, k2, k3;
+    reg signed [23:0]  e0, e1, e2, e3;
 
     wire signed [15:0] y_ref, y_new;
     wire               v_ref, v_new;
@@ -31,6 +37,10 @@ module tb_drc_gain;
         .clk(clk), .rst(rst), .in_vld(in_vld),
         .band0(b0), .band1(b1), .band2(b2), .band3(b3),
         .gain0(g0), .gain1(g1), .gain2(g2), .gain3(g3),
+        .thr0(t0), .thr1(t1), .thr2(t2), .thr3(t3),
+        .ratio0(r0), .ratio1(r1), .ratio2(r2), .ratio3(r3),
+        .atk0(k0), .atk1(k1), .atk2(k2), .atk3(k3),
+        .rel0(e0), .rel1(e1), .rel2(e2), .rel3(e3),
         .y(y_new), .y_vld(v_new)
     );
 
@@ -57,19 +67,29 @@ module tb_drc_gain;
         end
     endtask
 
-    /* 每拍比一次：两个模块的 y/y_vld 是同拍输出。
+    /* 新模块 2026-10-28 批 2 多了一级流水（差分与步进单独打一拍，见 fir_drc4.v
+     * 级 3 的注释），所以它的输出比参考模块晚一拍。这里把**参考模块**的输出
+     * 再延一拍去追新模块，判据仍然是逐位。 */
+    reg signed [15:0] y_ref_d;
+    reg               v_ref_d;
+    always @(posedge clk) begin
+        y_ref_d <= y_ref;
+        v_ref_d <= v_ref;
+    end
+
+    /* 每拍比一次：ref 与「延一拍后的 new」是同拍输出。
      * maxabs 的统计必须在 cmp_en 之外 —— 判据 2/3 关掉比对之后还要看幅度。 */
     always @(negedge clk) begin
         if (!rst) begin
             if (cmp_en) begin
-                if (v_ref !== v_new) begin
+                if (v_ref_d !== v_new) begin
                     errs = errs + 1;
-                    if (errs <= 5) $display("  失配 vld: ref=%b new=%b", v_ref, v_new);
+                    if (errs <= 5) $display("  失配 vld: ref=%b new=%b", v_ref_d, v_new);
                 end
-                if (v_ref && (y_ref !== y_new)) begin
+                if (v_ref_d && (y_ref_d !== y_new)) begin
                     errs = errs + 1;
                     if (errs <= 5)
-                        $display("  失配 y: ref=%0d new=%0d", $signed(y_ref), $signed(y_new));
+                        $display("  失配 y: ref=%0d new=%0d", $signed(y_ref_d), $signed(y_new));
                 end
             end
             if (v_new && meas) begin
@@ -85,6 +105,10 @@ module tb_drc_gain;
 
     initial begin
         g0 = 16'sd256; g1 = 16'sd256; g2 = 16'sd256; g3 = 16'sd256;
+        t0 = 24'sd419456; t1 = t0; t2 = t0; t3 = t0;
+        r0 = 24'sd2936064; r1 = r0; r2 = r0; r3 = r0;
+        k0 = 24'sd17408; k1 = k0; k2 = k0; k3 = k0;
+        e0 = 24'sd896;   e1 = e0; e2 = e0; e3 = e0;
         b0 = 0; b1 = 0; b2 = 0; b3 = 0;
 
         repeat (4) @(posedge clk);
@@ -98,7 +122,7 @@ module tb_drc_gain;
             in_vld = 1;
             @(posedge clk);
             in_vld = 0;
-            repeat (2) @(posedge clk);
+            repeat (4) @(posedge clk);
         end
         repeat (16) @(posedge clk);
         if (errs == 0 && nout > 2900)
@@ -119,7 +143,7 @@ module tb_drc_gain;
         for (i = 0; i < 40; i = i + 1) begin
             b0 = 40'sh0100_0000; b1 = 40'sh0100_0000;
             b2 = 40'sh0100_0000; b3 = 40'sh0100_0000;
-            in_vld = 1; @(posedge clk); in_vld = 0; repeat (2) @(posedge clk);
+            in_vld = 1; @(posedge clk); in_vld = 0; repeat (4) @(posedge clk);
             if (i == 5) begin maxabs = 0; meas = 1'b1; end   /* 前面几个是流水尾巴 */
         end
         repeat (16) @(posedge clk);
@@ -132,7 +156,7 @@ module tb_drc_gain;
             if (i == 10) begin maxabs = 0; meas = 1'b1; end
             b0 = 40'sh0100_0000; b1 = 40'sh0100_0000;
             b2 = 40'sh0100_0000; b3 = 40'sh0100_0000;
-            in_vld = 1; @(posedge clk); in_vld = 0; repeat (2) @(posedge clk);
+            in_vld = 1; @(posedge clk); in_vld = 0; repeat (4) @(posedge clk);
         end
         repeat (16) @(posedge clk);
         ymax_db18 = maxabs;
@@ -152,7 +176,7 @@ module tb_drc_gain;
             if (i == 10) begin maxabs = 0; meas = 1'b1; end
             b0 = 40'sh7000_0000; b1 = 40'sh7000_0000;
             b2 = 40'sh7000_0000; b3 = 40'sh7000_0000;
-            in_vld = 1; @(posedge clk); in_vld = 0; repeat (2) @(posedge clk);
+            in_vld = 1; @(posedge clk); in_vld = 0; repeat (4) @(posedge clk);
         end
         repeat (16) @(posedge clk);
         if (maxabs == 32767)

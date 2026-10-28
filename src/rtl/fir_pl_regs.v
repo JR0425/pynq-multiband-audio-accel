@@ -56,9 +56,15 @@ module fir_pl_regs #(
     output wire [31:0] ctrl,          // bit0 run / 1 drc_en / 2 flush(自清) / 3 mpo / 4 tone / 5 src / 8 clr
     output wire        clr_pulse,     // 单拍脉冲:清计数器
 
-    /* ---- 参数组(打包,高位在前) ---- */
-    output wire [127:0] gain_b0, thr_b0, ratio_b0, atk_b0, rel_b0,
-    output wire [127:0] gain_b1, thr_b1, ratio_b1, atk_b1, rel_b1,
+    /* ---- 参数组(打包,高位在前) ----
+     * 位宽直接按下游 `fir_pl_direct` 的用法裁好：增益每段 16 位、其余每段 24 位。
+     * 2026-10-28 晚修：这里原本是 128 位(每段 32 位)，BD 里用 xlslice 取 [63:0] 再当
+     * 四个 16 位用 —— 四段 32 位打包后 seg1 落在 [63:32]，取低 64 位得到的是
+     * {seg0 高 16, seg0 低 16, seg1 高 16, seg1 低 16}，于是 b1/b3 段吃到的增益恒 0、
+     * b2 段吃到 b1 的值。批 1 位流就这样跑过去了（四段同增益所以只听得出"变响了"）。 */
+    output wire [63:0]  gain_b0, gain_b1,                        // 四段 × 16 位 Q7.8
+    output wire [95:0]  thr_b0, ratio_b0, atk_b0, rel_b0,        // 四段 × 24 位
+    output wire [95:0]  thr_b1, ratio_b1, atk_b1, rel_b1,
     output wire [15:0]  ramp_div_b0, ramp_div_b1,
 
     /* ---- 其余控制 ---- */
@@ -117,8 +123,12 @@ module fir_pl_regs #(
             gain_r[i]  = 32'd256;      // 0 dB
             thr_r[i]   = 32'd419456;   // 3277(Q1.15) << 7 = -20 dBFS
             ratio_r[i] = 32'd2936064;  // 22938(Q1.15) << 7 = 0.7
-            atk_r[i]   = 32'd0;        // 不启用 -> 无记忆压缩
-            rel_r[i]   = 32'd0;        // 同上
+            /* 2026-10-28 批 2：ATK/REL 原来是 0（= 无记忆压缩）。四参数改成
+             * 运行期之后，0 仍然是"无记忆"的合法选择，但**出厂值必须是 v25
+             * 那套 WDRC 参数**，否则批 2 位流一上电听着就和批 1 不一样。
+             * 136/7 是 Q1.15 的原始整数，核里 <<7 → 17408 / 896。 */
+            atk_r[i]   = 32'd17408;    // 136 << 7 = 5 ms
+            rel_r[i]   = 32'd896;      // 7   << 7 = 100 ms
         end
         /* RAMP_DIV 默认 0 = 每采样走 1 LSB 的线性斜坡（寄存器表 v25 约定）。
          * 2026-10-28 教训：这里的 +0x70 是 **bank 内相对偏移**，bank0 绝对地址
@@ -325,16 +335,18 @@ module fir_pl_regs #(
 
     assign ctrl = ctrl_reg;
 
-    assign gain_b0  = {gain_r[3],  gain_r[2],  gain_r[1],  gain_r[0]};
-    assign gain_b1  = {gain_r[7],  gain_r[6],  gain_r[5],  gain_r[4]};
-    assign thr_b0   = {thr_r[3],   thr_r[2],   thr_r[1],   thr_r[0]};
-    assign thr_b1   = {thr_r[7],   thr_r[6],   thr_r[5],   thr_r[4]};
-    assign ratio_b0 = {ratio_r[3], ratio_r[2], ratio_r[1], ratio_r[0]};
-    assign ratio_b1 = {ratio_r[7], ratio_r[6], ratio_r[5], ratio_r[4]};
-    assign atk_b0   = {atk_r[3],   atk_r[2],   atk_r[1],   atk_r[0]};
-    assign atk_b1   = {atk_r[7],   atk_r[6],   atk_r[5],   atk_r[4]};
-    assign rel_b0   = {rel_r[3],   rel_r[2],   rel_r[1],   rel_r[0]};
-    assign rel_b1   = {rel_r[7],   rel_r[6],   rel_r[5],   rel_r[4]};
+    /* 打包一律「高位在前」，且只留下游要的低位宽：增益 16 位、其余 24 位。
+     * gain_r 是有符号 Q7.8，截低 16 位就是它的二进制补码，负增益照样对。 */
+    assign gain_b0  = {gain_r[3][15:0],  gain_r[2][15:0],  gain_r[1][15:0],  gain_r[0][15:0]};
+    assign gain_b1  = {gain_r[7][15:0],  gain_r[6][15:0],  gain_r[5][15:0],  gain_r[4][15:0]};
+    assign thr_b0   = {thr_r[3][23:0],   thr_r[2][23:0],   thr_r[1][23:0],   thr_r[0][23:0]};
+    assign thr_b1   = {thr_r[7][23:0],   thr_r[6][23:0],   thr_r[5][23:0],   thr_r[4][23:0]};
+    assign ratio_b0 = {ratio_r[3][23:0], ratio_r[2][23:0], ratio_r[1][23:0], ratio_r[0][23:0]};
+    assign ratio_b1 = {ratio_r[7][23:0], ratio_r[6][23:0], ratio_r[5][23:0], ratio_r[4][23:0]};
+    assign atk_b0   = {atk_r[3][23:0],   atk_r[2][23:0],   atk_r[1][23:0],   atk_r[0][23:0]};
+    assign atk_b1   = {atk_r[7][23:0],   atk_r[6][23:0],   atk_r[5][23:0],   atk_r[4][23:0]};
+    assign rel_b0   = {rel_r[3][23:0],   rel_r[2][23:0],   rel_r[1][23:0],   rel_r[0][23:0]};
+    assign rel_b1   = {rel_r[7][23:0],   rel_r[6][23:0],   rel_r[5][23:0],   rel_r[4][23:0]};
 
     assign ramp_div_b0 = ramp_r[0];
     assign ramp_div_b1 = ramp_r[1];

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# 增益端口化 + 斜坡的两组仿真
-#   1) tb_drc_gain  ：与改动前的 fir_drc4 逐位对拍（gain=256），再验 +18 dB 生效与饱和
-#   2) tb_gain_ramp ：斜坡单调、无阶跃、能到底、clr 直接对齐
+# 增益/DRC 参数端口化的四组仿真
+#   1) tb_drc_gain ：与改动前的 fir_drc4 逐位对拍（gain=256 + 出厂 DRC 参数）
+#   2) tb_drc_chan ：单段 vs HLS 公式（wdrc 逐位、drc ±1、ratio=1 直通）
+#   3) tb_gain_ramp：斜坡单调、无阶跃、能到底、clr 直接对齐
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SIM="$ROOT/sim/rtl_sim"
@@ -25,16 +26,21 @@ run_one () {
     if grep -q "=== 全部通过 ===" xsim.log; then return 0; else return 1; fi
 }
 
-echo "########## 1/2  DRC 增益端口化（逐位对拍） ##########"
+echo "########## 1/3  DRC 增益端口化（逐位对拍） ##########"
 W() { cygpath -w "$1"; }
 files="$(W "$ROOT/src/rtl/fir_drc4.v") $(W "$SIM/ref/fir_drc4_ref.v") $(W "$SIM/tb_drc_gain.v")"
 run_one drc_gain tb_drc_gain "$files" || rc=1
 
 echo
-echo "########## 2/2  增益斜坡 ##########"
+echo "########## 2/3  DRC 四参数 vs HLS 公式 ##########"
+files="$(W "$ROOT/src/rtl/fir_drc4.v") $(W "$SIM/tb_drc_chan.v")"
+run_one drc_chan tb_drc_chan "$files" || rc=1
+
+echo
+echo "########## 3/3  增益斜坡 ##########"
 files="$(W "$ROOT/src/rtl/fir_gain_ramp.v") $(W "$SIM/tb_gain_ramp.v")"
 run_one gain_ramp tb_gain_ramp "$files" || rc=1
 
 echo
-[ $rc -eq 0 ] && echo "===== 两组仿真都通过 =====" || echo "===== 有失败，看上面 ====="
+[ $rc -eq 0 ] && echo "===== 三组仿真都通过 =====" || echo "===== 有失败，看上面 ====="
 exit $rc

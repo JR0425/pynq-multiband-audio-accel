@@ -155,9 +155,10 @@ set regs [create_bd_cell -type module -reference fir_pl_regs fir_pl_regs_0]
 puts "==== fir_pl_regs_0 的引脚 ===="
 foreach p [get_bd_pins -quiet fir_pl_regs_0/*] { puts "  $p" }
 
-# gain_b0 是 128 位（四段各 32 位，低 16 位有效），要取 [63:0] 才是四段 16 位
-set gain_slice [create_bd_cell -type ip -vlnv xilinx.com:ip:xlslice:1.0 gain_slice]
-set_property -dict [list   CONFIG.DIN_WIDTH {128} CONFIG.DIN_FROM {63} CONFIG.DIN_TO {0} CONFIG.DOUT_WIDTH {64} ] $gain_slice
+# 参数包直连：fir_pl_regs 的输出位宽已经按 fir_pl_direct 的需要裁好
+# （增益每段 16 位 → 64 位；thr/ratio/atk/rel 每段 24 位 → 96 位），
+# 所以这里不再需要 xlslice。之前的接法是 128 位打包 + 取 [63:0] 再当四个 16 位用，
+# 结果 b1/b3 段吃到 0、b2 段吃到 b1 的值（批 1 位流就带着这个 bug）。
 
 # 只读输入先全部接 0（电平表/包络/播放/抓取都还没实现）
 set z128 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z128]
@@ -233,11 +234,13 @@ connect_bd_net [get_bd_pins gpio_stat2/gpio_io_i] [get_bd_pins fir_pl_direct_0/s
 connect_bd_net [get_bd_pins gpio_dbg/gpio_io_i]   [get_bd_pins fir_pl_direct_0/dbg0]
 connect_bd_net [get_bd_pins gpio_dbg/gpio2_io_i]  [get_bd_pins fir_pl_direct_0/dbg1]
 
-# ---- 运行期参数：增益 + 斜坡 ----
-connect_bd_net [get_bd_pins fir_pl_regs_0/gain_b0]     [get_bd_pins gain_slice/Din]
-connect_bd_net [get_bd_pins gain_slice/Dout]           [get_bd_pins fir_pl_direct_0/gain_pack]
+# ---- 运行期参数：增益/斜坡 + DRC 四参数（2026-10-28 批 2）----
+connect_bd_net [get_bd_pins fir_pl_regs_0/gain_b0]     [get_bd_pins fir_pl_direct_0/gain_pack]
 connect_bd_net [get_bd_pins fir_pl_regs_0/ramp_div_b0] [get_bd_pins fir_pl_direct_0/ramp_div]
 connect_bd_net [get_bd_pins fir_pl_direct_0/ramp_busy] [get_bd_pins fir_pl_regs_0/ramp_busy_b0]
+foreach pk {thr ratio atk rel} {
+  connect_bd_net [get_bd_pins fir_pl_regs_0/${pk}_b0] [get_bd_pins fir_pl_direct_0/${pk}_pack]
+}
 
 # ---- 观察量接真信号（2026-10-28 批 1）：env/gr/peak 不再是假线 ----
 connect_bd_net [get_bd_pins fir_pl_direct_0/env_b0]   [get_bd_pins fir_pl_regs_0/env_b0]

@@ -24,9 +24,8 @@
  * 和 fir_stream_shell 的另一个区别：**没有块边界，所以前端复位只在上电/flush
  * 时给一次**。延迟线跨采样一直保持，等于 v25 那种 static 延迟线的语义。
  *
- * 参数：fir_drc4 的阈值/压缩比/时间常数是综合时的 parameter（和 v25 的默认值
- * 同一套数值），四段增益同样是 parameter。要在网页上拖增益得再加寄存器，
- * 这一版没做 —— 先把延迟和稳定性验出来。
+ * 参数：四段增益和 DRC 的阈值/压缩比/起停时间全部是运行期寄存器
+ * （2026-10-28 批 2 把后四个也从 parameter 改成端口），网页拖滑杆即可。
  */
 
 `timescale 1ns / 1ps
@@ -51,6 +50,14 @@ module fir_pl_direct #(
      * 打包而不是四个独立端口，是为了 BD 里只需要一个 xlslice 就能从
      * fir_pl_regs 的 128 位参数组里取出来（少三个单元、少三根线）。 */
     input  wire [63:0] gain_pack,
+    /* 2026-10-28 批 2：DRC 四参数也是运行期，格式同 gain_pack 但每段 24 位
+     * （Q2.22 有符号），段 i 在 [24i+23 : 24i]：
+     *   thr_pack / ratio_pack / atk_pack / rel_pack
+     * 每个都是 fir_pl_regs 的 128 位参数组低 96 位的 xlslice。 */
+    input  wire [95:0] thr_pack,
+    input  wire [95:0] ratio_pack,
+    input  wire [95:0] atk_pack,
+    input  wire [95:0] rel_pack,
     input  wire [15:0] ramp_div,          // 斜坡移位量，6 ≈ 1.3 ms 收敛
     output wire        ramp_busy,         // 还有段没爬到目标（1 = 正在爬）
     output wire [31:0] stat0,            // i2s_duplex：ovf / und 计数
@@ -286,6 +293,22 @@ module fir_pl_direct #(
         .gain1  (g1_cur),
         .gain2  (g2_cur),
         .gain3  (g3_cur),
+        .thr0   (thr_pack[23:0]),
+        .thr1   (thr_pack[47:24]),
+        .thr2   (thr_pack[71:48]),
+        .thr3   (thr_pack[95:72]),
+        .ratio0 (ratio_pack[23:0]),
+        .ratio1 (ratio_pack[47:24]),
+        .ratio2 (ratio_pack[71:48]),
+        .ratio3 (ratio_pack[95:72]),
+        .atk0   (atk_pack[23:0]),
+        .atk1   (atk_pack[47:24]),
+        .atk2   (atk_pack[71:48]),
+        .atk3   (atk_pack[95:72]),
+        .rel0   (rel_pack[23:0]),
+        .rel1   (rel_pack[47:24]),
+        .rel2   (rel_pack[71:48]),
+        .rel3   (rel_pack[95:72]),
         .y      (drc_y),
         .y_vld  (drc_y_vld),
         .env_o  (drc_env),

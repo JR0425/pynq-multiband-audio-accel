@@ -23,6 +23,10 @@ ID_EXPECT = 0x504C0002
 
 BANK0 = 0x100
 OFF_GAIN = 0x00
+OFF_THR = 0x10
+OFF_RATIO = 0x20
+OFF_ATK = 0x30
+OFF_REL = 0x40
 # 2026-10-28 纠正：+0x70/+0x74 是 **bank 内相对偏移**（寄存器表 v25 的约定），
 # 不是控制区的绝对 0x070/0x074。bank0 的真实地址 = 0x100 + 0x70 = 0x170。
 # 早先读 0x070 读到恒 0，差点误判成"RAMP 寄存器写不进去"——RTL 一直是对的。
@@ -83,6 +87,33 @@ def main():
     ok = back == want
     bad += 0 if ok else 1
     print("[4] write %s -> read %s  %s" % (want, back, "OK" if ok else "FAIL"))
+
+    # DRC 四参数（批 2 才接进 BD 的）：出厂值必须等于 fir_drc4 的编译期参数
+    dflt = {"THR": (OFF_THR, 419456), "RATIO": (OFF_RATIO, 2936064),
+            "ATK": (OFF_ATK, 17408), "REL": (OFF_REL, 896)}
+    got = {}
+    for k, (off, exp) in dflt.items():
+        got[k] = [r.read(BANK0 + off + 4 * i) for i in range(4)]
+    ok = all(got[k] == [exp] * 4 for k, (off, exp) in dflt.items())
+    bad += 0 if ok else 1
+    print("[4b] default DRC: " + "  ".join("%s=%s" % (k, got[k]) for k in dflt)
+          + "  " + ("OK" if ok else "FAIL（期望 THR 419456 / RATIO 2936064 / ATK 17408 / REL 896）"))
+
+    # 四段写不同值，确认不会串段（参数包是按段裁位宽的，串段在这条上会露出来）
+    want_thr = [419456, 838912, 1258368, 1677824]
+    want_atk = [0, 4096, 17408, 32768]
+    for i in range(4):
+        r.write(BANK0 + OFF_THR + 4 * i, want_thr[i])
+        r.write(BANK0 + OFF_ATK + 4 * i, want_atk[i])
+    back_thr = [r.read(BANK0 + OFF_THR + 4 * i) for i in range(4)]
+    back_atk = [r.read(BANK0 + OFF_ATK + 4 * i) for i in range(4)]
+    ok = back_thr == want_thr and back_atk == want_atk
+    bad += 0 if ok else 1
+    print("[4c] per-band THR/ATK write->read  %s" % ("OK" if ok else "FAIL  %s %s" % (back_thr, back_atk)))
+    # 还原
+    for i in range(4):
+        r.write(BANK0 + OFF_THR + 4 * i, 419456)
+        r.write(BANK0 + OFF_ATK + 4 * i, 17408)
 
     # 斜坡：先回到 0 dB 让它稳定，再一次性写到 +18 dB，看 busy 的上升与落零
     for i in range(4):
