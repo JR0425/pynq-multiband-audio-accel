@@ -1306,13 +1306,19 @@ function applyTune(t){
   }
 
   function hideBlockOnly(){
-    // 块长/来源/录音只对 PS 在环里的那两档有意义
-    ["lat-sel", "src-sel", "rec-chk"].forEach(id => {
+    // 块长/来源/录音只对 PS 在环里的那两档有意义。
+    // 只藏控件本身，不要往上找父节点 —— 那两个 select 和"开始/停止"在同一行，
+    // 藏掉父容器会把按钮一起藏了。
+    ["lat-sel", "src-sel"].forEach(id => {
       const el = document.getElementById(id);
-      if (!el) return;
-      const row = el.closest("label, .row, .field, div");
-      if (row) row.style.display = "none";
+      if (el) el.style.display = "none";
     });
+    const rec = document.getElementById("rec-chk");
+    if (rec) {
+      const lab = rec.closest("label");
+      if (lab) lab.style.display = "none";
+      else rec.style.display = "none";
+    }
     if (hasGainEls()) {
       gainEls.forEach(el => { el.slider.max = "42"; });
     }
