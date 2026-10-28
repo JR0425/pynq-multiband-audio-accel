@@ -88,7 +88,11 @@ REGS_BASE_DEFAULT = 0x43C40000
 
 # ---------------------------------------------------------------- 换算
 def db_to_gain(db):
-    """页面 gain_db（−24..+24）→ GAIN[i]（Q7.8，int16 范围）。"""
+    """页面 gain_db（−24..+42）→ GAIN[i]（Q7.8，int16 范围）。
+
+    2026-10-28 听感拍板：演示默认 +30 dB（8095）—— 18 dB 用户嫌小，
+    24 dB 勉强、30 dB 合适（板上 gain_ladder/gain30 实测）。
+    """
     v = int(round(GAIN_UNITY * (10.0 ** (float(db) / 20.0))))
     return max(-32768, min(32767, v))
 
@@ -147,7 +151,7 @@ def apply_tune(regs, tune, last=None):
     只在字段真的变了的时候写 —— 每 20 ms 无脑写一遍会让 ramp 反复重置，
     表现是"增益永远爬不到头"。
     """
-    g = tune.get("gain_db") or [0.0] * 4
+    g = tune.get("gain_db") or [30.0] * 4   # 演示默认 +30 dB（2026-10-28 听感拍板）
     thr = tune.get("thr_db") or [-10.0] * 4
     rat = tune.get("ratio") or [0.0] * 4
     atk = tune.get("attack_ms") or [0.0] * 4
@@ -166,6 +170,11 @@ def apply_tune(regs, tune, last=None):
     changed = (last is None) or (cur["bypass"] != last.get("bypass"))
     for i in range(4):
         if last is None or cur["gain"][i] != last["gain"][i]:
+            # RAMP_DIV=5：指数斜坡，时间常数 32 采样 ≈ 0.7 ms，拖滑块不咔。
+            # 寄存器出厂默认 0 = 一步到位，所以这里每次都补写（幂等，写同值
+            # 不会重置 ramp —— 2026-10-28 板上实测口径）。
+            regs.wr(BANK0 + 0x70, 5)
+            regs.wr(BANK1 + 0x70, 5)
             regs.wr(BANK0 + OFF_GAIN + 4 * i, cur["gain"][i])
             regs.wr(BANK1 + OFF_GAIN + 4 * i, cur["gain"][i])   # 双耳暂时同一套
             changed = True

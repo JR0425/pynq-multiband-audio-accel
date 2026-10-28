@@ -41,7 +41,7 @@ TONE = 1 << 3
 BANK0 = 0x100
 OFF_GAIN = 0x00
 OFF_RAMP_BUSY = 0x74
-GAIN_18DB = 2033          # round(256 * 10^(18/20))
+GAIN_30DB = 8095          # round(256 * 10^(30/20)) —— 2026-10-28 听感拍板
 
 
 def read_all(tag):
@@ -103,7 +103,7 @@ def main():
         # div=5: 指数斜坡，时间常数 32 采样 ≈ 0.7 ms —— 增益切换听不出咔。
         # 默认 0 是一步到位，拖增益会"咔"一声，网页后端也应写 5。
         regs.write(0x170, 5)
-        set_gain(regs, GAIN_18DB)
+        set_gain(regs, GAIN_30DB)
 
     ctrl = ol.gpio_ctrl.mmio
 
