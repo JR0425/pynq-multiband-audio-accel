@@ -106,3 +106,4 @@ pynq_venv/
 
 # xsim 工作目录（每次跑仿真都会重建）
 sim/rtl_sim/xsim_*/
+build/_probe/
