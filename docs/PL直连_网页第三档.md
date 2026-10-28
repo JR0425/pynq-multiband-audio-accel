@@ -29,7 +29,7 @@
 | GET | `/` | 返回 `page.html`（和第一档同一个文件） |
 | GET | `/api/status` | 读 `fir_status.json`，附 `age` / `stale` / `mode:"pl"`；文件不存在返回 `{"ok":false,"running":false}` |
 | GET | `/api/tune` | 读 `fir_tune.json`，没有则 `null`（页面会填默认值并写回） |
-| POST | `/api/tune` | 范围钳制后写 `fir_tune.json`，回显钳制结果 |
+| POST | `/api/tune` | 范围钳制后写 `fir_tune.json`，回显钳制结果。可选 `b1` = 右耳处方（见 §2.1） |
 | GET | `/api/scope` | `{"ok":false, "msg":"PL 直连版没有波形缓冲（C3/C4 未实现）"}` |
 | GET | `/api/health` | 位流存在/大小、status 新鲜度、run 标志、路径 |
 | POST | `/api/start` | 写 `run=1`，并告诉页面后端进程到底在不在 |
@@ -40,6 +40,20 @@ attack 0..50 ms、release 0..500 ms。换算（dB→Q7.8、ms→Q2.22）**不在
 仍然由 `fir_pl_live.apply_tune()` 一处负责，避免两套换算慢慢漂开。
 
 `/api/start` 收到的 `src / l / nbuf / wav` 全部忽略：PL 直连没有块长和来源可选。
+
+### 2.1 右耳处方 `b1`（2026-10-29）
+
+```json
+{ "gain_db": [30,30,30,30], "thr_db": [-20,-20,-20,-20], "ratio": [0.7,0.7,0.7,0.7],
+  "attack_ms": [5,5,5,5], "release_ms": [100,100,100,100],
+  "b1": { "gain_db": [0, 6, 12, 18] } }
+```
+
+- **没有 `b1`** = 两只耳朵一样：`fir_pl_live.apply_tune()` 把 bank0 的五个参数
+  原样写进 bank1。这是默认，也是演示时的安全状态。
+- **有 `b1`** = 各写各的。`b1` 里缺哪项就用左耳那项顶上（只给 `gain_db` 时，
+  右耳的门限/压缩比/时间常数跟左耳一致），范围钳制和左耳同一套。
+- 网页上对应 PL 面板里的「双耳（右耳独立处方）」开关 + 右耳四条增益滑杆。
 `/api/rec`、`/api/hearing/tone` 明确返回 `ok:false` 并说明原因，不假装成功。
 
 ## 3. 页面的增量（`page.html` 末尾那一段）
@@ -86,5 +100,6 @@ start/stop 真的改 `run` 文件、status 透出观察量、没实现的接口�
 - 波形/频谱：要抓取缓冲（C3/C4），RTL 里现在是桩。
 - 录音下载：同上。
 - 听力测试建档：要按频率放音，PL 直连没有这条路（WAV 播放是整段播）。
-- 双耳各调各的：现在 bank1 写的是 bank0 的镜像（`fir_pl_live.apply_tune` 里双写）。
-  要做独立双耳，得先把 DRC4 例化两份（任务 4）。
+- 双耳**只有增益**能各调各的（网页上四条右耳滑杆）。右耳的门限/压缩比/时间常数
+  目前只能通过 `b1` 直接写 json，还没做滑杆。
+- `EAR_CTL[0]` 只是一个软件约定，RTL 里两份 DRC 一直在跑、没有硬件门控。
