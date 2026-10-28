@@ -158,17 +158,24 @@ def amp_to_db(v, full=32768.0):
 
 
 def read_obs(regs):
-    """读观察量：PEAK_IN/OUT（16 位）+ 四段 ENV/GR（Q2.22）。"""
+    """读观察量：PEAK_IN/OUT（16 位）+ 左右各四段 ENV/GR（Q2.22）。
+
+    2026-10-29 双耳：bank1 现在是第二份 DRC 的真信号，所以能分别看两只耳朵
+    的包络和压缩量 —— 这是"两套处方确实各算各的"最直接的证据。
+    """
     peak_in = regs.rd(REG_PEAK_IN) & 0xFFFF
     peak_out = regs.rd(REG_PEAK_OUT) & 0xFFFF
-    env = []
-    gr = []
+    env, gr, env_r, gr_r = [], [], [], []
     for i in range(4):
         e = regs.rd(BANK0 + OFF_ENV + 4 * i) & 0xFFFFFF
         g = regs.rd(BANK0 + OFF_GR + 4 * i) & 0xFFFFFF
+        e2 = regs.rd(BANK1 + OFF_ENV + 4 * i) & 0xFFFFFF
+        g2 = regs.rd(BANK1 + OFF_GR + 4 * i) & 0xFFFFFF
         env.append(round(e / float(Q22_ONE), 4))     # 线性幅度，1.0 = 满量程
         gr.append(round(g / float(Q22_ONE), 4))
-    return peak_in, peak_out, env, gr
+        env_r.append(round(e2 / float(Q22_ONE), 4))
+        gr_r.append(round(g2 / float(Q22_ONE), 4))
+    return peak_in, peak_out, env, gr, env_r, gr_r
 
 
 def read_run():
@@ -220,12 +227,26 @@ def apply_tune(regs, tune, last=None):
     rel = tune.get("release_ms") or [100.0] * 4
     byp = bool(tune.get("bypass"))
 
+    # 2026-10-29 双耳：tune["b1"] 存在就用它当右耳的处方，不存在就左右同一套
+    # （默认行为不变 —— 单耳时两只耳机听到的内容必须完全一样）。
+    b1 = tune.get("b1") or {}
+    g1   = b1.get("gain_db")    or g
+    thr1 = b1.get("thr_db")     or thr
+    rat1 = b1.get("ratio")      or rat
+    atk1 = b1.get("attack_ms")  or atk
+    rel1 = b1.get("release_ms") or rel
+
     cur = {
         "gain": [db_to_gain(x) for x in _four(g)],
         "thr": [dbfs_to_thr(x) for x in _four(thr)],
         "ratio": [ratio_to_reg(x) for x in _four(rat)],
         "atk": [ms_to_coef(x) for x in _four(atk)],
         "rel": [ms_to_coef(x) for x in _four(rel)],
+        "gain_b1": [db_to_gain(x) for x in _four(g1)],
+        "thr_b1": [dbfs_to_thr(x) for x in _four(thr1)],
+        "ratio_b1": [ratio_to_reg(x) for x in _four(rat1)],
+        "atk_b1": [ms_to_coef(x) for x in _four(atk1)],
+        "rel_b1": [ms_to_coef(x) for x in _four(rel1)],
         "bypass": byp,
     }
 
@@ -238,23 +259,34 @@ def apply_tune(regs, tune, last=None):
             regs.wr(BANK0 + 0x70, 5)
             regs.wr(BANK1 + 0x70, 5)
             regs.wr(BANK0 + OFF_GAIN + 4 * i, cur["gain"][i])
-            regs.wr(BANK1 + OFF_GAIN + 4 * i, cur["gain"][i])   # 双耳暂时同一套
+            changed = True
+        if last is None or cur["gain_b1"][i] != last["gain_b1"][i]:
+            regs.wr(BANK1 + 0x70, 5)
+            regs.wr(BANK1 + OFF_GAIN + 4 * i, cur["gain_b1"][i])
             changed = True
         if last is None or cur["thr"][i] != last["thr"][i]:
             regs.wr(BANK0 + OFF_THR + 4 * i, cur["thr"][i])
-            regs.wr(BANK1 + OFF_THR + 4 * i, cur["thr"][i])
+            changed = True
+        if last is None or cur["thr_b1"][i] != last["thr_b1"][i]:
+            regs.wr(BANK1 + OFF_THR + 4 * i, cur["thr_b1"][i])
             changed = True
         if last is None or cur["ratio"][i] != last["ratio"][i]:
             regs.wr(BANK0 + OFF_RATIO + 4 * i, cur["ratio"][i])
-            regs.wr(BANK1 + OFF_RATIO + 4 * i, cur["ratio"][i])
+            changed = True
+        if last is None or cur["ratio_b1"][i] != last["ratio_b1"][i]:
+            regs.wr(BANK1 + OFF_RATIO + 4 * i, cur["ratio_b1"][i])
             changed = True
         if last is None or cur["atk"][i] != last["atk"][i]:
             regs.wr(BANK0 + OFF_ATK + 4 * i, cur["atk"][i])
-            regs.wr(BANK1 + OFF_ATK + 4 * i, cur["atk"][i])
+            changed = True
+        if last is None or cur["atk_b1"][i] != last["atk_b1"][i]:
+            regs.wr(BANK1 + OFF_ATK + 4 * i, cur["atk_b1"][i])
             changed = True
         if last is None or cur["rel"][i] != last["rel"][i]:
             regs.wr(BANK0 + OFF_REL + 4 * i, cur["rel"][i])
-            regs.wr(BANK1 + OFF_REL + 4 * i, cur["rel"][i])
+            changed = True
+        if last is None or cur["rel_b1"][i] != last["rel_b1"][i]:
+            regs.wr(BANK1 + OFF_REL + 4 * i, cur["rel_b1"][i])
             changed = True
 
     # ctrl 不在这个窗口里 —— 它走 gpio_ctrl（0x43C00000），和探针/演示脚本一致。
@@ -290,7 +322,7 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True):
     st1 = regs.rd(REG_STAT1)
     gains = tune_cur["gain"] if tune_cur else [256] * 4
     busy = bool(ramp_busy)
-    peak_in, peak_out, env, gr = read_obs(regs)
+    peak_in, peak_out, env, gr, env_r, gr_r = read_obs(regs)
     (sink or write_status)({
         "t": now,
         "n": 0,                      # 没有"块"这个概念了
@@ -314,6 +346,12 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True):
         "env_db": [amp_to_db(v, 1.0) for v in env],
         "gr": gr,                        # 四段衰减量，线性幅度
         "gr_db": [amp_to_db(v, 1.0) for v in gr],   # 负值 = 压掉的 dB
+        # ---- 右耳（bank1）同一组量 ----
+        "env_r": env_r,
+        "env_r_db": [amp_to_db(v, 1.0) for v in env_r],
+        "gr_r": gr_r,
+        "gr_r_db": [amp_to_db(v, 1.0) for v in gr_r],
+        "dual": any(abs(env_r[i] - env[i]) > 1e-4 for i in range(4)) if env else False,
         # 电平表/抓取还没接进 RTL，先给 0，页面会显示空条而不是乱跳
         "in_rms": 0.0,
         "out_rms": 0.0,
@@ -389,6 +427,27 @@ def selftest():
         ok = got == want
         bad += 0 if ok else 1
         print("  %-14s = %8d  expect %8d  %s" % (name, got, want, "OK" if ok else "FAIL"))
+
+    print("== 2b. 双耳：tune[\"b1\"] 存在时右耳走另一套 ==")
+    dual_tune = {"gain_db": [12.0] * 4, "thr_db": [-20.0] * 4,
+                                            "ratio": [0.7] * 4, "attack_ms": [5.0] * 4,
+                                            "release_ms": [100.0] * 4,
+                                            "b1": {"gain_db": [0.0, 6.0, 12.0, 18.0],
+                                                   "thr_db": [-30.0] * 4}}
+    fake2 = FakeMMIO()
+    regs2 = Regs(fake2)
+    cur2, _ = apply_tune(regs2, dual_tune, None)
+    dchecks = [
+        ("左耳 GAIN[0] +12 dB",  fake2.mem[BANK0 + OFF_GAIN],          db_to_gain(12.0)),
+        ("右耳 GAIN[0] 0 dB",    fake2.mem[BANK1 + OFF_GAIN],          db_to_gain(0.0)),
+        ("右耳 GAIN[3] +18 dB",  fake2.mem[BANK1 + OFF_GAIN + 12],     db_to_gain(18.0)),
+        ("右耳 THR -30 dBFS",    fake2.mem[BANK1 + OFF_THR],           dbfs_to_thr(-30.0)),
+        ("左耳 THR -20 dBFS",    fake2.mem[BANK0 + OFF_THR],           dbfs_to_thr(-20.0)),
+    ]
+    for name, got, want in dchecks:
+        ok = got == want
+        bad += 0 if ok else 1
+        print("  %-22s = %8d  expect %8d  %s" % (name, got, want, "OK" if ok else "FAIL"))
 
     print("== 3. bypass 只清 ctrl[1] ==")
     tune["bypass"] = 1

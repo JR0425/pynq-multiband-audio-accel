@@ -58,6 +58,18 @@ MSYS_NO_PATHCONV=1 python board_ssh.py --sudo \
 
 **这是"四参数真的进了数据通路"唯一没拿到的板上证据，明天第一件补它。**
 
+### B3b 双耳两套处方（2026-10-29 新增）
+
+```bash
+... pl_dual_probe.py
+```
+
+期望：`[2]` 两套参数相同时左右 ENV/GR 逐段相同（差 ≤ 1 LSB）；
+`[4]` 只压右耳门限后 `max(grR) > max(grL)`；`[6]` 只抬右耳 +18 dB 后
+`envR/envL ≈ 8`；最后 `DUAL PROBE PASS`。
+
+三条判据分别证伪：右耳没在算、参数串台、两套增益共用一个斜坡。
+
 ### B4 网页第三档
 
 ```bash
@@ -102,4 +114,6 @@ sudo env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u /home/xilinx/
 - 双耳各调各的：bank1 现在写的是 bank0 的镜像；DSP 95%，直接例化两份超资源，
   走时分复用（见 `docs/PL直连_资源与时序.md` §4）。
 - MPO 限幅（B6）、THD+N（C6）、600 秒长跑（E3）：都没做。
+- 网页还**没有**两套处方的滑杆界面（现在只能后端写 `tune["b1"]`）；
+  演示双耳请用 `pl_dual_probe.py` 或手写 json，别说"网页上能分开调"。
 - 板子放几分钟 WAV 可能整机挂（历史现象，未定位）。
