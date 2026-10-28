@@ -1,13 +1,14 @@
 # 全 PL 直连版：现状、怎么验、下一步
 
-> 最后更新：2026-10-28 ｜ 对应位流 `board/overlay/fir_pl.bit`（md5 `4f15ea6f…`，
-> 板上实测的那颗是 `ccd0a6cf…`，同一份 RTL）
+> 最后更新：2026-10-28 晚 ｜ 对应位流 `board/overlay/fir_pl.bit`
+> （`ccd0a6cf…` 是板上实测过"测试音响、吹气响"的那颗；四段增益版本在编）
 > 配套：`docs/PL直连_寄存器表.md`（寄存器映射）、`skill/pitfalls/pl_internal_tone_diagnosis.md`
 
 ## 一句话
 
 **整条链在硬件上已经通了**：PL 内音源和话筒两条路都能在耳机里听到。
-现在缺的不是"能不能出声"，而是"能不能在运行期调参数"（网页要驱动它）。
+**四段增益也已经运行期可调**（AXI-Lite 寄存器 + 逐采样斜坡，绝不咔）。
+现在缺的是**压缩四参数**（THR/RATIO/ATK/REL）的运行期端口化，以及电平表/抓取缓冲。
 
 ## 数据通路
 
@@ -77,7 +78,67 @@ MSYS_NO_PATHCONV=1 python tools/board_debug/board_ssh.py --sudo \
 调试口：`gpio_dbg` @ `0x43C30000`（`dbg0` = 喂入/吐出字数，`dbg1` 位序见
 `board/scripts/pl_direct_probe.py` 的注释）。
 
-## 下一步：把 DRC 参数端口化（**没做完**）
+## 运行期四段增益（2026-10-28 晚做完）
+
+**四段增益已经是运行期可调的了**，不用再重编才能改。链路：
+
+```
+fir_pl_regs (0x43C40000)  GAIN[0..3]  ──┐
+   ↑ 写 / 读                              ├─→ fir_gain_ramp（逐采样斜坡）
+   PS（fir_pl_live.py / pl_gain.py）      │      ↓ 约 1.3 ms 爬到目标
+                                          └─→ fir_drc4.gain0..3（Q7.8 乘法）
+```
+
+- **斜坡**：`step = (tgt − cur) >>> div`，`div=6` 时间常数 64 个采样 ≈ 1.3 ms，
+  完全收敛约 310 个采样（6.5 ms）。差值小于 `2^div` 时至少走 1 个 LSB ——
+  没有这条会停在半路、`ramp_busy` 永远不落。
+- **复位/flush 直接对齐目标**：重新开始不该带着旧斜坡跑。
+- **默认值是 0 dB（256）**，和 v25 逐位一致。所以**说话要靠软件写增益才听得见**；
+  演示脚本 `pl_demo_check.py` 会自己写一遍 +18 dB（2033）。
+
+寄存器（都在 `fir_pl_regs` 的 4 KB 窗口，地址见 `docs/PL直连_寄存器表.md`）：
+
+| 地址 | 名称 | 说明 |
+|---|---|---|
+| `0x100 + 4i` | `GAIN[i]` | 左耳四段，Q7.8，256 = 0 dB，写 32 位（低 16 位有效） |
+| `0x200 + 4i` | 右耳同上 | 现在两耳写同一套（双耳分套还没做） |
+| `0x170` | `RAMP_DIV` | 斜坡移位量，默认 6；越大越慢 |
+| `0x174` | `RAMP_BUSY` | RO，bit0 左耳 / bit1 右耳，1 = 还在爬 |
+| `0x008/0x00C/0x010` | `STAT0/1/2` | 直通 `fir_pl_direct` 的 stat0/1/2（`ovf`/`und`/FIFO 水位） |
+
+**CTRL 仍然走 `gpio_ctrl`（0x43C00000）**，位定义见下一节 —— 换地址会让所有
+现成脚本失效。`fir_pl_regs` 里也有一份 CTRL，但 BD 里没接到 `fir_pl_direct`
+（避免两个驱动源），等网页那一档稳定了再合并。
+
+### 板上怎么单独改增益
+
+```bash
+MSYS_NO_PATHCONV=1 python tools/board_debug/board_ssh.py --putb64 \
+    tools/board_debug/pl_gain.py /home/xilinx/dma_exp/pl_gain.py
+
+MSYS_NO_PATHCONV=1 python tools/board_debug/board_ssh.py --sudo \
+  "cd /home/xilinx/dma_exp && XILINX_XRT=/usr \
+   /usr/local/share/pynq-venv/bin/python3 -u pl_gain.py --read"
+
+# 四段都 +18 dB（说话能听清）
+... pl_gain.py 18
+# 低频不补、高频补满（"高频听损"的处方，听感差别一眼能听出来）
+... pl_gain.py 0 6 12 18
+# 归零，做 A/B 的对照档
+... pl_gain.py 0
+```
+
+它会打印 `readback` 与 `ramp_busy`：`ramp_busy = 0` 就是"已经到位"，这是
+网页上"参数已生效"指示灯的依据。
+
+### 后端
+
+`board/scripts/fir_pl_live.py`：读 `/dev/shm/fir_tune.json` → 写寄存器，
+读寄存器 → 写 `/dev/shm/fir_status.json`（字段照 `fir_live.publish_status`，
+页面不用改）。`python3 fir_pl_live.py --selftest` 不需要板子/overlay，
+把换算、写序列、"参数没变就不重写"、status 字段齐全四件事都验一遍。
+
+## 下一步：把 THR/RATIO/ATK/REL 也端口化（**没做完**）
 
 四段增益不用新写数据通路 —— `fir_drc4_chan` 里已经有 `GAIN`
 （`gmul = p_band * GAIN`，`src/rtl/fir_drc4.v:134`），THR/RATIO/ATK/REL 也都是参数。
@@ -93,9 +154,9 @@ MSYS_NO_PATHCONV=1 python tools/board_debug/board_ssh.py --sudo \
 
 建议顺序（每步都能单独验）：
 
-1. **先只端口化 `GAIN`**（4 个 16 位输入，Q7.8，256 = 0 dB）。它只出现在 v:134
-   一处乘法、不参与任何 localparam，改动最小。斜坡放 `fir_pl_direct` 里做
-   （`gc += (tgt-gc)>>>6`，约 1.3 ms 收敛），不要在 DRC 内部改状态。
+1. ✅ **已完成**：`GAIN` 端口化 + `fir_gain_ramp` + `fir_pl_regs` 接进 BD（0x43C40000）。
+   验收：xsim 逐位对拍 3000 个采样 0 失配；+18 dB 比值 7.94（Q7.8 的 +18 dB 就是
+   2033/256）；斜坡最大单步 27、310 个采样收敛；`ramp_busy` 正确落零。
 2. 再端口化 `THR/RATIO/ATK/REL`，此时必须处理 `USE_WDRC` ——
    `ATK=REL=0` 时必须仍然逐位等于 v25，否则 `§3.4.3` 那张表的前提就没了。
 3. 最后把 `fir_pl_regs`（`src/rtl/fir_pl_regs.v`，36 项单元测试全过）接进 BD：

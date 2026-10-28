@@ -5,9 +5,12 @@
   2. 读一遍            —— 应是出厂值（0x4023=0xE5 一类）
   3. codec_init()      —— libaudio 配置 + codec_unmute()
   4. 再读一遍          —— 0x4023 应变成 0xF3，且 bit1=1（未静音）
+  4b. 写四段增益       —— 默认寄存器是 0 dB（256），说话听不见；
+                          这里写平 +18 dB（2033）。老位流没有 fir_pl_regs，
+                          会打印 "no fir_pl_regs" 并跳过（那就只能靠测试音）。
   5. ctrl=0x0B 放 5 秒  —— PL 内部 440 方波，不经 ADC，验"播放链路"
   6. 静音 1 秒
-  7. ctrl=0x03 放 10 秒 —— 话筒→前端→压缩→+18 dB，验"话筒链路"
+  7. ctrl=0x03 放 10 秒 —— 话筒→前端→压缩→四段增益，验"话筒链路"
   8. ctrl=0 收尾
 
 判读：
@@ -22,7 +25,7 @@ import time
 
 sys.path.insert(0, "/home/xilinx/dma_exp")
 
-from pynq import Overlay
+from pynq import Overlay, MMIO
 
 import dma_audio_probe as P
 
@@ -34,6 +37,12 @@ RUN = 1 << 0
 DRC = 1 << 1
 TONE = 1 << 3
 
+# fir_pl_regs 里的地址（docs/PL直连_寄存器表.md）
+BANK0 = 0x100
+OFF_GAIN = 0x00
+OFF_RAMP_BUSY = 0x74
+GAIN_18DB = 2033          # round(256 * 10^(18/20))
+
 
 def read_all(tag):
     parts = []
@@ -42,6 +51,24 @@ def read_all(tag):
         parts.append("0x%04X=%s" % (r, "--" if v is None else "%02X" % v))
     print("[%s] %s" % (tag, "  ".join(parts)))
     sys.stdout.flush()
+
+
+def find_regs(ol):
+    for name, d in ol.ip_dict.items():
+        if name.startswith("fir_pl_regs") and d.get("phys_addr") is not None:
+            return MMIO(d["phys_addr"], 0x1000), d["phys_addr"]
+    return None, None
+
+
+def set_gain(regs, g):
+    for i in range(4):
+        regs.write(BANK0 + OFF_GAIN + 4 * i, g)
+        regs.write(0x200 + OFF_GAIN + 4 * i, g)      # 右耳同一套
+    back = [regs.read(BANK0 + OFF_GAIN + 4 * i) & 0xFFFF for i in range(4)]
+    time.sleep(0.05)
+    busy = regs.read(OFF_RAMP_BUSY) & 0x3
+    print("   GAIN readback = %s   ramp_busy = 0x%X" % (back, busy))
+    return back
 
 
 def main():
@@ -66,6 +93,14 @@ def main():
         return
 
     print("[4] HP ok (bit1=1, unmuted)")
+
+    regs, base = find_regs(ol)
+    if regs is None:
+        print("[4b] no fir_pl_regs in this bitstream -> gains stay at 0 dB")
+        print("     (mic path will be very quiet; only the tone is reliable)")
+    else:
+        print("[4b] write flat +18 dB into GAIN[0..3]  (fir_pl_regs @ 0x%08X)" % base)
+        set_gain(regs, GAIN_18DB)
 
     ctrl = ol.gpio_ctrl.mmio
 
