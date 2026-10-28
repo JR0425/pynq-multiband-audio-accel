@@ -29,6 +29,11 @@
 set script_dir [file normalize [file dirname [info script]]]
 set repo_root  [file normalize [file join $script_dir .. ..]]
 set build_dir  [file join $repo_root build vivado audio_pl]
+# 允许换一个工程目录（BD 段迭代时用 build/vivado/bd_scratch，免得反复
+# create_project -force 破坏正式工程里已有的综合结果）
+if {[info exists ::env(FIR_PL_BUILD_DIR)]} {
+    set build_dir $::env(FIR_PL_BUILD_DIR)
+}
 set part_name  xc7z020clg400-1
 
 # 播放 FIFO 水位目标（字）。一个字 = 1/(2·48.83k) = 10.2 µs，
@@ -58,6 +63,8 @@ add_files -norecurse [list \
   [file join $repo_root src rtl i2s_duplex.v] \
   [file join $repo_root src rtl fir_mb_fe.v] \
   [file join $repo_root src rtl fir_drc4.v] \
+  [file join $repo_root src rtl fir_gain_ramp.v] \
+  [file join $repo_root src rtl fir_pl_regs.v] \
   [file join $repo_root src rtl fir_pl_direct.v] ]
 update_compile_order -fileset sources_1
 
@@ -103,7 +110,7 @@ set_property -dict [list \
 
 # ---- 寄存器总线 ----
 set axi_ic [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_ic]
-set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {4}] $axi_ic
+set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {5}] $axi_ic
 
 set gpio_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 gpio_ctrl]
 set_property -dict [list \
@@ -138,6 +145,32 @@ set_property -dict [list \
   CONFIG.C_ALL_INPUTS_2 {1} \
 ] $gpio_dbg
 
+# ---- 参数寄存器（2026-10-28 加）------------------------------------------
+# 2 个 axi_gpio 只能搬 32 位整数，装不下「四段增益 × 4 段参数」。
+# 这里挂一个自研的 AXI4-Lite 从机 fir_pl_regs（32 个寄存器 + 双耳两组银行），
+# 地址 0x43C40000。它同时把 RAMP_DIV / RAMP_BUSY 也管了。
+# 注意：CTRL 仍然走 gpio_ctrl（0x43C00000），探针和演示脚本都按那个地址写的，
+# 换地址会让所有现成的脚本失效 —— 等网页那一档稳定了再合并。
+set regs [create_bd_cell -type module -reference fir_pl_regs fir_pl_regs_0]
+puts "==== fir_pl_regs_0 的引脚 ===="
+foreach p [get_bd_pins -quiet fir_pl_regs_0/*] { puts "  $p" }
+
+# gain_b0 是 128 位（四段各 32 位，低 16 位有效），要取 [63:0] 才是四段 16 位
+set gain_slice [create_bd_cell -type ip -vlnv xilinx.com:ip:xlslice:1.0 gain_slice]
+set_property -dict [list   CONFIG.DIN_WIDTH {128} CONFIG.DIN_FROM {63} CONFIG.DIN_TO {0} CONFIG.DOUT_WIDTH {64} ] $gain_slice
+
+# 只读输入先全部接 0（电平表/包络/播放/抓取都还没实现）
+set z128 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z128]
+set_property -dict [list CONFIG.CONST_WIDTH {128} CONFIG.CONST_VAL {0}] $z128
+set z32 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z32]
+set_property -dict [list CONFIG.CONST_WIDTH {32} CONFIG.CONST_VAL {0}] $z32
+set z16 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z16]
+set_property -dict [list CONFIG.CONST_WIDTH {16} CONFIG.CONST_VAL {0}] $z16
+set z13 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z13]
+set_property -dict [list CONFIG.CONST_WIDTH {13} CONFIG.CONST_VAL {0}] $z13
+set z1 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z1]
+set_property -dict [list CONFIG.CONST_WIDTH {1} CONFIG.CONST_VAL {0}] $z1
+
 # ---- 直连那一条链 ----
 # i2s_duplex 是在 fir_pl_direct 内部例化的，BD 里只摆这一个 cell。
 # 中间那对 AXIS（i2s 的 M_AXIS 进前端、前端出来进 i2s 的 S_AXIS）
@@ -152,6 +185,14 @@ connect_bd_intf_net -intf_net axi_ic_m00 [get_bd_intf_pins axi_ic/M00_AXI] [get_
 connect_bd_intf_net -intf_net axi_ic_m01 [get_bd_intf_pins axi_ic/M01_AXI] [get_bd_intf_pins gpio_stat/S_AXI]
 connect_bd_intf_net -intf_net axi_ic_m02 [get_bd_intf_pins axi_ic/M02_AXI] [get_bd_intf_pins gpio_stat2/S_AXI]
 connect_bd_intf_net -intf_net axi_ic_m03 [get_bd_intf_pins axi_ic/M03_AXI] [get_bd_intf_pins gpio_dbg/S_AXI]
+puts "==== fir_pl_regs_0 的 AXI 接口 ===="
+foreach ip [get_bd_intf_pins -quiet fir_pl_regs_0/*] { puts "  intf $ip" }
+if {[catch {
+  connect_bd_intf_net -intf_net axi_ic_m04 [get_bd_intf_pins axi_ic/M04_AXI]                       [get_bd_intf_pins fir_pl_regs_0/S_AXI]
+} _e]} {
+  puts "### M04 连接失败: $_e"
+  error $_e
+}
 
 connect_bd_net [get_bd_pins gpio_ctrl/gpio_io_o]  [get_bd_pins fir_pl_direct_0/ctrl]
 connect_bd_net [get_bd_pins gpio_stat/gpio_io_i]  [get_bd_pins fir_pl_direct_0/stat0]
@@ -159,6 +200,28 @@ connect_bd_net [get_bd_pins gpio_stat/gpio2_io_i] [get_bd_pins fir_pl_direct_0/s
 connect_bd_net [get_bd_pins gpio_stat2/gpio_io_i] [get_bd_pins fir_pl_direct_0/stat2]
 connect_bd_net [get_bd_pins gpio_dbg/gpio_io_i]   [get_bd_pins fir_pl_direct_0/dbg0]
 connect_bd_net [get_bd_pins gpio_dbg/gpio2_io_i]  [get_bd_pins fir_pl_direct_0/dbg1]
+
+# ---- 运行期参数：增益 + 斜坡 ----
+connect_bd_net [get_bd_pins fir_pl_regs_0/gain_b0]     [get_bd_pins gain_slice/Din]
+connect_bd_net [get_bd_pins gain_slice/Dout]           [get_bd_pins fir_pl_direct_0/gain_pack]
+connect_bd_net [get_bd_pins fir_pl_regs_0/ramp_div_b0] [get_bd_pins fir_pl_direct_0/ramp_div]
+connect_bd_net [get_bd_pins fir_pl_direct_0/ramp_busy] [get_bd_pins fir_pl_regs_0/ramp_busy_b0]
+
+# ---- 只读输入：先接 0，等电平表/抓取做出来再换 ----
+connect_bd_net [get_bd_pins fir_pl_direct_0/stat0] [get_bd_pins fir_pl_regs_0/stat0]
+connect_bd_net [get_bd_pins fir_pl_direct_0/stat1] [get_bd_pins fir_pl_regs_0/stat1]
+connect_bd_net [get_bd_pins fir_pl_direct_0/stat2] [get_bd_pins fir_pl_regs_0/stat2]
+foreach pin {smp_cnt frm_cnt ply_rd ply_und lvl_in_lo lvl_in_hi lvl_out_lo lvl_out_hi              mpo_cnt scope_seq} {
+  connect_bd_net [get_bd_pins z32/dout] [get_bd_pins fir_pl_regs_0/$pin]
+}
+foreach pin {peak_in peak_out mpo_peak} {
+  connect_bd_net [get_bd_pins z16/dout] [get_bd_pins fir_pl_regs_0/$pin]
+}
+foreach pin {env_b0 gr_b0 env_b1 gr_b1} {
+  connect_bd_net [get_bd_pins z128/dout] [get_bd_pins fir_pl_regs_0/$pin]
+}
+connect_bd_net [get_bd_pins z13/dout] [get_bd_pins fir_pl_regs_0/scope_wr]
+connect_bd_net [get_bd_pins z1/dout]  [get_bd_pins fir_pl_regs_0/ramp_busy_b1]
 
 # ---- 时钟 / 复位 ----
 set clk_pins [list \
@@ -174,6 +237,8 @@ set clk_pins [list \
                [get_bd_pins axi_ic/M01_ACLK] \
                [get_bd_pins axi_ic/M02_ACLK] \
                [get_bd_pins axi_ic/M03_ACLK] \
+                              [get_bd_pins axi_ic/M04_ACLK] \
+                              [get_bd_pins fir_pl_regs_0/clk] \
                [get_bd_pins gpio_ctrl/s_axi_aclk] \
                [get_bd_pins gpio_stat/s_axi_aclk] \
                [get_bd_pins gpio_stat2/s_axi_aclk] \
@@ -189,6 +254,8 @@ set rst_pins [list \
                [get_bd_pins axi_ic/M01_ARESETN] \
                [get_bd_pins axi_ic/M02_ARESETN] \
                [get_bd_pins axi_ic/M03_ARESETN] \
+                              [get_bd_pins axi_ic/M04_ARESETN] \
+                              [get_bd_pins fir_pl_regs_0/rst_n] \
                [get_bd_pins gpio_ctrl/s_axi_aresetn] \
                [get_bd_pins gpio_stat/s_axi_aresetn] \
                [get_bd_pins gpio_stat2/s_axi_aresetn] \
@@ -314,7 +381,8 @@ report_timing_summary -quiet -file [file join $script_dir ${out_name}_timing.rpt
 report_utilization   -quiet -file [file join $script_dir ${out_name}_util.rpt]
 
 set wns [get_property SLACK [get_timing_paths -max_paths 1 -nworst 1 -delay_type max]]
-puts "\n### RESULT"
+puts "\
+               ### RESULT"
 puts "### TX_TARGET = $tx_target"
 puts "### WNS_ns = $wns"
 puts "### bit    = [file join $script_dir $out_name.bit]"
