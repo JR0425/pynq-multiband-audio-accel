@@ -1269,5 +1269,121 @@ function applyTune(t){
   pollHealth();
 })();
 </script>
+<script>
+/* =====================================================================
+ * 第三档（PL 直连）的增量，全部集中在这里：
+ *   · 观察量面板：PEAK IN/OUT、四段 ENV、四段 GR（都是 PL 里的真信号）
+ *   · 单段试听（solo）：其余段拉到 −24 dB —— PL 版没有独立静音位
+ *   · 滑杆上限放到 +42 dB（第一/二档是 ±24，PL 的演示口径是 +30）
+ *   · 把块长/来源/录音这些第一档才有的控件藏掉
+ * 判定条件只有一个：/api/status 的 mode === "pl"。第一/二档这条脚本什么都不做。
+ * ===================================================================== */
+(function(){
+  "use strict";
+  let panel = null, inited = false, solo = -1, savedGain = null;
+
+  /* 顶层 `const S = {...}` / `const gainEls = []` 是全局词法绑定，不挂在 window 上，
+   * 所以只能用 typeof 判断（typeof 对未声明的名字也不抛错）。 */
+  const hasS = () => (typeof S !== "undefined");
+  const hasGainEls = () => (typeof gainEls !== "undefined");
+
+  function fmt(v){ return (v === null || v === undefined) ? "—"
+                    : (v > 0 ? "+" : "") + Number(v).toFixed(1); }
+  function join(a){ return a && a.length ? a.map(fmt).join("   ") : "—"; }
+
+  function buildPanel(){
+    const main = document.querySelector("main") || document.body;
+    panel = document.createElement("section");
+    panel.style.cssText = "margin:16px auto 0;max-width:1180px;padding:12px 16px;" +
+      "border:1px solid #2b3a55;border-radius:12px;background:#0e1522;color:#cfe3ff;" +
+      "font:12.5px/1.75 ui-monospace,Consolas,monospace";
+    panel.innerHTML =
+      '<div style="font-weight:700;letter-spacing:.3px;margin-bottom:6px;color:#9fc5ff">' +
+      'PL 直连 · 观察量（真信号）</div>' +
+      '<div id="pl-obs">等待数据…</div>' +
+      '<div style="opacity:.6;margin-top:6px" id="pl-note"></div>';
+    main.insertBefore(panel, main.firstChild);
+  }
+
+  function hideBlockOnly(){
+    // 块长/来源/录音只对 PS 在环里的那两档有意义
+    ["lat-sel", "src-sel", "rec-chk"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const row = el.closest("label, .row, .field, div");
+      if (row) row.style.display = "none";
+    });
+    if (hasGainEls()) {
+      gainEls.forEach(el => { el.slider.max = "42"; });
+    }
+    const b = document.getElementById("btn-start");
+    if (b) b.textContent = "接通路";
+    const s = document.getElementById("btn-stop");
+    if (s) s.textContent = "断开";
+  }
+
+  function addSoloButtons(){
+    if (!hasGainEls()) return;
+    document.querySelectorAll(".gain-row").forEach((row, i) => {
+      if (row.querySelector(".pl-solo")) return;
+      const band = row.querySelector(".band");
+      if (!band) return;
+      const b = document.createElement("button");
+      b.className = "pl-solo";
+      b.textContent = "听";
+      b.title = "只留这一段：其余段拉到 −24 dB（PL 版没有独立静音位，不是真静音）";
+      b.style.cssText = "margin-left:8px;padding:1px 7px;font-size:11px;border-radius:6px;" +
+        "border:1px solid #33486b;background:#16203a;color:#9fc5ff;cursor:pointer";
+      b.addEventListener("click", () => setSolo(i));
+      band.appendChild(b);
+    });
+  }
+
+  function setSolo(i){
+    if (!hasGainEls() || !hasS()) return;
+    if (solo === i){
+      if (savedGain){ S.tune.gain_db = savedGain.slice(); }
+      solo = -1;
+    } else {
+      if (solo < 0) savedGain = S.tune.gain_db.slice();
+      S.tune.gain_db = S.tune.gain_db.map((v, k) => k === i ? v : -24);
+      solo = i;
+    }
+    gainEls.forEach((el, k) => { el.slider.value = S.tune.gain_db[k]; });
+    document.querySelectorAll(".pl-solo").forEach((b, k) => {
+      b.style.background = (k === solo) ? "#2a6cff33" : "#16203a";
+      b.style.color = (k === solo) ? "#ffffff" : "#9fc5ff";
+      b.style.borderColor = (k === solo) ? "#4f8bff" : "#33486b";
+    });
+    if (typeof flushTune === "function") flushTune();
+    else if (typeof sendTune === "function") sendTune();
+  }
+
+  async function tick(){
+    try {
+      const r = await fetch("/api/status", {cache:"no-store"});
+      const st = await r.json();
+      if (st && st.mode === "pl"){
+        if (!panel) buildPanel();
+        if (!inited){ inited = true; hideBlockOnly(); addSoloButtons(); }
+        const obs = document.getElementById("pl-obs");
+        if (obs){
+          obs.innerHTML =
+            "<div>PEAK IN  " + fmt(st.peak_in_db) + " dBFS    →    PEAK OUT  " +
+            fmt(st.peak_out_db) + " dBFS</div>" +
+            "<div>ENV ① ② ③ ④   " + join(st.env_db) + " dB</div>" +
+            "<div>GR  (压掉)     " + join(st.gr_db) + " dB</div>";
+        }
+        const note = document.getElementById("pl-note");
+        if (note) note.textContent = st.stale
+          ? "⚠ 后端 fir_pl_live.py 好像没在跑（status 超过 3 秒没更新）"
+          : "ENV/GR/PEAK 是 PL 里的真信号；in_rms/out_rms 那两根电平条还是桩，空着正常。";
+      }
+    } catch(e){ /* 板子掉了就下一拍再来 */ }
+    setTimeout(tick, 400);
+  }
+  tick();
+})();
+</script>
 </body>
 </html>

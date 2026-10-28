@@ -73,13 +73,21 @@ OFF_GR        = 0x60           # RO
 OFF_RAMP_DIV  = 0x70
 OFF_RAMP_BUSY = 0x74           # RO，bit0 = bank0，bit1 = bank1
 
+REG_PEAK_IN   = 0x040          # RO，16 位幅度，每 768 采样窗末锁存
+REG_PEAK_OUT  = 0x044
+
 CTRL_RUN   = 1 << 0
 CTRL_DRC   = 1 << 1
 CTRL_FLUSH = 1 << 2
 CTRL_CLR   = 1 << 8
 
 GAIN_UNITY = 256               # Q7.8，1.0 = 256
+Q22_ONE    = 1 << 22           # Q2.22 的 1.0
 FS         = 48000
+
+# 网页第三档用它开关通路：内容 "1" / "0"。PL 直连没有"启动音频流"的概念，
+# 只有 run 位；写文件比让网页进程去碰 MMIO 安全（overlay 只能在一个进程里）。
+RUN_PATH = os.environ.get("FIR_PL_RUN", "/dev/shm/fir_pl_run.txt")
 
 BIT_DEFAULT = "/home/xilinx/dma_exp/fir_pl.bit"
 CTRL_BASE_DEFAULT = 0x43C00000  # gpio_ctrl，ctrl 位仍走这里
@@ -131,6 +139,58 @@ def ms_to_coef(ms):
     return step15 << 7
 
 
+def coef_to_ms(c):
+    """上面的逆运算，只给 /api/status 显示用（页面要 attack_ms/release_ms）。"""
+    if c <= 0:
+        return 0.0
+    s = (int(c) >> 7) / 32768.0
+    if s <= 0.0 or s >= 1.0:
+        return 0.0
+    return round(-1.0 / (FS * math.log(1.0 - s)) * 1e3, 1)
+
+
+def amp_to_db(v, full=32768.0):
+    """线性幅度 → dBFS。0 返回 None，页面据此显示"—"。"""
+    v = abs(float(v))
+    if v <= 0.0:
+        return None
+    return round(20.0 * math.log10(v / full), 1)
+
+
+def read_obs(regs):
+    """读观察量：PEAK_IN/OUT（16 位）+ 四段 ENV/GR（Q2.22）。"""
+    peak_in = regs.rd(REG_PEAK_IN) & 0xFFFF
+    peak_out = regs.rd(REG_PEAK_OUT) & 0xFFFF
+    env = []
+    gr = []
+    for i in range(4):
+        e = regs.rd(BANK0 + OFF_ENV + 4 * i) & 0xFFFFFF
+        g = regs.rd(BANK0 + OFF_GR + 4 * i) & 0xFFFFFF
+        env.append(round(e / float(Q22_ONE), 4))     # 线性幅度，1.0 = 满量程
+        gr.append(round(g / float(Q22_ONE), 4))
+    return peak_in, peak_out, env, gr
+
+
+def read_run():
+    """网页写的 run 标志。文件不存在 = 1（独立跑时默认开）。"""
+    try:
+        with open(RUN_PATH, "r") as f:
+            return f.read().strip() != "0"
+    except Exception:
+        return True
+
+
+def write_run(on):
+    try:
+        tmp = RUN_PATH + ".tmp"
+        with open(tmp, "w") as f:
+            f.write("1" if on else "0")
+        os.replace(tmp, RUN_PATH)
+        return True
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------- 寄存器访问
 class Regs(object):
     """一层薄封装：只认 32 位整字的读写，方便 --selftest 用假 MMIO 顶替。"""
@@ -152,10 +212,12 @@ def apply_tune(regs, tune, last=None):
     表现是"增益永远爬不到头"。
     """
     g = tune.get("gain_db") or [30.0] * 4   # 演示默认 +30 dB（2026-10-28 听感拍板）
-    thr = tune.get("thr_db") or [-10.0] * 4
-    rat = tune.get("ratio") or [0.0] * 4
-    atk = tune.get("attack_ms") or [0.0] * 4
-    rel = tune.get("release_ms") or [0.0] * 4
+    # thr/ratio/atk/rel 的默认值必须等于寄存器出厂值（419456 / 2936064 / 17408 / 896），
+    # 否则后端一启动就把位流上电的那套 v25 参数顶掉。2026-10-28 批 2 定案。
+    thr = tune.get("thr_db") or [-20.0] * 4
+    rat = tune.get("ratio") or [0.7] * 4
+    atk = tune.get("attack_ms") or [5.0] * 4
+    rel = tune.get("release_ms") or [100.0] * 4
     byp = bool(tune.get("bypass"))
 
     cur = {
@@ -216,18 +278,24 @@ def _four(v):
     return [x, x, x, x]
 
 
-def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None):
-    """组装 status json。字段照 fir_live.publish_status 的约定，页面不用改。"""
+def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True):
+    """组装 status json。字段照 fir_live.publish_status 的约定，页面不用改。
+
+    2026-10-28 批 2：多给一组观察量（peak_in/out、四段 env/gr）。
+    RTL 里 PEAK 是真信号（每 768 采样窗锁存），ENV/GR 也是真信号；
+    电平表（in_rms/out_rms）还是桩，所以那两个保持 0，页面显示空条。
+    """
     now = time.time()
     st0 = regs.rd(REG_STAT0)
     st1 = regs.rd(REG_STAT1)
     gains = tune_cur["gain"] if tune_cur else [256] * 4
     busy = bool(ramp_busy)
+    peak_in, peak_out, env, gr = read_obs(regs)
     (sink or write_status)({
         "t": now,
         "n": 0,                      # 没有"块"这个概念了
         "pid": os.getpid(),
-        "running": True,
+        "running": bool(run),
         "ok": err is None,
         "mode": "pl",                # 网页用它显示"PL 直连"徽标
         "gain_db": [round(gain_to_db(g), 2) for g in gains],
@@ -235,8 +303,17 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None):
         "gain_applied_db": [round(gain_to_db(g), 2) for g in gains],
         "ramp_busy": 1 if busy else 0,
         "bypass": bool(regs.rd(REG_CTRL) & CTRL_DRC) is False,
-        "attack_ms": [0.0] * 4,
-        "release_ms": [0.0] * 4,
+        "attack_ms": [coef_to_ms(c) for c in (tune_cur or {}).get("atk", [0] * 4)],
+        "release_ms": [coef_to_ms(c) for c in (tune_cur or {}).get("rel", [0] * 4)],
+        # ---- 观察量（真信号）----
+        "peak_in": peak_in,
+        "peak_out": peak_out,
+        "peak_in_db": amp_to_db(peak_in, 32768.0),
+        "peak_out_db": amp_to_db(peak_out, 32768.0),
+        "env": env,                      # 四段包络，线性幅度（1.0 = 满量程）
+        "env_db": [amp_to_db(v, 1.0) for v in env],
+        "gr": gr,                        # 四段衰减量，线性幅度
+        "gr_db": [amp_to_db(v, 1.0) for v in gr],   # 负值 = 压掉的 dB
         # 电平表/抓取还没接进 RTL，先给 0，页面会显示空条而不是乱跳
         "in_rms": 0.0,
         "out_rms": 0.0,
@@ -341,6 +418,42 @@ def selftest():
     print("  缺字段：%s  %s" % (sorted(miss) if miss else "无", "OK" if not miss else "FAIL"))
     print("  mode=%s lat_ms=%s gain_db=%s" % (got.get("mode"), got.get("lat_ms"), got.get("gain_db")))
 
+    print("== 6. 观察量与 run 开关 ==")
+    fake.mem[REG_PEAK_IN] = 16384            # 半满量程 = -6.0 dBFS
+    fake.mem[REG_PEAK_OUT] = 23170
+    fake.mem[BANK0 + OFF_ENV + 4 * 0] = Q22_ONE // 2      # 0.5 = -6.0 dB
+    fake.mem[BANK0 + OFF_ENV + 4 * 1] = 0
+    fake.mem[BANK0 + OFF_GR + 4 * 0] = Q22_ONE // 4       # 压掉 12 dB
+    st = {}
+    publish(regs, cur, time.time(), 0, sink=lambda d: st.update(d))
+    checks = [
+        ("peak_in_db", st.get("peak_in_db"), -6.0),
+        ("peak_out_db", st.get("peak_out_db"), -3.0),
+        ("env_db[0]", st.get("env_db", [None])[0], -6.0),
+        ("env_db[1] zero->None", st.get("env_db", [None, 1])[1], None),
+        ("gr_db[0]", st.get("gr_db", [None])[0], -12.0),
+        ("env[0] linear", st.get("env", [None])[0], 0.5),
+    ]
+    for name, got, exp in checks:
+        ok = (got == exp)
+        bad += 0 if ok else 1
+        print("  %-22s = %-8s expect %-8s %s" % (name, got, exp, "OK" if ok else "FAIL"))
+
+    globals()["RUN_PATH"] = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                         "_run_selftest.txt")
+    try:
+        write_run(False)
+        ok = (read_run() is False)
+        write_run(True)
+        ok = ok and (read_run() is True)
+    finally:
+        try:
+            os.remove(RUN_PATH)
+        except Exception:
+            pass
+    bad += 0 if ok else 1
+    print("  run flag write/read  %s" % ("OK" if ok else "FAIL"))
+
     print("\n%s" % ("SELFTEST PASS" if bad == 0 else "SELFTEST FAIL (%d)" % bad))
     return 0 if bad == 0 else 1
 
@@ -400,16 +513,25 @@ def main():
     time.sleep(0.05)
 
     print("running: tune -> regs, regs -> status (Ctrl-C to stop)")
+    run = True
     while True:
         try:
+            # 2026-10-28 批 2：网页第三档通过 /dev/shm/fir_pl_run.txt 开关通路。
+            # 文件不存在时按"开"处理 —— 单独跑这个脚本时行为不变。
+            run_now = read_run()
+            if run_now != run:
+                run = run_now
+                set_ctrl((CTRL_RUN | (0 if (last or {}).get("bypass") else CTRL_DRC))
+                         if run else 0)
             tune = read_tune() or {}
             cur, changed = apply_tune(regs, tune, last)
             if changed:
                 last = cur
-                # ctrl[1] 由 bypass 决定；run 一直开
-                set_ctrl(CTRL_RUN | (0 if cur["bypass"] else CTRL_DRC))
+                # ctrl[1] 由 bypass 决定
+                if run:
+                    set_ctrl(CTRL_RUN | (0 if cur["bypass"] else CTRL_DRC))
             busy = regs.rd(REG_RAMP_BUSY) & 0x3
-            publish(regs, last, t0, busy, err)
+            publish(regs, last, t0, busy, err, run=run)
             err = None
         except Exception as ex:            # 板子上的异常不要静默，写进 status
             err = "%s: %s" % (type(ex).__name__, ex)
