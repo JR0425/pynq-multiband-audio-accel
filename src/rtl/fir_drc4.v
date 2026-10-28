@@ -89,12 +89,18 @@ module fir_drc4_chan #(
     parameter signed [DW-1:0] RATIO = 24'sd2936064,
     parameter signed [DW-1:0] ATK   = 24'sd17408,
     parameter signed [DW-1:0] REL   = 24'sd896,
-    parameter signed [15:0]   GAIN  = 16'sd256
+    parameter signed [15:0]   GAIN  = 16'sd256   // 只给 testbench / 老实例当默认
 ) (
     input  wire                  clk,
     input  wire                  rst,      // 清包络（和 HLS 的 reset 输入同义）
     input  wire                  in_vld,
     input  wire signed [BW-1:0]  band,
+    /* 运行期验配增益（Q7.8，1.0 = 256）。
+     * 2026-10-28：原来是参数，为了网页能拖滑杆改成端口。
+     * 斜坡不在这一级做 —— 由 fir_pl_direct 把爬好坡的目标值喂进来，
+     * 这样压缩器的包络状态不受增益变化影响（增益在包络检测之前，
+     * 换增益等价于换输入电平，包络本来就该跟着变）。 */
+    input  wire signed [15:0]    gain_i,
     output reg  signed [DW-1:0]  yv,
     output reg                   yv_vld
 );
@@ -130,8 +136,11 @@ module fir_drc4_chan #(
     reg signed [DW-1:0] p_band;
 
     /* ---------------- 级 1：× 增益 ---------------- */
-    /* 乘积 24×16 正好 40 位，别先扩到 48 再乘 —— 那会变成 48×48。 */
-    wire signed [39:0]   gmul = p_band * GAIN;
+    /* 乘积 24×16 正好 40 位，别先扩到 48 再乘 —— 那会变成 48×48。
+     * gain_i 是运行期值，但要和 p_band 同一拍对齐：p_band 是打了一拍的
+     * band，gain_i 由外面的斜坡寄存器直接给出（每个采样更新一次），
+     * 所以在 p_band 有效的那一拍取 gain_i 就是对的。 */
+    wire signed [39:0]   gmul = p_band * gain_i;
     wire signed [47:0]   gse  = {{8{gmul[39]}}, gmul};
     wire signed [47:0]   gshr = gse >>> SH_GAIN;
     wire signed [DW-1:0] gb1  = satd(gshr);
@@ -348,6 +357,12 @@ module fir_drc4 #(
     input  wire signed [BW-1:0]  band1,
     input  wire signed [BW-1:0]  band2,
     input  wire signed [BW-1:0]  band3,
+    /* 四段运行期增益（Q7.8）。老实例（fir_rtl_shell / fir_stream_shell）
+     * 直接绑 16'sd256，和端口化之前逐位相同。 */
+    input  wire signed [15:0]    gain0,
+    input  wire signed [15:0]    gain1,
+    input  wire signed [15:0]    gain2,
+    input  wire signed [15:0]    gain3,
     output reg  signed [15:0]    y,
     output reg                   y_vld
 );
@@ -368,20 +383,24 @@ module fir_drc4 #(
     wire                 v0,  v1,  v2,  v3;
 
     fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
-                    .THR(THR0), .RATIO(RATIO0), .ATK(ATK0), .REL(REL0), .GAIN(GAIN0))
-    u_b0 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band0), .yv(yv0), .yv_vld(v0));
+                    .THR(THR0), .RATIO(RATIO0), .ATK(ATK0), .REL(REL0))
+    u_b0 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band0),
+            .gain_i(gain0), .yv(yv0), .yv_vld(v0));
 
     fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
-                    .THR(THR1), .RATIO(RATIO1), .ATK(ATK1), .REL(REL1), .GAIN(GAIN1))
-    u_b1 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band1), .yv(yv1), .yv_vld(v1));
+                    .THR(THR1), .RATIO(RATIO1), .ATK(ATK1), .REL(REL1))
+    u_b1 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band1),
+            .gain_i(gain1), .yv(yv1), .yv_vld(v1));
 
     fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
-                    .THR(THR2), .RATIO(RATIO2), .ATK(ATK2), .REL(REL2), .GAIN(GAIN2))
-    u_b2 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band2), .yv(yv2), .yv_vld(v2));
+                    .THR(THR2), .RATIO(RATIO2), .ATK(ATK2), .REL(REL2))
+    u_b2 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band2),
+            .gain_i(gain2), .yv(yv2), .yv_vld(v2));
 
     fir_drc4_chan #(.BW(BW), .DW(DW), .FRAC_ACC(FRAC_ACC), .FRAC_DRC(FRAC_DRC),
-                    .THR(THR3), .RATIO(RATIO3), .ATK(ATK3), .REL(REL3), .GAIN(GAIN3))
-    u_b3 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band3), .yv(yv3), .yv_vld(v3));
+                    .THR(THR3), .RATIO(RATIO3), .ATK(ATK3), .REL(REL3))
+    u_b3 (.clk(clk), .rst(rst), .in_vld(in_vld), .band(band3),
+            .gain_i(gain3), .yv(yv3), .yv_vld(v3));
 
     /* drc_t(Q2.22) 加到 acc_t(Q8.32)：小数位差 10，左移 10。
      * 四段都 ≤ 2^23，<<10 之后 ≤ 2^33，四项相加 ≤ 2^35，40 位装得下。 */

@@ -160,6 +160,12 @@ module fir_rtl_shell #(
         .band1  (dbg_b1),
         .band2  (dbg_b2),
         .band3  (dbg_b3),
+        /* 这两个 shell 走的是编译期固定参数，四段增益绑 0 dB，
+         * 和端口化之前逐位相同（2026-10-28 改成运行期端口） */
+        .gain0  (16'sd256),
+        .gain1  (16'sd256),
+        .gain2  (16'sd256),
+        .gain3  (16'sd256),
         .y      (drc_y),
         .y_vld  (drc_y_vld)
     );

@@ -30,6 +30,8 @@ module tb_fir_drc4;
         .clk(clk), .rst(rst),
         .in_vld(in_vld),
         .band0(band0), .band1(band1), .band2(band2), .band3(band3),
+        .gain0(16'sd256), .gain1(16'sd256),
+        .gain2(16'sd256), .gain3(16'sd256),
         .y(y), .y_vld(y_vld)
     );
 

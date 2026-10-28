@@ -35,7 +35,8 @@ module fir_pl_direct #(
     parameter integer TX_TARGET = 128,   // 播放 FIFO 水位目标（字），直接进延迟
     parameter integer OUT_AW    = 5,     // 输出 FIFO 深度 = 2^OUT_AW 字
     parameter integer RST_CYC   = 8,     // flush 松开后再给前端几拍复位
-    parameter integer OUT_GAIN  = 8      // 输出固定增益（8 = +18 dB），饱和
+    parameter integer OUT_GAIN  = 1      // 主增益（1 = 0 dB）。分频段增益已运行期可调，
+                                         // 这一级留作整机总音量，默认不再额外放大
 ) (
     input  wire        clk,
     input  wire        rst_n,
@@ -45,6 +46,13 @@ module fir_pl_direct #(
      * ctrl[2] flush   =1 两侧 FIFO 和前端一起清空
      * 其余位留给 i2s_duplex（[8] 清计数） */
     input  wire [31:0] ctrl,
+    /* 四段运行期验配增益目标值（Q7.8，1.0 = 256），打包成 64 位：
+     *   [63:48] band3  [47:32] band2  [31:16] band1  [15:0] band0
+     * 打包而不是四个独立端口，是为了 BD 里只需要一个 xlslice 就能从
+     * fir_pl_regs 的 128 位参数组里取出来（少三个单元、少三根线）。 */
+    input  wire [63:0] gain_pack,
+    input  wire [15:0] ramp_div,          // 斜坡移位量，6 ≈ 1.3 ms 收敛
+    output wire        ramp_busy,         // 还有段没爬到目标（1 = 正在爬）
     output wire [31:0] stat0,            // i2s_duplex：ovf / und 计数
     output wire [31:0] stat1,            // i2s_duplex：FIFO 占用
     output wire [31:0] stat2,            // 这里自己的：输出 FIFO 溢出 / 见过的最大 TX 水位
@@ -191,6 +199,40 @@ module fir_pl_direct #(
     wire signed [15:0] drc_y;
     wire               drc_y_vld;
 
+    /* ================= 四段增益斜坡（2026-10-28 加） =================
+     *
+     * 拖滑杆一次能从 −24 dB 跳到 +24 dB，直接塞进乘法器就是一声"咔"。
+     * 斜坡本身在 fir_gain_ramp 里（独立模块，好单独仿真）：
+     *   step = (tgt − cur) >>> ramp_div，除不尽时至少走 1 个 LSB，
+     *   div=6 → 时间常数 64 个采样 ≈ 1.3 ms @48 kHz。
+     *
+     * tick 用 fe_dout_vld：每个采样走一步，四段共用一个节拍。
+     * clr 用 fe_rst：flush 之后直接对齐目标，不该带着旧斜坡跑。
+     */
+    wire signed [15:0] g0_cur, g1_cur, g2_cur, g3_cur;
+
+    wire signed [15:0] g0_tgt = gain_pack[15:0];
+    wire signed [15:0] g1_tgt = gain_pack[31:16];
+    wire signed [15:0] g2_tgt = gain_pack[47:32];
+    wire signed [15:0] g3_tgt = gain_pack[63:48];
+
+    fir_gain_ramp u_ramp (
+        .clk    (clk),
+        .rst_n  (rst_n),
+        .clr    (fe_rst),
+        .tick   (fe_dout_vld),
+        .tgt0   (g0_tgt),
+        .tgt1   (g1_tgt),
+        .tgt2   (g2_tgt),
+        .tgt3   (g3_tgt),
+        .div    (ramp_div),
+        .cur0   (g0_cur),
+        .cur1   (g1_cur),
+        .cur2   (g2_cur),
+        .cur3   (g3_cur),
+        .busy   (ramp_busy)
+    );
+
     fir_drc4 u_drc (
         .clk    (clk),
         .rst    (fe_rst),
@@ -199,6 +241,10 @@ module fir_pl_direct #(
         .band1  (b1),
         .band2  (b2),
         .band3  (b3),
+        .gain0  (g0_cur),
+        .gain1  (g1_cur),
+        .gain2  (g2_cur),
+        .gain3  (g3_cur),
         .y      (drc_y),
         .y_vld  (drc_y_vld)
     );
@@ -250,9 +296,13 @@ module fir_pl_direct #(
      * 送进耳机几乎听不见（吹气这种宽带大声能听见、说话听不见），
      * 听上去就像"根本没接话筒"。
      *
-     * 这里先给一个编译期固定档 +18 dB（OUT_GAIN=8），饱和到 int16 全量程，
-     * 把说话推到能听清。等 AXI-Lite 寄存器接进来，这个常数换成运行期可调的
-     * 四段 GAIN（见 桌面\PYNQ音频项目\PL直连_寄存器表.md 的 GAIN[0..3]）。
+     * 2026-10-28 晚：四段 GAIN 已经端口化（来自 fir_pl_regs 的 GAIN[0..3]），
+     * 所以这里的 +18 dB 临时档撤掉，OUT_GAIN 回归 1（0 dB），留给整机总音量。
+     * **默认增益是 0 dB**（寄存器出厂值 256），说话要靠软件写增益才听得见 ——
+     * 启动脚本 pl_demo_check.py / pl_direct_probe.py 都会先写一遍 +18 dB。
+     *
+     * 注意旁路（ctrl[1]=0）走 fe_dout，不经过四段增益，所以 A/B 对比时
+     * 两边的响度不一样，这是对的：A/B 就是要"不补偿"和"按处方补偿"。
      */
     wire signed [31:0] g_mul = out_q * OUT_GAIN;
     wire signed [15:0] g_sat = (g_mul >  32'sd32767) ?  16'sd32767 :
