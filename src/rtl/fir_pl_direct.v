@@ -58,8 +58,17 @@ module fir_pl_direct #(
     input  wire [95:0] ratio_pack,
     input  wire [95:0] atk_pack,
     input  wire [95:0] rel_pack,
+    /* 2026-10-29：bank1（右耳）那套参数。双耳 = 两套处方，单麦分左右。
+     * 两个 bank 用同一个模块例化两次，靠"拆乘法"把 DSP 从 20/套降到 12/套
+     * （见 fir_drc4.v 文件头），否则 209 + 20 会超过 220。 */
+    input  wire [63:0] gain_pack_b1,
+    input  wire [95:0] thr_pack_b1,
+    input  wire [95:0] ratio_pack_b1,
+    input  wire [95:0] atk_pack_b1,
+    input  wire [95:0] rel_pack_b1,
     input  wire [15:0] ramp_div,          // 斜坡移位量，6 ≈ 1.3 ms 收敛
     output wire        ramp_busy,         // 还有段没爬到目标（1 = 正在爬）
+    output wire        ramp_busy_b1,
     output wire [31:0] stat0,            // i2s_duplex：ovf / und 计数
     output wire [31:0] stat1,            // i2s_duplex：FIFO 占用
     output wire [31:0] stat2,            // 这里自己的：输出 FIFO 溢出 / 见过的最大 TX 水位
@@ -81,6 +90,8 @@ module fir_pl_direct #(
      *   ctrl[5]=1 时它是音源（替代麦克风），地址按采样节拍递增。 */
     output wire [127:0] env_b0,
     output wire [127:0] gr_b0,
+    output wire [127:0] env_b1,
+    output wire [127:0] gr_b1,
     output wire [15:0]  peak_in,
     output wire [15:0]  peak_out,
     output wire [13:0]  ply_addr,
@@ -279,9 +290,43 @@ module fir_pl_direct #(
         .busy   (ramp_busy)
     );
 
-    wire [95:0] drc_env, drc_gr;   /* 四段包络/衰减观察（4×24） */
+    /* bank1（右耳）的斜坡：同一套模块，目标值来自 gain_pack_b1。
+     * 两个斜坡各自爬各自的，一双耳朵拖滑杆时不会互相拖。 */
+    wire signed [15:0] h0_cur, h1_cur, h2_cur, h3_cur;
 
-    fir_drc4 u_drc (
+    fir_gain_ramp u_ramp_b (
+        .clk    (clk),
+        .rst_n  (rst_n),
+        .clr    (fe_rst),
+        .tick   (fe_dout_vld),
+        .tgt0   (gain_pack_b1[15:0]),
+        .tgt1   (gain_pack_b1[31:16]),
+        .tgt2   (gain_pack_b1[47:32]),
+        .tgt3   (gain_pack_b1[63:48]),
+        .div    (ramp_div),
+        .cur0   (h0_cur),
+        .cur1   (h1_cur),
+        .cur2   (h2_cur),
+        .cur3   (h3_cur),
+        .busy   (ramp_busy_b1)
+    );
+
+    wire [95:0] drc_env, drc_gr;   /* bank0（左）四段包络/衰减观察（4×24） */
+    wire [95:0] drc_env_r, drc_gr_r; /* bank1（右） */
+
+    /* ================= 双耳：两套处方，两套 DRC =================
+     *
+     * 单麦 → 同一个四段信号 → 左右各一套增益/阈值/压缩比/time constant。
+     * 两套参数都由 fir_pl_regs 给（bank0 是 *_pack，bank1 是 *_pack_b1）。
+     *
+     * 为什么能放两份：fir_drc4 里两个 25×24 乘法拆成「18 位走 DSP + 6 位走 LUT」，
+     * 一套从 20 个 DSP 降到 12 个，两份 24 个，整机 213/220。
+     * 拆分是整数分解（B = Bhi·64 + Blo），逐位精确，tb_drc_gain/tb_drc_chan 全过。
+     */
+    wire signed [15:0] drc_y_l, drc_y_r;
+    wire               drc_vld_l, drc_vld_r;
+
+    fir_drc4 u_drc_l (
         .clk    (clk),
         .rst    (fe_rst),
         .in_vld (fe_dout_vld),
@@ -309,14 +354,47 @@ module fir_pl_direct #(
         .rel1   (rel_pack[47:24]),
         .rel2   (rel_pack[71:48]),
         .rel3   (rel_pack[95:72]),
-        .y      (drc_y),
-        .y_vld  (drc_y_vld),
+        .y      (drc_y_l),
+        .y_vld  (drc_vld_l),
         .env_o  (drc_env),
         .gr_o   (drc_gr)
     );
 
-    /* env/gr 打包：四段 Q2.22（24 位）符号扩展到 32，段0 在最低 32 位。
-     * bank1 那份（env_b1/gr_b1）批 2 双耳时再加第二份 DRC。 */
+    fir_drc4 u_drc_r (
+        .clk    (clk),
+        .rst    (fe_rst),
+        .in_vld (fe_dout_vld),
+        .band0  (b0),
+        .band1  (b1),
+        .band2  (b2),
+        .band3  (b3),
+        .gain0  (h0_cur),
+        .gain1  (h1_cur),
+        .gain2  (h2_cur),
+        .gain3  (h3_cur),
+        .thr0   (thr_pack_b1[23:0]),
+        .thr1   (thr_pack_b1[47:24]),
+        .thr2   (thr_pack_b1[71:48]),
+        .thr3   (thr_pack_b1[95:72]),
+        .ratio0 (ratio_pack_b1[23:0]),
+        .ratio1 (ratio_pack_b1[47:24]),
+        .ratio2 (ratio_pack_b1[71:48]),
+        .ratio3 (ratio_pack_b1[95:72]),
+        .atk0   (atk_pack_b1[23:0]),
+        .atk1   (atk_pack_b1[47:24]),
+        .atk2   (atk_pack_b1[71:48]),
+        .atk3   (atk_pack_b1[95:72]),
+        .rel0   (rel_pack_b1[23:0]),
+        .rel1   (rel_pack_b1[47:24]),
+        .rel2   (rel_pack_b1[71:48]),
+        .rel3   (rel_pack_b1[95:72]),
+        .y      (drc_y_r),
+        .y_vld  (drc_vld_r),
+        .env_o  (drc_env_r),
+        .gr_o   (drc_gr_r)
+    );
+
+    /* env/gr 打包：四段 Q2.22（24 位）符号扩展到 32，段0 在最低 32 位。 */
     wire signed [23:0] e0 = drc_env[23:0];
     wire signed [23:0] e1 = drc_env[47:24];
     wire signed [23:0] e2 = drc_env[71:48];
@@ -327,6 +405,17 @@ module fir_pl_direct #(
     wire signed [23:0] w3 = drc_gr[95:72];
     assign env_b0 = {{8{e3[23]}}, e3, {8{e2[23]}}, e2, {8{e1[23]}}, e1, {8{e0[23]}}, e0};
     assign gr_b0  = {{8{w3[23]}}, w3, {8{w2[23]}}, w2, {8{w1[23]}}, w1, {8{w0[23]}}, w0};
+
+    wire signed [23:0] f0 = drc_env_r[23:0];
+    wire signed [23:0] f1 = drc_env_r[47:24];
+    wire signed [23:0] f2 = drc_env_r[71:48];
+    wire signed [23:0] f3 = drc_env_r[95:72];
+    wire signed [23:0] v0 = drc_gr_r[23:0];
+    wire signed [23:0] v1 = drc_gr_r[47:24];
+    wire signed [23:0] v2 = drc_gr_r[71:48];
+    wire signed [23:0] v3 = drc_gr_r[95:72];
+    assign env_b1 = {{8{f3[23]}}, f3, {8{f2[23]}}, f2, {8{f1[23]}}, f1, {8{f0[23]}}, f0};
+    assign gr_b1  = {{8{v3[23]}}, v3, {8{v2[23]}}, v2, {8{v1[23]}}, v1, {8{v0[23]}}, v0};
 
     /* ---- 峰值表：每 768 采样（16 ms）窗内 |max|，窗末锁存 ----
      * 进侧看 fe_dout（处理前），出侧看 out_q（处理后）——评委一眼看出
@@ -367,8 +456,9 @@ module fir_pl_direct #(
      * 所以中途切只是"过压缩"和"不过压缩"两个值换一下，会有一声轻微的跳变，
      * 不会把状态搞乱。锁存反而更糟 —— 复位期间 ctrl[1] 通常是 0，
      * 之后想改 drc_en 就再也改不了了。 */
-    assign        out_q   = ctrl[1] ? drc_y    : fe_dout;
-    wire               out_vld = ctrl[1] ? drc_y_vld : fe_dout_vld;
+    assign        out_q   = ctrl[1] ? drc_y_l  : fe_dout;
+    wire signed [15:0] out_q_r = ctrl[1] ? drc_y_r : fe_dout;   /* 旁路时左右相同 */
+    wire               out_vld = ctrl[1] ? drc_vld_l : fe_dout_vld;
 
     /* ================= 内部测试音（ctrl[3]，2026-10-28 加） =================
      *
@@ -418,13 +508,17 @@ module fir_pl_direct #(
      * 注意旁路（ctrl[1]=0）走 fe_dout，不经过四段增益，所以 A/B 对比时
      * 两边的响度不一样，这是对的：A/B 就是要"不补偿"和"按处方补偿"。
      */
-    wire signed [31:0] g_mul = out_q * OUT_GAIN;
-    wire signed [15:0] g_sat = (g_mul >  32'sd32767) ?  16'sd32767 :
-                               (g_mul < -32'sd32768) ? -16'sd32768 :
-                               g_mul[15:0];
+    wire signed [31:0] g_mul_l = out_q   * OUT_GAIN;
+    wire signed [31:0] g_mul_r = out_q_r * OUT_GAIN;
+    wire signed [15:0] g_sat_l = (g_mul_l >  32'sd32767) ?  16'sd32767 :
+                                 (g_mul_l < -32'sd32768) ? -16'sd32768 :
+                                 g_mul_l[15:0];
+    wire signed [15:0] g_sat_r = (g_mul_r >  32'sd32767) ?  16'sd32767 :
+                                 (g_mul_r < -32'sd32768) ? -16'sd32768 :
+                                 g_mul_r[15:0];
 
-    wire signed [15:0] out_q_mux = ctrl[3] ? (tone_sq ? TONE_AMP : -TONE_AMP)
-                                           : g_sat;
+    wire signed [15:0] out_l = ctrl[3] ? (tone_sq ? TONE_AMP : -TONE_AMP) : g_sat_l;
+    wire signed [15:0] out_r = ctrl[3] ? (tone_sq ? TONE_AMP : -TONE_AMP) : g_sat_r;
 
     /* ================= 输出 FIFO ================= */
     /* 前端输出没有 ready，而 i2s_duplex 的播放入口可能有一拍不 ready
@@ -440,27 +534,27 @@ module fir_pl_direct #(
 
     wire [15:0] ofifo_q = ofifo[orptr[OUT_AW-1:0]];
 
-    /* ---- 一个采样写两份（2026-10-27 与上面的取一修配套） ----
-     * i2s_duplex 的发送侧每帧从 FIFO 取两个字（hold0 / hold1）。收侧现在每帧
-     * 只产一个采样，所以这里必须把一个采样写两遍；否则每帧少一个字，`und`
-     * 会一直涨，声音是断续的。
+    /* ---- 一帧写两个声道（2026-10-29 双耳改造） ----
+     * i2s_duplex 的发送侧每帧从 FIFO 取两个字（hold0 / hold1）。收侧每帧只产
+     * 一个采样，所以必须往 FIFO 里塞两个。以前是"同一个采样写两遍"，
+     * 现在左边写 out_l、右边写 out_r —— 双耳时两个值不同，单耳/旁路时相同。
      *
      * 用 2 位计数而不是"写一次立刻再写一次"：写使能是寄存的，同一个 always
-     * 块里连写两拍会让第二拍的数据来源在 `dup_half` 翻转后变成新采样。
-     *
-     * 以后做双耳（B5）时，两份分别写 drc_l / drc_r 即可，结构不用改。 */
-    reg [15:0] dup_q;
-    reg [1:0]  dup_left;      // 还剩几份没写
+     * 块里连写两拍会让第二拍的数据来源在计数翻转后变掉。
+     */
+    reg [15:0] pr_l, pr_r;
+    reg [1:0]  dup_left;      // 还剩几个字没写（2 = 左、右都还没写）
     reg        dup_wr;
     reg        dup_drop;      // 一对没写出去（正常恒 0）
     wire [15:0] ofifo_din;
 
     assign ofifo_wr  = dup_wr;
-    assign ofifo_din = dup_q;
+    assign ofifo_din = (dup_left == 2'd2) ? pr_l : pr_r;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n || flush) begin
-            dup_q    <= 16'd0;
+            pr_l     <= 16'd0;
+            pr_r     <= 16'd0;
             dup_left <= 2'd0;
             dup_wr   <= 1'b0;
             dup_drop <= 1'b0;
@@ -475,7 +569,8 @@ module fir_pl_direct #(
             end
             if (out_vld) begin
                 if (dup_left == 2'd0) begin
-                    dup_q    <= out_q_mux;
+                    pr_l     <= out_l;
+                    pr_r     <= out_r;
                     dup_left <= 2'd2;
                 end else begin
                     dup_drop <= 1'b1;     // 上一对还没写完又来一个（不该发生）

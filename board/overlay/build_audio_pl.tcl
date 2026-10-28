@@ -242,9 +242,19 @@ foreach pk {thr ratio atk rel} {
   connect_bd_net [get_bd_pins fir_pl_regs_0/${pk}_b0] [get_bd_pins fir_pl_direct_0/${pk}_pack]
 }
 
+# ---- 双耳（2026-10-29）：bank1 那套参数也从寄存器来 ----
+# 以前这四组和 gain_b1 都接到常量 0，右耳永远是静音；现在接真的。
+connect_bd_net [get_bd_pins fir_pl_regs_0/gain_b1]  [get_bd_pins fir_pl_direct_0/gain_pack_b1]
+connect_bd_net [get_bd_pins fir_pl_direct_0/ramp_busy_b1] [get_bd_pins fir_pl_regs_0/ramp_busy_b1]
+foreach pk {thr ratio atk rel} {
+  connect_bd_net [get_bd_pins fir_pl_regs_0/${pk}_b1] [get_bd_pins fir_pl_direct_0/${pk}_pack_b1]
+}
+
 # ---- 观察量接真信号（2026-10-28 批 1）：env/gr/peak 不再是假线 ----
 connect_bd_net [get_bd_pins fir_pl_direct_0/env_b0]   [get_bd_pins fir_pl_regs_0/env_b0]
 connect_bd_net [get_bd_pins fir_pl_direct_0/gr_b0]    [get_bd_pins fir_pl_regs_0/gr_b0]
+connect_bd_net [get_bd_pins fir_pl_direct_0/env_b1]   [get_bd_pins fir_pl_regs_0/env_b1]
+connect_bd_net [get_bd_pins fir_pl_direct_0/gr_b1]    [get_bd_pins fir_pl_regs_0/gr_b1]
 connect_bd_net [get_bd_pins fir_pl_direct_0/peak_in]  [get_bd_pins fir_pl_regs_0/peak_in]
 connect_bd_net [get_bd_pins fir_pl_direct_0/peak_out] [get_bd_pins fir_pl_regs_0/peak_out]
 
@@ -258,11 +268,7 @@ foreach pin {smp_cnt frm_cnt ply_rd ply_und lvl_in_lo lvl_in_hi lvl_out_lo lvl_o
   connect_bd_net [get_bd_pins z32/dout] [get_bd_pins fir_pl_regs_0/$pin]
 }
 connect_bd_net [get_bd_pins z16/dout]  [get_bd_pins fir_pl_regs_0/mpo_peak]
-foreach pin {env_b1 gr_b1} {
-  connect_bd_net [get_bd_pins z128/dout] [get_bd_pins fir_pl_regs_0/$pin]
-}
 connect_bd_net [get_bd_pins z13/dout] [get_bd_pins fir_pl_regs_0/scope_wr]
-connect_bd_net [get_bd_pins z1/dout]  [get_bd_pins fir_pl_regs_0/ramp_busy_b1]
 
 # ---- 时钟 / 复位 ----
 set clk_pins [list \

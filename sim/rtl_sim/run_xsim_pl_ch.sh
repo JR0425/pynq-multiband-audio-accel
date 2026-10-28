@@ -40,6 +40,7 @@ MSYS_NO_PATHCONV=1 cmd /c "$(cygpath -w "$XV")" \
     "$(cygpath -w "$ROOT/src/rtl/i2s_duplex.v")" \
     "$(cygpath -w "$ROOT/src/rtl/fir_mb_fe.v")" \
     "$(cygpath -w "$ROOT/src/rtl/fir_drc4.v")" \
+    "$(cygpath -w "$ROOT/src/rtl/fir_gain_ramp.v")" \
     "$(cygpath -w "$ROOT/src/rtl/fir_pl_direct.v")" \
     "$(cygpath -w "$SIM/tb_pl_channel.v")" \
     > xvlog.log 2>&1

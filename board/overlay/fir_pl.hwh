@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Wed Oct 28 23:12:40 2026" VIVADOVERSION="2020.2">
+<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Thu Oct 29 00:47:21 2026" VIVADOVERSION="2020.2">
 
   <SYSTEMINFO ARCH="zynq" DEVICE="7z020" NAME="audio_pl" PACKAGE="clg400" SPEEDGRADE="-1"/>
 
@@ -2465,6 +2465,31 @@
             <CONNECTION INSTANCE="fir_pl_regs_0" PORT="rel_b0"/>
           </CONNECTIONS>
         </PORT>
+        <PORT DIR="I" LEFT="63" NAME="gain_pack_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_gain_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="gain_b1"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="I" LEFT="95" NAME="thr_pack_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_thr_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="thr_b1"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="I" LEFT="95" NAME="ratio_pack_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_ratio_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="ratio_b1"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="I" LEFT="95" NAME="atk_pack_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_atk_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="atk_b1"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="I" LEFT="95" NAME="rel_pack_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_rel_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="rel_b1"/>
+          </CONNECTIONS>
+        </PORT>
         <PORT DIR="I" LEFT="15" NAME="ramp_div" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_ramp_div_b0">
           <CONNECTIONS>
             <CONNECTION INSTANCE="fir_pl_regs_0" PORT="ramp_div_b0"/>
@@ -2473,6 +2498,11 @@
         <PORT DIR="O" NAME="ramp_busy" SIGIS="undef" SIGNAME="fir_pl_direct_0_ramp_busy">
           <CONNECTIONS>
             <CONNECTION INSTANCE="fir_pl_regs_0" PORT="ramp_busy_b0"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="O" NAME="ramp_busy_b1" SIGIS="undef" SIGNAME="fir_pl_direct_0_ramp_busy_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="ramp_busy_b1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" LEFT="31" NAME="stat0" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_direct_0_stat0">
@@ -2511,6 +2541,16 @@
         <PORT DIR="O" LEFT="127" NAME="gr_b0" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_direct_0_gr_b0">
           <CONNECTIONS>
             <CONNECTION INSTANCE="fir_pl_regs_0" PORT="gr_b0"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="O" LEFT="127" NAME="env_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_direct_0_env_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="env_b1"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="O" LEFT="127" NAME="gr_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_direct_0_gr_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="gr_b1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" LEFT="15" NAME="peak_in" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_direct_0_peak_in">
@@ -2686,7 +2726,11 @@
             <CONNECTION INSTANCE="fir_pl_direct_0" PORT="gain_pack"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="63" NAME="gain_b1" RIGHT="0" SIGIS="undef"/>
+        <PORT DIR="O" LEFT="63" NAME="gain_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_gain_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_direct_0" PORT="gain_pack_b1"/>
+          </CONNECTIONS>
+        </PORT>
         <PORT DIR="O" LEFT="95" NAME="thr_b0" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_thr_b0">
           <CONNECTIONS>
             <CONNECTION INSTANCE="fir_pl_direct_0" PORT="thr_pack"/>
@@ -2707,10 +2751,26 @@
             <CONNECTION INSTANCE="fir_pl_direct_0" PORT="rel_pack"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="O" LEFT="95" NAME="thr_b1" RIGHT="0" SIGIS="undef"/>
-        <PORT DIR="O" LEFT="95" NAME="ratio_b1" RIGHT="0" SIGIS="undef"/>
-        <PORT DIR="O" LEFT="95" NAME="atk_b1" RIGHT="0" SIGIS="undef"/>
-        <PORT DIR="O" LEFT="95" NAME="rel_b1" RIGHT="0" SIGIS="undef"/>
+        <PORT DIR="O" LEFT="95" NAME="thr_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_thr_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_direct_0" PORT="thr_pack_b1"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="O" LEFT="95" NAME="ratio_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_ratio_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_direct_0" PORT="ratio_pack_b1"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="O" LEFT="95" NAME="atk_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_atk_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_direct_0" PORT="atk_pack_b1"/>
+          </CONNECTIONS>
+        </PORT>
+        <PORT DIR="O" LEFT="95" NAME="rel_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_rel_b1">
+          <CONNECTIONS>
+            <CONNECTION INSTANCE="fir_pl_direct_0" PORT="rel_pack_b1"/>
+          </CONNECTIONS>
+        </PORT>
         <PORT DIR="O" LEFT="15" NAME="ramp_div_b0" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_regs_0_ramp_div_b0">
           <CONNECTIONS>
             <CONNECTION INSTANCE="fir_pl_direct_0" PORT="ramp_div"/>
@@ -2779,14 +2839,14 @@
             <CONNECTION INSTANCE="fir_pl_direct_0" PORT="gr_b0"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="127" NAME="env_b1" RIGHT="0" SIGIS="undef" SIGNAME="z128_dout">
+        <PORT DIR="I" LEFT="127" NAME="env_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_direct_0_env_b1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="z128" PORT="dout"/>
+            <CONNECTION INSTANCE="fir_pl_direct_0" PORT="env_b1"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" LEFT="127" NAME="gr_b1" RIGHT="0" SIGIS="undef" SIGNAME="z128_dout">
+        <PORT DIR="I" LEFT="127" NAME="gr_b1" RIGHT="0" SIGIS="undef" SIGNAME="fir_pl_direct_0_gr_b1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="z128" PORT="dout"/>
+            <CONNECTION INSTANCE="fir_pl_direct_0" PORT="gr_b1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" LEFT="31" NAME="lvl_in_lo" RIGHT="0" SIGIS="undef" SIGNAME="z32_dout">
@@ -2844,9 +2904,9 @@
             <CONNECTION INSTANCE="fir_pl_direct_0" PORT="ramp_busy"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="ramp_busy_b1" SIGIS="undef" SIGNAME="z1_dout">
+        <PORT DIR="I" NAME="ramp_busy_b1" SIGIS="undef" SIGNAME="fir_pl_direct_0_ramp_busy_b1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="z1" PORT="dout"/>
+            <CONNECTION INSTANCE="fir_pl_direct_0" PORT="ramp_busy_b1"/>
           </CONNECTIONS>
         </PORT>
       </PORTS>
@@ -7050,11 +7110,7 @@
         <PARAMETER NAME="EDK_IPTYPE" VALUE="PERIPHERAL"/>
       </PARAMETERS>
       <PORTS>
-        <PORT DIR="O" LEFT="0" NAME="dout" RIGHT="0" SIGIS="undef" SIGNAME="z1_dout">
-          <CONNECTIONS>
-            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="ramp_busy_b1"/>
-          </CONNECTIONS>
-        </PORT>
+        <PORT DIR="O" LEFT="0" NAME="dout" RIGHT="0" SIGIS="undef"/>
       </PORTS>
       <BUSINTERFACES/>
     </MODULE>
@@ -7067,12 +7123,7 @@
         <PARAMETER NAME="EDK_IPTYPE" VALUE="PERIPHERAL"/>
       </PARAMETERS>
       <PORTS>
-        <PORT DIR="O" LEFT="127" NAME="dout" RIGHT="0" SIGIS="undef" SIGNAME="z128_dout">
-          <CONNECTIONS>
-            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="env_b1"/>
-            <CONNECTION INSTANCE="fir_pl_regs_0" PORT="gr_b1"/>
-          </CONNECTIONS>
-        </PORT>
+        <PORT DIR="O" LEFT="127" NAME="dout" RIGHT="0" SIGIS="undef"/>
       </PORTS>
       <BUSINTERFACES/>
     </MODULE>

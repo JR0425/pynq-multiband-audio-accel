@@ -206,8 +206,12 @@ module fir_drc4_chan #(
     reg signed [24:0]   p_diff;
     reg signed [DW-1:0] p_step;
 
-    /* 级 4：乘法（DSP） */
-    wire signed [48:0]   prod = p_diff * p_step;
+    /* 级 4：乘法（DSP + LUT 拆分，见文件头「为什么要拆乘法」）
+     * p_step = step_hi·64 + step_lo，两段各乘一次再相加，整数上完全相等。 */
+    wire signed [DW-7:0] step_hi = p_step >>> 6;      // 18 位，正好塞进 DSP48 的 B 口
+    wire signed [6:0]    step_lo = {1'b0, p_step[5:0]};  // 低 6 位，补 0 变有符号
+    (* use_dsp = "no" *) wire signed [31:0] prod_lo = p_diff * step_lo;
+    wire signed [48:0]   prod = ((p_diff * step_hi) <<< 6) + prod_lo;
 
     reg signed [48:0] p_prod;
 
@@ -231,7 +235,10 @@ module fir_drc4_chan #(
      * 2026-10-25 实测 WNS −0.140 ns、44 个失败端点**全部**是
      * `u_b{0,2,3}/p_gr_reg[*]/D`，路径是 DSP 的 gr_p → 右移 → 48 位比较 → 寄存器，
      * 12 级 CARRY4、9.921 ns。拆开之后这条降到 6 ns 量级。 */
-    wire signed [48:0]   gr_p = p_ex * omr_r;
+    wire signed [DW-7:0] omr_hi = omr_r >>> 6;
+    wire signed [6:0]    omr_lo = {1'b0, omr_r[5:0]};
+    (* use_dsp = "no" *) wire signed [31:0] gr_lo = p_ex * omr_lo;
+    wire signed [48:0]   gr_p = ((p_ex * omr_hi) <<< 6) + gr_lo;
     wire signed [47:0]   gr_s = gr_p >>> FRAC_DRC;
 
     reg signed [47:0]    p_grs;      // 移位结果，下一拍再判饱和
