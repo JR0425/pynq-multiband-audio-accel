@@ -22,6 +22,7 @@ BIT = "/home/xilinx/dma_exp/fir_pl.bit"
 ID_EXPECT = 0x504C0002
 
 BANK0 = 0x100
+BANK1 = 0x200
 OFF_GAIN = 0x00
 OFF_THR = 0x10
 OFF_RATIO = 0x20
@@ -115,9 +116,27 @@ def main():
         r.write(BANK0 + OFF_THR + 4 * i, 419456)
         r.write(BANK0 + OFF_ATK + 4 * i, 17408)
 
+    # [4d] 两个 bank 必须互不影响
+    # 2026-10-29 板上抓到的 bug 就在这：bank 选择位原来取 addr[11]，而
+    # 0x100 与 0x200 的 bit11 都是 0 —— 写 0x2xx（右耳）全落进 bank0，
+    # 右耳参数永远写不进去，现象是"两套处方怎么调都一起变"。
+    # 这一段原来没有，所以 bug 一路漏到板上才发现。
+    b0_want = [300, 400, 500, 600]
+    b1_want = [700, 800, 900, 1000]
+    for i in range(4):
+        r.write(BANK0 + OFF_GAIN + 4 * i, b0_want[i])
+        r.write(BANK1 + OFF_GAIN + 4 * i, b1_want[i])
+    back0 = [r.read(BANK0 + OFF_GAIN + 4 * i) & 0xFFFF for i in range(4)]
+    back1 = [r.read(BANK1 + OFF_GAIN + 4 * i) & 0xFFFF for i in range(4)]
+    ok = (back0 == b0_want) and (back1 == b1_want)
+    bad += 0 if ok else 1
+    print("[4d] bank0/bank1 互不影响  b0=%s b1=%s  %s"
+          % (back0, back1, "OK" if ok else "FAIL（右耳参数落到了左耳）"))
+
     # 斜坡：先回到 0 dB 让它稳定，再一次性写到 +18 dB，看 busy 的上升与落零
     for i in range(4):
         r.write(BANK0 + OFF_GAIN + 4 * i, GAIN_0DB)
+        r.write(BANK1 + OFF_GAIN + 4 * i, GAIN_0DB)     # 右耳也归零，别留在 1000
     time.sleep(0.1)
     busy0 = r.read(OFF_RAMP_BUSY) & 0x3
 

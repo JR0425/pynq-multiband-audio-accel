@@ -1,7 +1,7 @@
 Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 ------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
-| Date         : Thu Oct 29 00:50:27 2026
+| Date         : Thu Oct 29 16:00:03 2026
 | Host         : yu running 64-bit major release  (build 9200)
 | Command      : report_utilization -file D:/pynq-multiband-audio-accel/board/overlay/fir_pl_synth_util.rpt
 | Design       : audio_pl_wrapper
@@ -30,16 +30,16 @@ Table of Contents
 +----------------------------+-------+-------+-----------+-------+
 |          Site Type         |  Used | Fixed | Available | Util% |
 +----------------------------+-------+-------+-----------+-------+
-| Slice LUTs*                | 19881 |     0 |     53200 | 37.37 |
-|   LUT as Logic             | 17546 |     0 |     53200 | 32.98 |
+| Slice LUTs*                | 21236 |     0 |     53200 | 39.92 |
+|   LUT as Logic             | 18901 |     0 |     53200 | 35.53 |
 |   LUT as Memory            |  2335 |     0 |     17400 | 13.42 |
 |     LUT as Distributed RAM |  1548 |     0 |           |       |
 |     LUT as Shift Register  |   787 |     0 |           |       |
-| Slice Registers            | 12282 |     0 |    106400 | 11.54 |
-|   Register as Flip Flop    | 12282 |     0 |    106400 | 11.54 |
+| Slice Registers            | 13085 |     0 |    106400 | 12.30 |
+|   Register as Flip Flop    | 13085 |     0 |    106400 | 12.30 |
 |   Register as Latch        |     0 |     0 |    106400 |  0.00 |
-| F7 Muxes                   |   289 |     0 |     26600 |  1.09 |
-| F8 Muxes                   |    64 |     0 |     13300 |  0.48 |
+| F7 Muxes                   |   433 |     0 |     26600 |  1.63 |
+| F8 Muxes                   |    65 |     0 |     13300 |  0.49 |
 +----------------------------+-------+-------+-----------+-------+
 * Warning! The Final LUT count, after physical optimizations and full implementation, is typically lower. Run opt_design after synthesis, if not already completed, for a more realistic count.
 
@@ -59,7 +59,7 @@ Table of Contents
 | 2     |          Yes |           - |          Set |
 | 554   |          Yes |           - |        Reset |
 | 391   |          Yes |         Set |            - |
-| 11335 |          Yes |       Reset |            - |
+| 12138 |          Yes |       Reset |            - |
 +-------+--------------+-------------+--------------+
 
 
@@ -152,23 +152,23 @@ Table of Contents
 +------------+-------+----------------------+
 |  Ref Name  |  Used |  Functional Category |
 +------------+-------+----------------------+
-| FDRE       | 11335 |         Flop & Latch |
-| LUT6       |  5259 |                  LUT |
-| LUT2       |  4658 |                  LUT |
-| LUT3       |  3805 |                  LUT |
-| LUT5       |  3239 |                  LUT |
-| CARRY4     |  2108 |           CarryLogic |
-| LUT1       |  1582 |                  LUT |
+| FDRE       | 12138 |         Flop & Latch |
+| LUT6       |  6250 |                  LUT |
+| LUT2       |  5267 |                  LUT |
+| LUT3       |  3792 |                  LUT |
+| LUT5       |  3327 |                  LUT |
+| CARRY4     |  2204 |           CarryLogic |
+| LUT4       |  1716 |                  LUT |
 | RAMD64E    |  1536 |   Distributed Memory |
-| LUT4       |  1533 |                  LUT |
+| LUT1       |  1310 |                  LUT |
 | FDCE       |   554 |         Flop & Latch |
 | SRL16E     |   526 |   Distributed Memory |
+| MUXF7      |   433 |                MuxFx |
 | FDSE       |   391 |         Flop & Latch |
-| MUXF7      |   289 |                MuxFx |
 | SRLC32E    |   261 |   Distributed Memory |
 | DSP48E1    |   213 |     Block Arithmetic |
 | BIBUF      |   130 |                   IO |
-| MUXF8      |    64 |                MuxFx |
+| MUXF8      |    65 |                MuxFx |
 | RAMD32     |    18 |   Distributed Memory |
 | RAMB36E1   |     8 |         Block Memory |
 | RAMS32     |     6 |   Distributed Memory |

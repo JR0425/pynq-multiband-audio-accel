@@ -1,7 +1,7 @@
 Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 ------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2020.2 (win64) Build 3064766 Wed Nov 18 09:12:45 MST 2020
-| Date         : Thu Oct 29 00:54:30 2026
+| Date         : Thu Oct 29 16:04:39 2026
 | Host         : yu running 64-bit major release  (build 9200)
 | Command      : report_timing_summary -quiet -file D:/pynq-multiband-audio-accel/board/overlay/fir_pl_timing.rpt
 | Design       : audio_pl_wrapper
@@ -128,7 +128,7 @@ Table of Contents
 
     WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
     -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-      0.107        0.000                      0                46341        0.030        0.000                      0                46341        3.000        0.000                       0                 14728  
+      0.124        0.000                      0                48283        0.025        0.000                      0                48283        3.000        0.000                       0                 15617  
 
 
 All user specified timing constraints are met.
@@ -160,7 +160,7 @@ Clock                                      WNS(ns)      TNS(ns)  TNS Failing End
 audio_pl_i/clk_wiz_10MHz/inst/clk_in1                                                                                                                                                    3.000        0.000                       0                     1  
   clk_out1_audio_pl_clk_wiz_10MHz_0                                                                                                                                                     97.845        0.000                       0                     2  
   clkfbout_audio_pl_clk_wiz_10MHz_0                                                                                                                                                     17.845        0.000                       0                     3  
-clk_fpga_0                                   0.107        0.000                      0                45785        0.030        0.000                      0                45785        3.750        0.000                       0                 14722  
+clk_fpga_0                                   0.124        0.000                      0                47727        0.025        0.000                      0                47727        3.750        0.000                       0                 15611  
 
 
 ------------------------------------------------------------------------------------------------
@@ -179,7 +179,7 @@ From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS
 
 Path Group         From Clock         To Clock               WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints  
 ----------         ----------         --------               -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------  
-**async_default**  clk_fpga_0         clk_fpga_0               0.606        0.000                      0                  556        1.709        0.000                      0                  556  
+**async_default**  clk_fpga_0         clk_fpga_0               1.358        0.000                      0                  556        1.598        0.000                      0                  556  
 
 
 ------------------------------------------------------------------------------------------------
@@ -263,28 +263,28 @@ Max Period  n/a     MMCME2_ADV/CLKFBIN  n/a            100.000       20.000     
 From Clock:  clk_fpga_0
   To Clock:  clk_fpga_0
 
-Setup :            0  Failing Endpoints,  Worst Slack        0.107ns,  Total Violation        0.000ns
-Hold  :            0  Failing Endpoints,  Worst Slack        0.030ns,  Total Violation        0.000ns
+Setup :            0  Failing Endpoints,  Worst Slack        0.124ns,  Total Violation        0.000ns
+Hold  :            0  Failing Endpoints,  Worst Slack        0.025ns,  Total Violation        0.000ns
 PW    :            0  Failing Endpoints,  Worst Slack        3.750ns,  Total Violation        0.000ns
 ---------------------------------------------------------------------------------------------------
 
 
 Max Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             0.107ns  (required time - arrival time)
-  Source:                 audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/p_gr_reg[3]/C
+Slack (MET) :             0.124ns  (required time - arrival time)
+  Source:                 audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/p_a7_reg[16]/C
                             (rising edge-triggered cell FDRE clocked by clk_fpga_0  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[21]/D
                             (rising edge-triggered cell FDRE clocked by clk_fpga_0  {rise@0.000ns fall@5.000ns period=10.000ns})
   Path Group:             clk_fpga_0
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            10.000ns  (clk_fpga_0 rise@10.000ns - clk_fpga_0 rise@0.000ns)
-  Data Path Delay:        9.493ns  (logic 5.480ns (57.726%)  route 4.013ns (42.274%))
-  Logic Levels:           21  (CARRY4=17 LUT2=2 LUT4=1 LUT6=1)
-  Clock Path Skew:        -0.274ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    2.653ns = ( 12.653 - 10.000 ) 
-    Source Clock Delay      (SCD):    3.042ns
-    Clock Pessimism Removal (CPR):    0.115ns
+  Data Path Delay:        9.534ns  (logic 4.915ns (51.552%)  route 4.619ns (48.448%))
+  Logic Levels:           16  (CARRY4=13 LUT2=1 LUT4=1 LUT6=1)
+  Clock Path Skew:        -0.219ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.657ns = ( 12.657 - 10.000 ) 
+    Source Clock Delay      (SCD):    3.005ns
+    Clock Pessimism Removal (CPR):    0.129ns
   Clock Uncertainty:      0.154ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
     Total System Jitter     (TSJ):    0.071ns
     Total Input Jitter      (TIJ):    0.300ns
@@ -298,71 +298,57 @@ Slack (MET) :             0.107ns  (required time - arrival time)
     PS7_X0Y0             PS7                          0.000     0.000 r  audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0]
                          net (fo=1, routed)           1.193     1.193    audio_pl_i/ps7_0/inst/FCLK_CLK_unbuffered[0]
     BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     1.294 r  audio_pl_i/ps7_0/inst/buffer_fclk_clk_0.FCLK_CLK_0_BUFG/O
-                         net (fo=14749, routed)       1.748     3.042    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/clk
-    SLICE_X31Y47         FDRE                                         r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/p_gr_reg[3]/C
+                         net (fo=15638, routed)       1.711     3.005    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/clk
+    SLICE_X54Y95         FDRE                                         r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/p_a7_reg[16]/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X31Y47         FDRE (Prop_fdre_C_Q)         0.419     3.461 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/p_gr_reg[3]/Q
-                         net (fo=2, routed)           0.888     4.349    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/gr_b1[3]
-    SLICE_X30Y59         LUT2 (Prop_lut2_I1_O)        0.297     4.646 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___224/O
-                         net (fo=1, routed)           0.000     4.646    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___224_n_0
-    SLICE_X30Y59         CARRY4 (Prop_carry4_S[3]_CO[3])
-                                                      0.376     5.022 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[3]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     5.022    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[3]_i_2_n_0
-    SLICE_X30Y60         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.117     5.139 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[7]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     5.139    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[7]_i_2_n_0
-    SLICE_X30Y61         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.117     5.256 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[11]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     5.256    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[11]_i_2_n_0
-    SLICE_X30Y62         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.117     5.373 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[15]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     5.373    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[15]_i_2_n_0
-    SLICE_X30Y63         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.117     5.490 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[19]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     5.490    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[19]_i_2_n_0
-    SLICE_X30Y64         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.117     5.607 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___91_i_1/CO[3]
-                         net (fo=1, routed)           0.000     5.607    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___91_i_1_n_0
-    SLICE_X30Y65         CARRY4 (Prop_carry4_CI_CO[0])
-                                                      0.254     5.861 f  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___91_i_3/CO[0]
-                         net (fo=52, routed)          0.886     6.748    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___91_i_3_n_3
-    SLICE_X33Y59         LUT2 (Prop_lut2_I0_O)        0.367     7.115 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[4]_i_3__6/O
-                         net (fo=1, routed)           0.525     7.640    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[4]_i_3__6_n_0
-    SLICE_X35Y59         CARRY4 (Prop_carry4_CYINIT_CO[3])
-                                                      0.580     8.220 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[4]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     8.220    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[4]_i_2_n_0
-    SLICE_X35Y60         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.114     8.334 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[8]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     8.334    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[8]_i_2_n_0
-    SLICE_X35Y61         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.114     8.448 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[12]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     8.448    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[12]_i_2_n_0
-    SLICE_X35Y62         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.114     8.562 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[16]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     8.562    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[16]_i_2_n_0
-    SLICE_X35Y63         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.114     8.676 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[20]_i_2/CO[3]
-                         net (fo=1, routed)           0.000     8.676    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[20]_i_2_n_0
-    SLICE_X35Y64         CARRY4 (Prop_carry4_CI_O[2])
-                                                      0.239     8.915 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___91_i_2/O[2]
-                         net (fo=5, routed)           0.521     9.436    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_w0[23]
-    SLICE_X34Y63         LUT4 (Prop_lut4_I0_O)        0.295     9.731 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[23]_i_34__6/O
-                         net (fo=1, routed)           0.358    10.090    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[23]_i_34__6_n_0
-    SLICE_X36Y63         CARRY4 (Prop_carry4_DI[0]_CO[3])
-                                                      0.757    10.847 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_22/CO[3]
-                         net (fo=1, routed)           0.000    10.847    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_22_n_0
-    SLICE_X36Y64         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.117    10.964 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_12/CO[3]
-                         net (fo=1, routed)           0.000    10.964    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_12_n_0
-    SLICE_X36Y65         CARRY4 (Prop_carry4_CI_CO[3])
-                                                      0.117    11.081 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_6/CO[3]
-                         net (fo=1, routed)           0.000    11.081    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_6_n_0
-    SLICE_X36Y66         CARRY4 (Prop_carry4_CI_CO[0])
-                                                      0.254    11.335 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_3/CO[0]
-                         net (fo=24, routed)          0.834    12.168    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_3_n_3
-    SLICE_X35Y65         LUT6 (Prop_lut6_I0_O)        0.367    12.535 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[21]_i_1__6/O
-                         net (fo=1, routed)           0.000    12.535    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[21]_i_1__6_n_0
-    SLICE_X35Y65         FDRE                                         r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[21]/D
+    SLICE_X54Y95         FDRE (Prop_fdre_C_Q)         0.478     3.483 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/p_a7_reg[16]/Q
+                         net (fo=2, routed)           1.310     4.793    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/p_a7[16]
+    SLICE_X34Y91         CARRY4 (Prop_carry4_DI[0]_CO[3])
+                                                      0.724     5.517 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[19]_i_2/CO[3]
+                         net (fo=1, routed)           0.000     5.517    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[19]_i_2_n_0
+    SLICE_X34Y92         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.117     5.634 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___138_i_1/CO[3]
+                         net (fo=1, routed)           0.000     5.634    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___138_i_1_n_0
+    SLICE_X34Y93         CARRY4 (Prop_carry4_CI_CO[0])
+                                                      0.254     5.888 f  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___138_i_3/CO[0]
+                         net (fo=52, routed)          0.560     6.448    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___138_i_3_n_3
+    SLICE_X32Y92         LUT2 (Prop_lut2_I0_O)        0.367     6.815 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[4]_i_3__6/O
+                         net (fo=1, routed)           0.781     7.596    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[4]_i_3__6_n_0
+    SLICE_X31Y86         CARRY4 (Prop_carry4_CYINIT_CO[3])
+                                                      0.580     8.176 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[4]_i_2/CO[3]
+                         net (fo=1, routed)           0.000     8.176    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[4]_i_2_n_0
+    SLICE_X31Y87         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     8.290 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[8]_i_2/CO[3]
+                         net (fo=1, routed)           0.000     8.290    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[8]_i_2_n_0
+    SLICE_X31Y88         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     8.404 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[12]_i_2/CO[3]
+                         net (fo=1, routed)           0.000     8.404    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[12]_i_2_n_0
+    SLICE_X31Y89         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     8.518 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[16]_i_2/CO[3]
+                         net (fo=1, routed)           0.000     8.518    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[16]_i_2_n_0
+    SLICE_X31Y90         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114     8.632 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[20]_i_2/CO[3]
+                         net (fo=1, routed)           0.000     8.632    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[20]_i_2_n_0
+    SLICE_X31Y91         CARRY4 (Prop_carry4_CI_O[2])
+                                                      0.239     8.871 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/i___138_i_2/O[2]
+                         net (fo=5, routed)           0.483     9.354    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_w0[23]
+    SLICE_X29Y92         LUT4 (Prop_lut4_I0_O)        0.302     9.656 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[23]_i_34__6/O
+                         net (fo=1, routed)           0.465    10.121    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[23]_i_34__6_n_0
+    SLICE_X31Y92         CARRY4 (Prop_carry4_DI[0]_CO[3])
+                                                      0.526    10.647 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_22/CO[3]
+                         net (fo=1, routed)           0.000    10.647    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_22_n_0
+    SLICE_X31Y93         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114    10.761 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_12/CO[3]
+                         net (fo=1, routed)           0.000    10.761    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_12_n_0
+    SLICE_X31Y94         CARRY4 (Prop_carry4_CI_CO[3])
+                                                      0.114    10.875 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_6/CO[3]
+                         net (fo=1, routed)           0.000    10.875    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_6_n_0
+    SLICE_X31Y95         CARRY4 (Prop_carry4_CI_CO[0])
+                                                      0.271    11.146 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_3/CO[0]
+                         net (fo=24, routed)          1.020    12.166    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[23]_i_3_n_3
+    SLICE_X33Y91         LUT6 (Prop_lut6_I0_O)        0.373    12.539 r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[21]_i_1__6/O
+                         net (fo=1, routed)           0.000    12.539    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv[21]_i_1__6_n_0
+    SLICE_X33Y91         FDRE                                         r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[21]/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk_fpga_0 rise edge)
@@ -370,16 +356,16 @@ Slack (MET) :             0.107ns  (required time - arrival time)
     PS7_X0Y0             PS7                          0.000    10.000 r  audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0]
                          net (fo=1, routed)           1.088    11.088    audio_pl_i/ps7_0/inst/FCLK_CLK_unbuffered[0]
     BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.091    11.179 r  audio_pl_i/ps7_0/inst/buffer_fclk_clk_0.FCLK_CLK_0_BUFG/O
-                         net (fo=14749, routed)       1.474    12.653    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/clk
-    SLICE_X35Y65         FDRE                                         r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[21]/C
-                         clock pessimism              0.115    12.768    
-                         clock uncertainty           -0.154    12.614    
-    SLICE_X35Y65         FDRE (Setup_fdre_C_D)        0.029    12.643    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[21]
+                         net (fo=15638, routed)       1.478    12.657    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/clk
+    SLICE_X33Y91         FDRE                                         r  audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[21]/C
+                         clock pessimism              0.129    12.786    
+                         clock uncertainty           -0.154    12.632    
+    SLICE_X33Y91         FDRE (Setup_fdre_C_D)        0.032    12.664    audio_pl_i/fir_pl_direct_0/inst/u_drc_r/u_b3/yv_reg[21]
   -------------------------------------------------------------------
-                         required time                         12.643    
-                         arrival time                         -12.535    
+                         required time                         12.664    
+                         arrival time                         -12.539    
   -------------------------------------------------------------------
-                         slack                                  0.107    
+                         slack                                  0.124    
 
 
 
@@ -387,20 +373,20 @@ Slack (MET) :             0.107ns  (required time - arrival time)
 
 Min Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             0.030ns  (arrival time - required time)
-  Source:                 audio_pl_i/gpio_stat2/U0/ip2bus_data_i_D1_reg[20]/C
+Slack (MET) :             0.025ns  (arrival time - required time)
+  Source:                 audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/SI_REG/ar.ar_pipe/m_payload_i_reg[62]/C
                             (rising edge-triggered cell FDRE clocked by clk_fpga_0  {rise@0.000ns fall@5.000ns period=10.000ns})
-  Destination:            audio_pl_i/gpio_stat2/U0/AXI_LITE_IPIF_I/I_SLAVE_ATTACHMENT/s_axi_rdata_i_reg[11]/D
+  Destination:            audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/RD.ar_channel_0/s_arid_r_reg[9]/D
                             (rising edge-triggered cell FDRE clocked by clk_fpga_0  {rise@0.000ns fall@5.000ns period=10.000ns})
   Path Group:             clk_fpga_0
   Path Type:              Hold (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk_fpga_0 rise@0.000ns - clk_fpga_0 rise@0.000ns)
-  Data Path Delay:        0.344ns  (logic 0.141ns (40.996%)  route 0.203ns (59.004%))
+  Data Path Delay:        0.278ns  (logic 0.128ns (45.999%)  route 0.150ns (54.001%))
   Logic Levels:           0  
-  Clock Path Skew:        0.267ns (DCD - SCD - CPR)
-    Destination Clock Delay (DCD):    1.190ns
-    Source Clock Delay      (SCD):    0.888ns
-    Clock Pessimism Removal (CPR):    0.035ns
+  Clock Path Skew:        0.260ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    1.270ns
+    Source Clock Delay      (SCD):    0.971ns
+    Clock Pessimism Removal (CPR):    0.039ns
 
     Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
   -------------------------------------------------------------------    -------------------
@@ -409,12 +395,12 @@ Slack (MET) :             0.030ns  (arrival time - required time)
     PS7_X0Y0             PS7                          0.000     0.000 r  audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0]
                          net (fo=1, routed)           0.310     0.310    audio_pl_i/ps7_0/inst/FCLK_CLK_unbuffered[0]
     BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.026     0.336 r  audio_pl_i/ps7_0/inst/buffer_fclk_clk_0.FCLK_CLK_0_BUFG/O
-                         net (fo=14749, routed)       0.552     0.888    audio_pl_i/gpio_stat2/U0/s_axi_aclk
-    SLICE_X52Y94         FDRE                                         r  audio_pl_i/gpio_stat2/U0/ip2bus_data_i_D1_reg[20]/C
+                         net (fo=15638, routed)       0.635     0.971    audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/SI_REG/ar.ar_pipe/aclk
+    SLICE_X49Y138        FDRE                                         r  audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/SI_REG/ar.ar_pipe/m_payload_i_reg[62]/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X52Y94         FDRE (Prop_fdre_C_Q)         0.141     1.029 r  audio_pl_i/gpio_stat2/U0/ip2bus_data_i_D1_reg[20]/Q
-                         net (fo=1, routed)           0.203     1.232    audio_pl_i/gpio_stat2/U0/AXI_LITE_IPIF_I/I_SLAVE_ATTACHMENT/s_axi_rdata_i_reg[31]_0[11]
-    SLICE_X48Y93         FDRE                                         r  audio_pl_i/gpio_stat2/U0/AXI_LITE_IPIF_I/I_SLAVE_ATTACHMENT/s_axi_rdata_i_reg[11]/D
+    SLICE_X49Y138        FDRE (Prop_fdre_C_Q)         0.128     1.099 r  audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/SI_REG/ar.ar_pipe/m_payload_i_reg[62]/Q
+                         net (fo=1, routed)           0.150     1.249    audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/RD.ar_channel_0/Q[26]
+    SLICE_X51Y139        FDRE                                         r  audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/RD.ar_channel_0/s_arid_r_reg[9]/D
   -------------------------------------------------------------------    -------------------
 
                          (clock clk_fpga_0 rise edge)
@@ -422,15 +408,15 @@ Slack (MET) :             0.030ns  (arrival time - required time)
     PS7_X0Y0             PS7                          0.000     0.000 r  audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0]
                          net (fo=1, routed)           0.337     0.337    audio_pl_i/ps7_0/inst/FCLK_CLK_unbuffered[0]
     BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.029     0.366 r  audio_pl_i/ps7_0/inst/buffer_fclk_clk_0.FCLK_CLK_0_BUFG/O
-                         net (fo=14749, routed)       0.824     1.190    audio_pl_i/gpio_stat2/U0/AXI_LITE_IPIF_I/I_SLAVE_ATTACHMENT/s_axi_aclk
-    SLICE_X48Y93         FDRE                                         r  audio_pl_i/gpio_stat2/U0/AXI_LITE_IPIF_I/I_SLAVE_ATTACHMENT/s_axi_rdata_i_reg[11]/C
-                         clock pessimism             -0.035     1.155    
-    SLICE_X48Y93         FDRE (Hold_fdre_C_D)         0.047     1.202    audio_pl_i/gpio_stat2/U0/AXI_LITE_IPIF_I/I_SLAVE_ATTACHMENT/s_axi_rdata_i_reg[11]
+                         net (fo=15638, routed)       0.904     1.270    audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/RD.ar_channel_0/aclk
+    SLICE_X51Y139        FDRE                                         r  audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/RD.ar_channel_0/s_arid_r_reg[9]/C
+                         clock pessimism             -0.039     1.231    
+    SLICE_X51Y139        FDRE (Hold_fdre_C_D)        -0.007     1.224    audio_pl_i/axi_ic/m00_couplers/auto_pc/inst/gen_axilite.gen_b2s_conv.axilite_b2s/RD.ar_channel_0/s_arid_r_reg[9]
   -------------------------------------------------------------------
-                         required time                         -1.202    
-                         arrival time                           1.232    
+                         required time                         -1.224    
+                         arrival time                           1.249    
   -------------------------------------------------------------------
-                         slack                                  0.030    
+                         slack                                  0.025    
 
 
 
@@ -444,9 +430,9 @@ Period(ns):         10.000
 Sources:            { audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0] }
 
 Check Type        Corner  Lib Pin      Reference Pin  Required(ns)  Actual(ns)  Slack(ns)  Location       Pin
-Min Period        n/a     DSP48E1/CLK  n/a            3.884         10.000      6.116      DSP48_X3Y20    audio_pl_i/fir_pl_direct_0/inst/u_fe/GEN_MUL[103].p_reg[103]/CLK
-Low Pulse Width   Slow    RAMD64E/CLK  n/a            1.250         5.000       3.750      SLICE_X34Y141  audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_cap_fifo/mem_reg_1088_1151_15_17/RAMA/CLK
-High Pulse Width  Slow    RAMD32/CLK   n/a            1.250         5.000       3.750      SLICE_X58Y82   audio_pl_i/fir_pl_direct_0/inst/ofifo_reg_0_31_12_15/RAMA/CLK
+Min Period        n/a     DSP48E1/CLK  n/a            3.884         10.000      6.116      DSP48_X1Y7     audio_pl_i/fir_pl_direct_0/inst/u_fe/GEN_MUL[102].p_reg[102]/CLK
+Low Pulse Width   Slow    RAMD64E/CLK  n/a            1.250         5.000       3.750      SLICE_X36Y106  audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_cap_fifo/mem_reg_0_63_31_31/DP/CLK
+High Pulse Width  Slow    RAMD64E/CLK  n/a            1.250         5.000       3.750      SLICE_X58Y126  audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_cap_fifo/mem_reg_1024_1087_15_17/RAMA/CLK
 
 
 
@@ -455,27 +441,27 @@ Path Group:  **async_default**
 From Clock:  clk_fpga_0
   To Clock:  clk_fpga_0
 
-Setup :            0  Failing Endpoints,  Worst Slack        0.606ns,  Total Violation        0.000ns
-Hold  :            0  Failing Endpoints,  Worst Slack        1.709ns,  Total Violation        0.000ns
+Setup :            0  Failing Endpoints,  Worst Slack        1.358ns,  Total Violation        0.000ns
+Hold  :            0  Failing Endpoints,  Worst Slack        1.598ns,  Total Violation        0.000ns
 ---------------------------------------------------------------------------------------------------
 
 
 Max Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             0.606ns  (required time - arrival time)
+Slack (MET) :             1.358ns  (required time - arrival time)
   Source:                 audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/C
                             (rising edge-triggered cell FDRE clocked by clk_fpga_0  {rise@0.000ns fall@5.000ns period=10.000ns})
-  Destination:            audio_pl_i/fir_pl_regs_0/inst/r_data_reg[14]/CLR
+  Destination:            audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_tx_fifo/rp_reg[8]/CLR
                             (recovery check against rising-edge clock clk_fpga_0  {rise@0.000ns fall@5.000ns period=10.000ns})
   Path Group:             **async_default**
   Path Type:              Recovery (Max at Slow Process Corner)
   Requirement:            10.000ns  (clk_fpga_0 rise@10.000ns - clk_fpga_0 rise@0.000ns)
-  Data Path Delay:        8.679ns  (logic 0.580ns (6.683%)  route 8.099ns (93.317%))
+  Data Path Delay:        7.716ns  (logic 0.580ns (7.517%)  route 7.136ns (92.483%))
   Logic Levels:           1  (LUT1=1)
-  Clock Path Skew:        -0.156ns (DCD - SCD + CPR)
-    Destination Clock Delay (DCD):    2.673ns = ( 12.674 - 10.000 ) 
-    Source Clock Delay      (SCD):    2.944ns
-    Clock Pessimism Removal (CPR):    0.115ns
+  Clock Path Skew:        -0.367ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    2.704ns = ( 12.704 - 10.000 ) 
+    Source Clock Delay      (SCD):    3.200ns
+    Clock Pessimism Removal (CPR):    0.129ns
   Clock Uncertainty:      0.154ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
     Total System Jitter     (TSJ):    0.071ns
     Total Input Jitter      (TIJ):    0.300ns
@@ -489,14 +475,14 @@ Slack (MET) :             0.606ns  (required time - arrival time)
     PS7_X0Y0             PS7                          0.000     0.000 r  audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0]
                          net (fo=1, routed)           1.193     1.193    audio_pl_i/ps7_0/inst/FCLK_CLK_unbuffered[0]
     BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.101     1.294 r  audio_pl_i/ps7_0/inst/buffer_fclk_clk_0.FCLK_CLK_0_BUFG/O
-                         net (fo=14749, routed)       1.650     2.944    audio_pl_i/rst_ps7_0_100M/U0/slowest_sync_clk
-    SLICE_X48Y54         FDRE                                         r  audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/C
+                         net (fo=15638, routed)       1.906     3.200    audio_pl_i/rst_ps7_0_100M/U0/slowest_sync_clk
+    SLICE_X60Y105        FDRE                                         r  audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X48Y54         FDRE (Prop_fdre_C_Q)         0.456     3.400 r  audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/Q
-                         net (fo=70, routed)          3.723     7.123    audio_pl_i/fir_pl_regs_0/inst/rst_n
-    SLICE_X55Y117        LUT1 (Prop_lut1_I0_O)        0.124     7.247 f  audio_pl_i/fir_pl_regs_0/inst/b_valid_i_2/O
-                         net (fo=120, routed)         4.376    11.623    audio_pl_i/fir_pl_regs_0/inst/b_valid_i_2_n_0
-    SLICE_X47Y46         FDCE                                         f  audio_pl_i/fir_pl_regs_0/inst/r_data_reg[14]/CLR
+    SLICE_X60Y105        FDRE (Prop_fdre_C_Q)         0.456     3.656 r  audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/Q
+                         net (fo=69, routed)          2.680     6.336    audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_cap_fifo/rst_n
+    SLICE_X104Y141       LUT1 (Prop_lut1_I0_O)        0.124     6.460 f  audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_cap_fifo/und_cnt[15]_i_3/O
+                         net (fo=436, routed)         4.456    10.916    audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_tx_fifo/AR[0]
+    SLICE_X63Y73         FDCE                                         f  audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_tx_fifo/rp_reg[8]/CLR
   -------------------------------------------------------------------    -------------------
 
                          (clock clk_fpga_0 rise edge)
@@ -504,16 +490,16 @@ Slack (MET) :             0.606ns  (required time - arrival time)
     PS7_X0Y0             PS7                          0.000    10.000 r  audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0]
                          net (fo=1, routed)           1.088    11.088    audio_pl_i/ps7_0/inst/FCLK_CLK_unbuffered[0]
     BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.091    11.179 r  audio_pl_i/ps7_0/inst/buffer_fclk_clk_0.FCLK_CLK_0_BUFG/O
-                         net (fo=14749, routed)       1.494    12.674    audio_pl_i/fir_pl_regs_0/inst/clk
-    SLICE_X47Y46         FDCE                                         r  audio_pl_i/fir_pl_regs_0/inst/r_data_reg[14]/C
-                         clock pessimism              0.115    12.788    
-                         clock uncertainty           -0.154    12.634    
-    SLICE_X47Y46         FDCE (Recov_fdce_C_CLR)     -0.405    12.229    audio_pl_i/fir_pl_regs_0/inst/r_data_reg[14]
+                         net (fo=15638, routed)       1.525    12.704    audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_tx_fifo/clk
+    SLICE_X63Y73         FDCE                                         r  audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_tx_fifo/rp_reg[8]/C
+                         clock pessimism              0.129    12.833    
+                         clock uncertainty           -0.154    12.679    
+    SLICE_X63Y73         FDCE (Recov_fdce_C_CLR)     -0.405    12.274    audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_tx_fifo/rp_reg[8]
   -------------------------------------------------------------------
-                         required time                         12.229    
-                         arrival time                         -11.623    
+                         required time                         12.274    
+                         arrival time                         -10.916    
   -------------------------------------------------------------------
-                         slack                                  0.606    
+                         slack                                  1.358    
 
 
 
@@ -521,20 +507,20 @@ Slack (MET) :             0.606ns  (required time - arrival time)
 
 Min Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             1.709ns  (arrival time - required time)
+Slack (MET) :             1.598ns  (arrival time - required time)
   Source:                 audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/C
                             (rising edge-triggered cell FDRE clocked by clk_fpga_0  {rise@0.000ns fall@5.000ns period=10.000ns})
-  Destination:            audio_pl_i/fir_pl_regs_0/inst/aw_addr_reg[10]/CLR
+  Destination:            audio_pl_i/fir_pl_direct_0/inst/u_i2s/rr_reg[5]/CLR
                             (removal check against rising-edge clock clk_fpga_0  {rise@0.000ns fall@5.000ns period=10.000ns})
   Path Group:             **async_default**
   Path Type:              Removal (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk_fpga_0 rise@0.000ns - clk_fpga_0 rise@0.000ns)
-  Data Path Delay:        1.981ns  (logic 0.186ns (9.390%)  route 1.795ns (90.611%))
+  Data Path Delay:        1.570ns  (logic 0.186ns (11.851%)  route 1.384ns (88.149%))
   Logic Levels:           1  (LUT1=1)
-  Clock Path Skew:        0.364ns (DCD - SCD - CPR)
-    Destination Clock Delay (DCD):    1.290ns
-    Source Clock Delay      (SCD):    0.891ns
-    Clock Pessimism Removal (CPR):    0.035ns
+  Clock Path Skew:        0.064ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    1.329ns
+    Source Clock Delay      (SCD):    0.997ns
+    Clock Pessimism Removal (CPR):    0.268ns
 
     Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
   -------------------------------------------------------------------    -------------------
@@ -543,14 +529,14 @@ Slack (MET) :             1.709ns  (arrival time - required time)
     PS7_X0Y0             PS7                          0.000     0.000 r  audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0]
                          net (fo=1, routed)           0.310     0.310    audio_pl_i/ps7_0/inst/FCLK_CLK_unbuffered[0]
     BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.026     0.336 r  audio_pl_i/ps7_0/inst/buffer_fclk_clk_0.FCLK_CLK_0_BUFG/O
-                         net (fo=14749, routed)       0.555     0.891    audio_pl_i/rst_ps7_0_100M/U0/slowest_sync_clk
-    SLICE_X48Y54         FDRE                                         r  audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/C
+                         net (fo=15638, routed)       0.661     0.997    audio_pl_i/rst_ps7_0_100M/U0/slowest_sync_clk
+    SLICE_X60Y105        FDRE                                         r  audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/C
   -------------------------------------------------------------------    -------------------
-    SLICE_X48Y54         FDRE (Prop_fdre_C_Q)         0.141     1.032 r  audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/Q
-                         net (fo=70, routed)          1.593     2.624    audio_pl_i/fir_pl_regs_0/inst/rst_n
-    SLICE_X55Y117        LUT1 (Prop_lut1_I0_O)        0.045     2.669 f  audio_pl_i/fir_pl_regs_0/inst/b_valid_i_2/O
-                         net (fo=120, routed)         0.202     2.872    audio_pl_i/fir_pl_regs_0/inst/b_valid_i_2_n_0
-    SLICE_X59Y118        FDCE                                         f  audio_pl_i/fir_pl_regs_0/inst/aw_addr_reg[10]/CLR
+    SLICE_X60Y105        FDRE (Prop_fdre_C_Q)         0.141     1.138 r  audio_pl_i/rst_ps7_0_100M/U0/ACTIVE_LOW_PR_OUT_DFF[0].FDRE_PER_N/Q
+                         net (fo=69, routed)          1.144     2.282    audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_cap_fifo/rst_n
+    SLICE_X104Y141       LUT1 (Prop_lut1_I0_O)        0.045     2.327 f  audio_pl_i/fir_pl_direct_0/inst/u_i2s/u_cap_fifo/und_cnt[15]_i_3/O
+                         net (fo=436, routed)         0.240     2.567    audio_pl_i/fir_pl_direct_0/inst/u_i2s/ply_cnt2
+    SLICE_X101Y141       FDCE                                         f  audio_pl_i/fir_pl_direct_0/inst/u_i2s/rr_reg[5]/CLR
   -------------------------------------------------------------------    -------------------
 
                          (clock clk_fpga_0 rise edge)
@@ -558,15 +544,15 @@ Slack (MET) :             1.709ns  (arrival time - required time)
     PS7_X0Y0             PS7                          0.000     0.000 r  audio_pl_i/ps7_0/inst/PS7_i/FCLKCLK[0]
                          net (fo=1, routed)           0.337     0.337    audio_pl_i/ps7_0/inst/FCLK_CLK_unbuffered[0]
     BUFGCTRL_X0Y16       BUFG (Prop_bufg_I_O)         0.029     0.366 r  audio_pl_i/ps7_0/inst/buffer_fclk_clk_0.FCLK_CLK_0_BUFG/O
-                         net (fo=14749, routed)       0.924     1.290    audio_pl_i/fir_pl_regs_0/inst/clk
-    SLICE_X59Y118        FDCE                                         r  audio_pl_i/fir_pl_regs_0/inst/aw_addr_reg[10]/C
-                         clock pessimism             -0.035     1.255    
-    SLICE_X59Y118        FDCE (Remov_fdce_C_CLR)     -0.092     1.163    audio_pl_i/fir_pl_regs_0/inst/aw_addr_reg[10]
+                         net (fo=15638, routed)       0.963     1.329    audio_pl_i/fir_pl_direct_0/inst/u_i2s/clk
+    SLICE_X101Y141       FDCE                                         r  audio_pl_i/fir_pl_direct_0/inst/u_i2s/rr_reg[5]/C
+                         clock pessimism             -0.268     1.061    
+    SLICE_X101Y141       FDCE (Remov_fdce_C_CLR)     -0.092     0.969    audio_pl_i/fir_pl_direct_0/inst/u_i2s/rr_reg[5]
   -------------------------------------------------------------------
-                         required time                         -1.163    
-                         arrival time                           2.872    
+                         required time                         -0.969    
+                         arrival time                           2.567    
   -------------------------------------------------------------------
-                         slack                                  1.709    
+                         slack                                  1.598    
 
 
 
