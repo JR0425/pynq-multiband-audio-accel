@@ -145,7 +145,7 @@ systemctl is-enabled fir-webui.service            # 应为 enabled
 - `page.html`（网页界面，放不放都行；放了就用它当首页）
 - `libaudio_stream.so`（**改过 `board/scripts/audio_stream.cpp` 才需要重编**）
 
-板上没有 SFTP，用 base64 推（`tools/board_debug/perf_probe.py` 里的 `push()`
+板上没有 SFTP，用 base64 推（`board/probes/perf_probe.py` 里的 `push()`
 就是这个做法，并且会校验 md5 —— **只信返回码不够，曾经返回 0 而文件没换**）。
 
 ### 3.4 跑起来
@@ -208,7 +208,7 @@ rm -rf build/vivado/<工程名>
 
 构建完不只看"没有报错"，还要过两道：
 
-1. `rebuild.sh csim` 最后会跑 `tools/ref_model_wdrc.py --mode wdrc`，
+1. `rebuild.sh csim` 最后会跑 `sim/model/ref_model_wdrc.py --mode wdrc`，
    打印 `PASS：与 csim 逐点相同`；
 2. 上板跑 `sh run_live.sh 30`，结尾必须是 `[OK ] 960000 / 960000 个采样逐位相同`。
 
@@ -232,7 +232,7 @@ BD_ONLY=1 bash build/run_pl_build.sh    # 只验 BD 接线，过了就停，几�
 
 脚本自带三样东西，别自己另起一个循环：
 
-- **PID 锁**（`tools/board_debug/_tmp/pl_build.lock`）：只允许一个构建循环；
+- **PID 锁**（`build/tmp/probes/pl_build.lock`）：只允许一个构建循环；
 - **每轮重试**（8 轮，轮间 60 s）：`create_bd_design` 的随机 rsb 读失败是常态，
   靠重试吸收，**不要去诊断**；
 - **每轮换一个全新工程目录**（`build/vivado/pl_<轮>_<时间戳>`）：在残留目录上重跑
@@ -254,7 +254,7 @@ WNS 为负时先看 `board/overlay/fir_pl_timing.rpt` 里第一条 VIOLATED 的�
 ### 6.3 上板验收（不需要耳朵的两条）
 
 ```bash
-cd tools/board_debug
+cd board/probes
 MSYS_NO_PATHCONV=1 python board_ssh.py --put ../../board/overlay/fir_pl.bit /home/xilinx/dma_exp/fir_pl.bit
 MSYS_NO_PATHCONV=1 python board_ssh.py --put ../../board/overlay/fir_pl.hwh /home/xilinx/dma_exp/fir_pl.hwh
 

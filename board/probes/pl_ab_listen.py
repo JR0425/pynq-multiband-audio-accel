@@ -13,7 +13,7 @@
 
 用法（PC 侧，Windows）：
 
-    python tools/board_debug/pl_ab_listen.py --secs 30
+    python board/probes/pl_ab_listen.py --secs 30
 
 判据：ON/OFF 中位数之比 > 1.5 算"耳机在出声"；< 1.15 算"没声"。
 """

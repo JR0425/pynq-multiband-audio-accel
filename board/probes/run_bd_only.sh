@@ -8,7 +8,7 @@
 set -u
 cd /d/pynq-multiband-audio-accel || exit 1
 
-OUT=tools/board_debug/_tmp/bd_only.log
+OUT=build/tmp/probes/bd_only.log
 VIV="E:\Xilinx\Vivado\2020.2\bin\vivado.bat"
 TCL="D:\pynq-multiband-audio-accel\board\overlay\build_audio_pl.tcl"
 

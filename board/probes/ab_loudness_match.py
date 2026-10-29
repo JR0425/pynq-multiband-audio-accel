@@ -1,6 +1,6 @@
 """§3.4.1：用板上录到的那一对 wav 做等响度 A/B。
 
-先在板上跑一趟取回两个 wav（tools/ab_board_run.py），然后这里：
+先在板上跑一趟取回两个 wav（board/probes/ab_board_run.py），然后这里：
   1. 核对进核 wav 与 data/audio/board_input_48k.wav 逐位相同；
   2. 用整数参考模型在同一输入上重算，与出核 wav 逐位对拍；
   3. 三个文件乘同一个下调量（给补偿留峰值余量），过核输出再整体提
@@ -21,8 +21,8 @@ import wave
 
 import numpy as np
 
-D = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(D, "tools"))
+D = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(D, "sim", "model"))
 import ref_model_wdrc as M  # noqa: E402
 
 FS = 48000

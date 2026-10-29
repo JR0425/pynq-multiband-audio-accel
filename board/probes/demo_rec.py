@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """demo_rec.py —— 录一段实时说话的处理前后对比。**在 Windows 上跑。**
 
-    python tools/board_debug/demo_rec.py 15
+    python board/probes/demo_rec.py 15
 
 做的事：让板子用演示档位（L=360/NBUF=2，嘴到耳 16.2 ms）开实时，
 对着耳机麦说 N 秒，然后停下、等自检跑完、把两个 wav 拉回电脑：
@@ -113,7 +113,7 @@ def status():
 
 def main():
     if len(sys.argv) < 2:
-        raise SystemExit("用法：python tools/board_debug/demo_rec.py <秒数>")
+        raise SystemExit("用法：python board/probes/demo_rec.py <秒数>")
     secs = int(sys.argv[1])
     if not 3 <= secs <= 280:
         raise SystemExit("秒数给 3~280（内存里只留这么长）")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """多频段前端（3 低通 + 相减 + 4 段综合）的逐位整数参考模型。
 
-  用法：python tools/ref_model_mb.py [--taps 193]
+  用法：python sim/model/ref_model_mb.py [--taps 193]
 
 产出（都在 sim/rtl_sim/ 下）：
       ref_fe_ylp0/1/2.mem   三个低通累加器（40 位十六进制）
@@ -32,7 +32,7 @@ import argparse
 import os
 import sys
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_rtl_coeffs import q17, nalloc, read_coeffs  # noqa: E402
 from ref_model_int import to_q15, sat16              # noqa: E402

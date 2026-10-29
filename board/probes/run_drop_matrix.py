@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """run_drop_matrix.py —— 主机侧：跑「配置 × 丢块」矩阵。**在 Windows 上跑。**
 
-    python tools/board_debug/run_drop_matrix.py [--arms base,gb3,...]
+    python board/probes/run_drop_matrix.py [--arms base,gb3,...]
 
 每一臂在板子上跑 60 秒（由 board_debug/drop_probe.py 采集），主机只负责
 推文件、对齐起跑相位（板子 uptime 相对 30 秒定时器）、开/关网页负载、
@@ -11,7 +11,7 @@
 网页负载 = 主机上开一个 headless Chrome 指着 http://192.168.2.99:8080/ ，
 和演示时人开着页面一样（页面每 150 ms 拉状态、250 ms 拉示波器）。
 
-结果落在 tools/_tmp/drop_matrix_<时间>/，同时打印一张表。
+结果落在 build/tmp/probes_rounds/drop_matrix_<时间>/，同时打印一张表。
 """
 
 import argparse

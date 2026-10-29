@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """在板上跑一条命令，把回显原样打回来。
 
-    python tools/board_debug/board_run.py "cd /home/xilinx/dma_exp && ls" [超时秒]
+    python board/probes/board_run.py "cd /home/xilinx/dma_exp && ls" [超时秒]
 
 回显按字节写到 stdout，不经过本地控制台码页 —— 板上脚本输出的是 UTF-8，
 Windows 控制台默认是 GBK，直接 print 会变成乱码。

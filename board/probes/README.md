@@ -1,4 +1,4 @@
-# `tools/board_debug/` —— 板子死机的排查脚手架
+# `board/probes/` —— 板子死机的排查脚手架
 
 2026-10-15 / 10-16 查「实时通路跑起来会把板子弄死」这件事时写的脚本。
 现在挂在这里，下次再遇到板子挂掉或要做 soak，直接拿。
@@ -79,11 +79,11 @@ root 所有的。** 先传到 `/dev/shm/`，再 `--sudo "cp /dev/shm/x /home/xil
 
 ```sh
 # 终端 A:串口录制必须开着,不然 panic_print 打出来也没人接
-python tools/pynq_serial_capture.py COM6 21600 tools/_tmp/roundN/console.log
+python board/probes/pynq_serial_capture.py COM6 21600 build/tmp/probes_rounds/roundN/console.log
 
 # 终端 B:一臂一臂地跑。NEXT_SETTLE 把每臂的起跑 uptime 对齐
 NEXT_SETTLE=180 NEXT_WAITMIN=180 NEXT_HANGWAIT=6 \
-  python tools/board_debug/next_round.py tools/_tmp/roundN 2 Z_idle N_long
+  python board/probes/next_round.py build/tmp/probes_rounds/roundN 2 Z_idle N_long
 ```
 
 - `NEXT_SETTLE=NNN` 每臂起跑前等到板子开机满 NNN 秒
@@ -93,7 +93,7 @@ NEXT_SETTLE=180 NEXT_WAITMIN=180 NEXT_HANGWAIT=6 \
 只想读一遍板子的账本、不跑任何东西：
 
 ```sh
-python tools/board_debug/sd_probe.py tools/_tmp/roundN
+python board/probes/sd_probe.py build/tmp/probes_rounds/roundN
 ```
 
 ## 用之前先看这几条规矩

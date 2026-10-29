@@ -125,7 +125,7 @@ def uptime():
 
 
 def main():
-    outdir = sys.argv[1] if len(sys.argv) > 1 else "tools/_tmp/round5"
+    outdir = sys.argv[1] if len(sys.argv) > 1 else "build/tmp/probes_rounds/round5"
     os.makedirs(outdir, exist_ok=True)
     dest = os.path.join(outdir, "sd_probe.txt")
 

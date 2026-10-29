@@ -57,13 +57,14 @@ HLS 的 FIR 核及其 C 仿真流程、把核和 PYNQ 音频 codec 接在一起�
 | `sim/hls_csim/` | C 仿真的测试台与 FIR 系数文件 |
 | `sim/rtl_sim/` | RTL 仿真的 testbench、参考模型、黄金向量与逐位比对脚本，跑法见该目录的 `README.md` |
 | `build/` | 构建脚本、HLS 指令文件、各版本综合与实现报告；索引见 `build/README.md` |
-| `board/` | PYNQ 笔记本、整机 overlay（`overlay/fir.bit`）、核驱动、板级脚本；索引见 `board/README.md` |
+| `board/` | PYNQ 笔记本、整机 overlay（`overlay/fir.bit`）、核驱动、板级脚本、主机侧探针（`probes/`）；索引见 `board/README.md` |
 | `data/audio/` | 测试音频与生成的音频 |
 | `data/figures/` | 生成的分析图 |
 | `data/results/` | 所有实测读数；**哪个文件是当前结论、哪些不能引用，见 `data/results/README.md`** |
 | `skill/` | 提示词、模板、检查脚本、踩坑笔记 |
 | `report/` | 接口说明、提交清单、协作日志、板端截图 |
-| `tools/` | 主机侧辅助脚本：参考模型、系数生成、质量指标、板子调试 |
+
+参考模型、系数生成、质量指标和演示素材生成脚本在 `sim/model/`，板子调试探针在 `board/probes/`。
 
 ## Python 基线
 

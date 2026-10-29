@@ -18,7 +18,7 @@ import sys
 import time
 import urllib.request
 
-D = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+D = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASE = os.environ.get("BOARD", "http://192.168.2.99:8080")
 OUTDIR = os.path.join(D, "data", "audio")
 

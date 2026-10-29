@@ -48,7 +48,7 @@ set_directive_interface -mode s_axilite -bundle control "fir_multiband" return
 #
 # 四关（顺序不能换）：
 #   ① csim：attack = release = 0 时输出必须和 v20_baseline_output.txt **逐字节相同**；
-#      attack/release = 136/7 时和 tools/ref_model_wdrc.py **逐点相同**
+#      attack/release = 136/7 时和 sim/model/ref_model_wdrc.py **逐点相同**
 #   ② csynth：看每采样拍数（v20 是 35）和资源增量
 #   ③ 读 xfir_multiband_hw.h 核对偏移：老寄存器一个都没动，
 #      attack 落在 0x58、release 落在 0x60

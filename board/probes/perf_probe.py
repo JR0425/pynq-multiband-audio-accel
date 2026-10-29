@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """性能线测量：音频链路延迟（数字法）+ CPU 占用。主机侧跑，SSH 上板。
 
-    python tools/board_debug/perf_probe.py latency [秒/配置]
-    python tools/board_debug/perf_probe.py cpu [秒]
+    python board/probes/perf_probe.py latency [秒/配置]
+    python board/probes/perf_probe.py cpu [秒]
 
 latency：对每个配置跑一遍实时通路（LIVE_SRC=wav，不依赖话筒），
   由 fir_live.py 的 LAT_TRACE 记下每块"被采到的时刻"和"交给 codec 的时刻"，

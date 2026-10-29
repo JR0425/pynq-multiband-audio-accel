@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """输出质量指标：THD+N 与四段频响 —— 全部走和核逐位相同的整数模型。
 
-    python tools/quality_metrics.py            # 打表
-    python tools/quality_metrics.py --csv out.csv
+    python sim/model/quality_metrics.py            # 打表
+    python sim/model/quality_metrics.py --csv out.csv
 
 两个部分：
 

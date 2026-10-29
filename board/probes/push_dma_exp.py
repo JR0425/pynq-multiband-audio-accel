@@ -4,7 +4,7 @@
 传完逐个核对 md5 —— 这步不能省，SFTP 曾经报成功但文件是坏的。
 
 用法：
-    python tools/board_debug/push_dma_exp.py
+    python board/probes/push_dma_exp.py
 """
 
 import base64
@@ -23,7 +23,7 @@ FILES = [
     ("board/overlay/fir_dma.hwh", "fir_dma.hwh"),
     ("board/scripts/dma_audio_probe.py", "dma_audio_probe.py"),
 ]
-# 额外文件按仓库相对路径追加，比如 tools/board_debug/dma_audio_diag.py
+# 额外文件按仓库相对路径追加，比如 board/probes/dma_audio_diag.py
 FILES += [(p, os.path.basename(p)) for p in sys.argv[1:]]
 
 

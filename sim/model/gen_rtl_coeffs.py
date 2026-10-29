@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """把浮点系数转成 RTL 用的定点整数表。
 
-  用法：python tools/gen_rtl_coeffs.py [--taps 193] [--edges 500,1000,2000]
+  用法：python sim/model/gen_rtl_coeffs.py [--taps 193] [--edges 500,1000,2000]
 
   输入：sim/hls_csim/lp_<edge>_n<taps>.txt   （每行一个 float）
   输出：src/rtl/coeffs_n<taps>.mem          （每行一个 18 位十六进制，给 $readmemh）
@@ -39,7 +39,7 @@ import os
 import sys
 from decimal import Decimal, ROUND_HALF_UP
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CW = 18          # 系数位宽，Q1.17
 FRAC = 17        # 小数位

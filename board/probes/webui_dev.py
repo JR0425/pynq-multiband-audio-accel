@@ -9,15 +9,15 @@
 它不碰真板子、不加载 overlay，全程只读写临时目录里的三个文件。
 
 用法：
-    python tools/webui_dev.py                 # 默认 8090，自动打开浏览器
-    python tools/webui_dev.py --port 8091
-    python tools/webui_dev.py --no-open
+    python board/probes/webui_dev.py                 # 默认 8090，自动打开浏览器
+    python board/probes/webui_dev.py --port 8091
+    python board/probes/webui_dev.py --no-open
 
 页面地址就是 http://127.0.0.1:8090/ 。改完 pl.html 按 Ctrl+F5 刷新即可
 （后端每次都从磁盘读 HTML，不用重启）。
 
 注意：这里喂的是**假数据**，只用来调版面和交互。判断"参数真的进了数据通路"
-必须回板上跑 tools/board_debug/pl_regs_check.py + pl_drc_ply_probe.py。
+必须回板上跑 board/probes/pl_regs_check.py + pl_drc_ply_probe.py。
 """
 import argparse
 import json
@@ -33,7 +33,7 @@ import time
 import webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+ROOT = os.path.dirname(os.path.dirname(HERE))
 SCRIPTS = os.path.join(ROOT, "board", "scripts")
 WEBUI = os.path.join(SCRIPTS, "fir_pl_webui.py")
 

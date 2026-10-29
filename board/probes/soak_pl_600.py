@@ -11,9 +11,9 @@
   5. 温度/内存无异常趋势
 
 用法：
-    python tools/board_debug/soak_pl_600.py                 # 600 秒
-    python tools/board_debug/soak_pl_600.py --secs 60       # 冒烟
-    python tools/board_debug/soak_pl_600.py --json out.json
+    python board/probes/soak_pl_600.py                 # 600 秒
+    python board/probes/soak_pl_600.py --secs 60       # 冒烟
+    python board/probes/soak_pl_600.py --json out.json
 """
 import argparse
 import json

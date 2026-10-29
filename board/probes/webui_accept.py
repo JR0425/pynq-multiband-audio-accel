@@ -10,9 +10,9 @@
 顺带跑一遍后端自检（fir_pl_webui.py --selftest），确认接口契约没被改坏。
 
 用法：
-    python tools/webui_accept.py                     # 自己起假数据 + 无头浏览器
-    python tools/webui_accept.py --url http://192.168.2.99:8080/
-    python tools/webui_accept.py --url ... --size 1366x768 --shot out.png
+    python board/probes/webui_accept.py                     # 自己起假数据 + 无头浏览器
+    python board/probes/webui_accept.py --url http://192.168.2.99:8080/
+    python board/probes/webui_accept.py --url ... --size 1366x768 --shot out.png
 
 没有装 Playwright 也能跑：用的是系统里的 Edge/Chrome 无头模式，
 注入一段测量脚本，再把结果从 document.title 里捞回来。
@@ -34,7 +34,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
+ROOT = os.path.dirname(os.path.dirname(HERE))
 
 BROWSERS = [
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",

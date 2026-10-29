@@ -6,13 +6,13 @@
 # 于是它在需要临时文件时随机失败 —— 现象正是"随机读不到自己的 tcl 文件、
 # 每次点到的文件都不一样、报错里还带 : No error"。这些文件本身完全正常。
 #
-# 用法：bash tools/board_debug/bd_tmpfix_test.sh
+# 用法：bash board/probes/bd_tmpfix_test.sh
 set -u
 ROOT=/d/pynq-multiband-audio-accel
 TCL="D:\pynq-multiband-audio-accel\board\overlay\build_audio_pl.tcl"
 VIV="E:\Xilinx\Vivado\2020.2\bin\vivado.bat"
-VTMP="$ROOT/tools/board_debug/_tmp/vtmp"
-LOG="$ROOT/tools/board_debug/_tmp/bd_tmpfix.log"
+VTMP="$ROOT/build/tmp/probes/vtmp"
+LOG="$ROOT/build/tmp/probes/bd_tmpfix.log"
 
 mkdir -p "$VTMP"
 WTMP="$(cygpath -w "$VTMP")"

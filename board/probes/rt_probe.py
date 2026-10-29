@@ -5,7 +5,7 @@
 #   完整经过:report/llm_collab_log/2026-10-16_board_hang_rcu_stall.md
 """只读探针:板子上"实时线程会不会把内核饿死"这件事,到底有没有护栏。
 
-2026-10-16 深夜六的栈证据(`tools/_tmp/round6/console.log`,`panic_print=31` 打出来的
+2026-10-16 深夜六的栈证据(`build/tmp/probes_rounds/round6/console.log`,`panic_print=31` 打出来的
 全任务转储)把问题指到了这个方向:
 
   - 挂的那一下,CPU0 上跑的正是 `fir_live.py` 的**搬样线程**(pid 922),
@@ -34,7 +34,7 @@
 **全是只读命令,一个写都没有。**
 
 用法:
-  python rt_probe.py                # 输出到 tools/_tmp/round6/rt_probe.txt
+  python rt_probe.py                # 输出到 build/tmp/probes_rounds/round6/rt_probe.txt
   python rt_probe.py <输出目录>
 """
 
@@ -80,7 +80,7 @@ def connect(timeout=20):
 
 
 def main():
-    outdir = sys.argv[1] if len(sys.argv) > 1 else "tools/_tmp/round6"
+    outdir = sys.argv[1] if len(sys.argv) > 1 else "build/tmp/probes_rounds/round6"
     os.makedirs(outdir, exist_ok=True)
     dest = os.path.join(outdir, "rt_probe.txt")
     c = connect()

@@ -79,7 +79,7 @@ def connect(timeout=20):
 
 
 def main():
-    outdir = sys.argv[1] if len(sys.argv) > 1 else "tools/_tmp/round6"
+    outdir = sys.argv[1] if len(sys.argv) > 1 else "build/tmp/probes_rounds/round6"
     os.makedirs(outdir, exist_ok=True)
     dest = os.path.join(outdir, "probe_config.txt")
     c = connect()

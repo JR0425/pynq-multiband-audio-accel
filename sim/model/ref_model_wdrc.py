@@ -2,8 +2,8 @@
 """WDRC 版的逐位参考模型 —— 纯整数，和 HLS 核一对一。
 
   用法：
-      python tools/ref_model_wdrc.py --mode legacy   # 对 v20_baseline_output.txt
-      python tools/ref_model_wdrc.py --mode wdrc     # 对 v21_wdrc_output.txt
+      python sim/model/ref_model_wdrc.py --mode legacy   # 对 v20_baseline_output.txt
+      python sim/model/ref_model_wdrc.py --mode wdrc     # 对 v21_wdrc_output.txt
 
 为什么要这个模型：
     csim 只证明"核能跑"，不证明"算得对"。这里用同一套定点规则独立算一遍，
@@ -32,7 +32,7 @@ from decimal import Decimal, ROUND_HALF_UP
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_rtl_coeffs import q17, nalloc, read_coeffs  # noqa: E402
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 N_BANDS = 4
 N_LP = 3

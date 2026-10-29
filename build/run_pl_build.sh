@@ -26,7 +26,8 @@ cd /d/pynq-multiband-audio-accel || exit 1
 #
 # 锁必须"谁上锁谁解锁"：原来无条件 rmdir，任何旧循环退出都会把新循环的锁删掉，
 # 于是第三个又能进来。带 PID 之后，只有主人能删，僵死锁可以自动接管。
-LOCK=tools/board_debug/_tmp/pl_build.lock
+LOCK=build/tmp/probes/pl_build.lock
+mkdir -p build/tmp/probes
 if [ -f "$LOCK" ]; then
   old=$(cat "$LOCK" 2>/dev/null)
   if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then
@@ -38,9 +39,9 @@ fi
 echo $$ > "$LOCK"
 trap '[ "$(cat "$LOCK" 2>/dev/null)" = "$$" ] && rm -f "$LOCK"' EXIT
 
-LOG=tools/board_debug/_tmp/pl_build.log
-RC=tools/board_debug/_tmp/pl_build.rc
-MARK=tools/board_debug/_tmp/pl_build_mark
+LOG=build/tmp/probes/pl_build.log
+RC=build/tmp/probes/pl_build.rc
+MARK=build/tmp/probes/pl_build_mark
 BIT=board/overlay/fir_pl.bit
 : > "$RC"
 
@@ -96,7 +97,7 @@ for i in 1 2 3 4 5 6 7 8; do
     break
   fi
   echo "round $i failed at $(date +%H:%M:%S): $(grep -m1 '^ERROR' "$LOG")" >> "$RC"
-  cp "$LOG" "tools/board_debug/_tmp/pl_build_round$i.log"
+  cp "$LOG" "build/tmp/probes/pl_build_round$i.log"
   sleep 60
 done
 kill_stray

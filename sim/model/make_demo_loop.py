@@ -1,6 +1,6 @@
 """生成两段用于"循环播放"演示的 48 kHz / 16 位单声道 WAV。
 
-    python tools/make_demo_loop.py
+    python sim/model/make_demo_loop.py
 
 输出到 data/audio/：
   demo_bands_48k.wav       四段各一个稳态正弦（250/750/1500/4000 Hz），2 s 无缝循环。
@@ -14,7 +14,7 @@ import wave
 import numpy as np
 
 FS = 48000
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "audio")
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "audio")
 
 
 def write_wav(path, x):

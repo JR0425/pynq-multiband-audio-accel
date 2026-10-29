@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """RTL 的逐位参考模型 —— 纯整数运算。
 
-  用法：python tools/ref_model_int.py [--taps 193] [--in data/audio/test_input.txt]
+  用法：python sim/model/ref_model_int.py [--taps 193] [--in data/audio/test_input.txt]
 
   产出（都在 sim/rtl_sim/ 下）：
       in_q15.mem          输入，每行一个 16 位十六进制，给 testbench 的 $readmemh
@@ -40,7 +40,7 @@ import os
 import sys
 from decimal import Decimal, ROUND_HALF_UP
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_rtl_coeffs import q17, nalloc, read_coeffs  # noqa: E402
 
