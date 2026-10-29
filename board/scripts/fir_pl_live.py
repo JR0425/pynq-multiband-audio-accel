@@ -255,6 +255,16 @@ def apply_tune(regs, tune, last=None):
         "bypass": byp,
     }
 
+    # 2026-10-29 修：bypass 原来直接把 ctrl[1] 清零，而 ctrl[1] 是**整条 DRC 链路**
+    # 的使能（四段增益也在里面），于是"直通"会把增益一起旁路掉 —— 用户调增益
+    # 完全没反应，左右耳也变成同一路。现在改成：链路始终通，旁路时把压缩器
+    # 调成"不动作"（阈值抬到 0 dBFS + 比例 1:1），增益照常生效。
+    if byp:
+        cur["thr"]      = [dbfs_to_thr(0.0)] * 4
+        cur["ratio"]    = [0] * 4
+        cur["thr_b1"]   = [dbfs_to_thr(0.0)] * 4
+        cur["ratio_b1"]  = [0] * 4
+
     changed = (last is None) or (cur["bypass"] != last.get("bypass"))
     for i in range(4):
         if last is None or cur["gain"][i] != last["gain"][i]:
@@ -300,8 +310,12 @@ def apply_tune(regs, tune, last=None):
 
 
 def ctrl_for(cur):
-    """bypass=1 → 只过前端（ctrl[1]=0）；否则走压缩 + 四段增益。"""
-    return CTRL_RUN | (0 if cur["bypass"] else CTRL_DRC)
+    """DRC 链路（含四段增益）永远开；"直通"靠压缩器不动作实现，不靠关链路。
+
+    原来这里返回 CTRL_RUN（清掉 CTRL_DRC）→ 输出直接是前端原始样本，
+    四段增益和压缩一起被跳过，用户以为增益坏了。
+    """
+    return CTRL_RUN | CTRL_DRC
 
 
 def _four(v):
@@ -342,8 +356,8 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=N
         # 2026-10-29 修：fir_pl_regs 的 CTRL(0x004) 恒读 0 —— 真正的 ctrl 端口接的是
         # gpio_ctrl(0x43C00000)，不是这个寄存器。原来读 REG_CTRL 导致网页上的
         # "旁路"永远显示为开（实际在压缩）。有 ctrl 对象就读它，没有就退回读寄存器。
-        "bypass": (not bool(ctrl.read(0) & CTRL_DRC)) if ctrl is not None
-                  else (bool(regs.rd(REG_CTRL) & CTRL_DRC) is False),
+        # ctrl[1] 现在恒为 1（链路常通），bypass 只能从参数看
+        "bypass": bool((tune_cur or {}).get("bypass")),
         "attack_ms": [coef_to_ms(c) for c in (tune_cur or {}).get("atk", [0] * 4)],
         "release_ms": [coef_to_ms(c) for c in (tune_cur or {}).get("rel", [0] * 4)],
         # ---- 观察量（真信号）----
@@ -458,18 +472,28 @@ def selftest():
         bad += 0 if ok else 1
         print("  %-22s = %8d  expect %8d  %s" % (name, got, want, "OK" if ok else "FAIL"))
 
-    print("== 3. bypass 只清 ctrl[1] ==")
+    print("== 3. bypass：链路仍通，只让压缩器不动作 ==")
     tune["bypass"] = 1
     cur2, _ = apply_tune(regs, tune, cur)
-    ok = ctrl_for(cur2) == CTRL_RUN
+    ok = ctrl_for(cur2) == (CTRL_RUN | CTRL_DRC)
     bad += 0 if ok else 1
-    print("  CTRL = 0x%02X  expect 0x%02X  %s"
-          % (ctrl_for(cur2), CTRL_RUN, "OK" if ok else "FAIL"))
+    print("  CTRL = 0x%02X  expect 0x%02X（增益不能被旁路）  %s"
+          % (ctrl_for(cur2), CTRL_RUN | CTRL_DRC, "OK" if ok else "FAIL"))
+    ok = (fake.mem[BANK0 + OFF_THR] == dbfs_to_thr(0.0)
+          and fake.mem[BANK0 + OFF_RATIO] == 0
+          and fake.mem[BANK1 + OFF_THR] == dbfs_to_thr(0.0)
+          and fake.mem[BANK1 + OFF_RATIO] == 0)
+    bad += 0 if ok else 1
+    print("  bypass 时 THR=0dBFS / RATIO=0（两耳）  %s" % ("OK" if ok else "FAIL"))
+    ok = fake.mem[BANK0 + OFF_GAIN] == db_to_gain(18)
+    bad += 0 if ok else 1
+    print("  bypass 时 GAIN 仍是 18 dB  %s" % ("OK" if ok else "FAIL"))
 
     print("== 4. 不变就不重写（避免 ramp 被反复重置）==")
-    before = dict(fake.mem)
     tune["bypass"] = 0
-    apply_tune(regs, tune, cur2)
+    cur3, _ = apply_tune(regs, tune, cur2)      # 先回到"压缩生效"的正常态
+    before = dict(fake.mem)
+    apply_tune(regs, tune, cur3)                # 同样的参数再走一遍
     n_changed = sum(1 for k in before if before[k] != fake.mem[k])
     ok = n_changed == 0          # 参数一个都没变 ⇒ 一个寄存器都不该被重写
     bad += 0 if ok else 1

@@ -62,7 +62,7 @@ R_REL = (0.0, 500.0)
 # 第一次打开页面时给什么。三个 DRC 参数 = 寄存器出厂值（419456 / 2936064 /
 # 17408 / 896 换算成 dB、ratio、ms），增益用演示口径 +30 dB。
 DEFAULT_TUNE = {
-    "gain_db": [30.0, 30.0, 30.0, 30.0],
+    "gain_db": [36.0, 36.0, 36.0, 36.0],
     "thr_db": [-20.0, -20.0, -20.0, -20.0],
     "ratio": [0.7, 0.7, 0.7, 0.7],
     "attack_ms": [5.0, 5.0, 5.0, 5.0],
@@ -427,7 +427,7 @@ def selftest():
     t0 = j.get("tune") if isinstance(j, dict) else None
     chk("tune 无文件 -> ok/tune 包装 + 演示默认",
         j.get("ok") is True and isinstance(t0, dict)
-        and t0.get("gain_db") == [30.0] * 4
+        and t0.get("gain_db") == [36.0] * 4
         and t0.get("thr_db") == [-20.0] * 4 and t0.get("ratio") == [0.7] * 4, t0)
     code, j = get("/api/health")
     chk("health.ok=false", j.get("ok") is False and j.get("mode") == "pl")
