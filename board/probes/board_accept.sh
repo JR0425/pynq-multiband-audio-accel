@@ -50,7 +50,7 @@ else
 fi
 
 res_regs=NA; res_drc=NA; res_dual=NA
-LOG="$BD/_tmp"; mkdir -p "$LOG"
+LOG="$ROOT/build/tmp/probes"; mkdir -p "$LOG"
 
 say "2/4 寄存器窗口（ID / 出厂值 / 四段写读 / 斜坡）"
 ssh_ --sudo "$RUN pl_regs_check.py" 2>&1 | tee "$LOG/acc_regs.log" | tail -20
