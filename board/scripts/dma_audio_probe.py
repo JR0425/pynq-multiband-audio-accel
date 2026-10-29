@@ -158,6 +158,26 @@ def codec_unmute():
     for reg, val in ((0x401C, 0x21), (0x401E, 0x41),
                      (0x4023, 0xF3), (0x4024, 0xF3)):
         i2c_wr(reg, val)
+    codec_input_gain()
+
+
+# 模拟录音增益（差分输入音量，R8/R9 = 0x400E/0x400F）：
+#   [7:2] 增益码，-12 dB .. +35.25 dB，每档 0.75 dB
+#   bit1  0 = 静音
+#   bit0  1 = 走差分输入
+# PYNQ 出厂写 0xB3 = 码 44 = +21 dB；再叠加 Rec Mixer 1 的 LDBOOST +20 dB
+# （0x400B/0x400D = 0x10），模拟侧本来是 +41 dB，离上限只剩 14.25 dB。
+# 2026-10-29 用户选"提模拟 PGA"：拉到 0xFF = +35.25 dB，数字增益相应降 14 dB。
+# 前提先量过：安静时 peak_in 只有 2 LSB（-84 dBFS），也就是模拟噪声已经压在
+# 16 位截断底噪以下，抬模拟增益不会把底噪一起抬起来。
+ANALOG_IN_GAIN = 0xFF
+
+
+def codec_input_gain(code=ANALOG_IN_GAIN):
+    for reg in (0x400E, 0x400F):
+        i2c_wr(reg, code)
+    print("  codec 模拟输入 0x400E/0x400F = 0x%02X (%.2f dB)"
+          % (code, -12.0 + ((code >> 2) & 0x3F) * 0.75))
 
 
 # ---------------------------------------------------------------- overlay

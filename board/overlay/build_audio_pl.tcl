@@ -110,7 +110,7 @@ set_property -dict [list \
 
 # ---- 寄存器总线 ----
 set axi_ic [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_ic]
-set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {6}] $axi_ic
+set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {7}] $axi_ic
 
 set gpio_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 gpio_ctrl]
 set_property -dict [list \
@@ -165,10 +165,6 @@ set z128 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z128]
 set_property -dict [list CONFIG.CONST_WIDTH {128} CONFIG.CONST_VAL {0}] $z128
 set z32 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z32]
 set_property -dict [list CONFIG.CONST_WIDTH {32} CONFIG.CONST_VAL {0}] $z32
-set z16 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z16]
-set_property -dict [list CONFIG.CONST_WIDTH {16} CONFIG.CONST_VAL {0}] $z16
-set z13 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z13]
-set_property -dict [list CONFIG.CONST_WIDTH {13} CONFIG.CONST_VAL {0}] $z13
 set z1 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 z1]
 set_property -dict [list CONFIG.CONST_WIDTH {1} CONFIG.CONST_VAL {0}] $z1
 
@@ -207,6 +203,31 @@ connect_bd_net [get_bd_pins fir_pl_direct_0/ply_en]    [get_bd_pins ply_bram/enb
 connect_bd_net [get_bd_pins fir_pl_direct_0/ply_addr]  [get_bd_pins ply_bram/addrb]
 connect_bd_net [get_bd_pins ply_bram/doutb]            [get_bd_pins fir_pl_direct_0/ply_rdata]
 
+# ---- 抓取缓冲（C3，2026-10-29）：4096×32，低 16 位进核 / 高 16 位出核 ----
+# A 口给 axi_bram_ctrl（PS 读），B 口给 fir_pl_direct 的写口。
+# 4096 点 @ 48.8 kHz ≈ 84 ms 历史，够画时域波形和做 4096 点 FFT。
+set cap_bram [create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 cap_bram]
+set_property -dict [list \
+  CONFIG.Memory_Type {True_Dual_Port_RAM} \
+  CONFIG.Write_Width_A {32} \
+  CONFIG.Write_Depth_A {4096} \
+  CONFIG.Use_Byte_Write_Enable {false} \
+  CONFIG.Enable_B {Use_ENB_Pin} \
+  CONFIG.Register_PortA_Enable_of_Memory_Primitives {false} \
+  CONFIG.Register_PortB_Enable_of_Memory_Primitives {false} \
+] $cap_bram
+set cap_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.1 cap_ctrl]
+set_property -dict [list CONFIG.SINGLE_PORT_BRAM {0} CONFIG.DATA_WIDTH {32}] $cap_ctrl
+connect_bd_intf_net [get_bd_intf_pins cap_ctrl/BRAM_PORTA] [get_bd_intf_pins cap_bram/BRAM_PORTA]
+connect_bd_net [get_bd_pins ps7_0/FCLK_CLK0]          [get_bd_pins cap_bram/clkb]
+connect_bd_net [get_bd_pins fir_pl_direct_0/cap_we]   [get_bd_pins cap_bram/web]
+connect_bd_net [get_bd_pins fir_pl_direct_0/cap_addr] [get_bd_pins cap_bram/addrb]
+connect_bd_net [get_bd_pins fir_pl_direct_0/cap_din]  [get_bd_pins cap_bram/dinb]
+
+# 抓取控制与指针：0x64 bit0 = snap（1 = 冻结写指针），0x6C = 写指针
+connect_bd_net [get_bd_pins fir_pl_regs_0/scope_ctl]  [get_bd_pins fir_pl_direct_0/scope_snap]
+connect_bd_net [get_bd_pins fir_pl_direct_0/scope_wr] [get_bd_pins fir_pl_regs_0/scope_wr]
+
 # 播放控制来自寄存器（ply_ctl[0] en、[1] loop；ply_len = 波表字数）
 connect_bd_net [get_bd_pins fir_pl_regs_0/ply_ctl] [get_bd_pins fir_pl_direct_0/ply_ctl]
 connect_bd_net [get_bd_pins fir_pl_regs_0/ply_len] [get_bd_pins fir_pl_direct_0/ply_len]
@@ -233,6 +254,7 @@ if {[catch {
 
 if {[catch {
   connect_bd_intf_net -intf_net axi_ic_m05 [get_bd_intf_pins axi_ic/M05_AXI]                       [get_bd_intf_pins ply_ctrl/S_AXI]
+connect_bd_intf_net -intf_net axi_ic_m06 [get_bd_intf_pins axi_ic/M06_AXI]                       [get_bd_intf_pins cap_ctrl/S_AXI]
 } _e]} {
   puts "### M05 连接失败: $_e"
   error $_e
@@ -275,11 +297,9 @@ connect_bd_net [get_bd_pins fir_pl_direct_0/stat1] [get_bd_pins fir_pl_regs_0/st
 connect_bd_net [get_bd_pins fir_pl_direct_0/stat2] [get_bd_pins fir_pl_regs_0/stat2]
 
 
-foreach pin {smp_cnt frm_cnt ply_rd ply_und lvl_in_lo lvl_in_hi lvl_out_lo lvl_out_hi              mpo_cnt scope_seq} {
+foreach pin {smp_cnt frm_cnt ply_rd ply_und lvl_in_lo lvl_in_hi lvl_out_lo lvl_out_hi scope_seq} {
   connect_bd_net [get_bd_pins z32/dout] [get_bd_pins fir_pl_regs_0/$pin]
 }
-connect_bd_net [get_bd_pins z16/dout]  [get_bd_pins fir_pl_regs_0/mpo_peak]
-connect_bd_net [get_bd_pins z13/dout] [get_bd_pins fir_pl_regs_0/scope_wr]
 
 # ---- 时钟 / 复位 ----
 set clk_pins [list \
@@ -302,6 +322,8 @@ set clk_pins [list \
                [get_bd_pins gpio_stat2/s_axi_aclk] \
                [get_bd_pins gpio_dbg/s_axi_aclk] \
                               [get_bd_pins ply_ctrl/s_axi_aclk] \
+                              [get_bd_pins cap_ctrl/s_axi_aclk] \
+                              [get_bd_pins axi_ic/M06_ACLK] \
                [get_bd_pins fir_pl_direct_0/clk] ]
 
 set rst_pins [list \
@@ -319,6 +341,8 @@ set rst_pins [list \
                [get_bd_pins gpio_stat/s_axi_aresetn] \
                [get_bd_pins gpio_stat2/s_axi_aresetn] \
                [get_bd_pins gpio_dbg/s_axi_aresetn]                               [get_bd_pins ply_ctrl/s_axi_aresetn] \
+                              [get_bd_pins cap_ctrl/s_axi_aresetn] \
+                              [get_bd_pins axi_ic/M06_ARESETN] \
                [get_bd_pins fir_pl_direct_0/rst_n] ]
 
 connect_bd_net {*}$clk_pins
@@ -375,6 +399,10 @@ assign_bd_address -offset 0x43C40000 -range 0x00001000 \
 assign_bd_address -offset 0x43C50000 -range 0x00010000 \
   -target_address_space [get_bd_addr_spaces ps7_0/Data] [seg_of_pin ply_ctrl/S_AXI] -force
 
+# 抓取缓冲：4096 字 × 4 B = 16 KB（C3，2026-10-30）
+assign_bd_address -offset 0x43C60000 -range 0x00010000 \
+  -target_address_space [get_bd_addr_spaces ps7_0/Data] [seg_of_pin cap_ctrl/S_AXI] -force
+
 puts "==== ADDR MAP ===="
 foreach s [get_bd_addr_segs -of_objects [get_bd_addr_spaces ps7_0/Data]] {
   puts "  [get_property NAME $s]  offset=[get_property offset $s]  range=[get_property range $s]"
@@ -391,9 +419,9 @@ foreach w $want {
     error "ADDR MAP 缺 $w,现有:$have"
   }
 }
-# 批 1 加的波表 BRAM 从机（段名带 mem0 后缀,提前写死容易错,按"至少 6 个从机"判）
-if {[llength $have] < 6} {
-  error "ADDR MAP 只有 [llength $have] 个从机,少了 ply_ctrl 的段。现有:$have"
+# 批 1 加的波表 BRAM 从机（段名带 mem0 后缀,提前写死容易错,按"至少 7 个从机"判）
+if {[llength $have] < 7} {
+  error "ADDR MAP 只有 [llength $have] 个从机,少了 ply_ctrl/cap_ctrl 的段。现有:$have"
 }
 puts "### ADDR MAP OK ($have)"
 

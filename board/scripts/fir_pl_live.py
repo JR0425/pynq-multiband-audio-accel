@@ -27,6 +27,7 @@ import json
 import math
 import os
 import sys
+import threading
 import time
 
 sys.path.insert(0, "/home/xilinx/dma_exp")
@@ -94,6 +95,26 @@ FS         = 48000
 # 网页第三档用它开关通路：内容 "1" / "0"。PL 直连没有"启动音频流"的概念，
 # 只有 run 位；写文件比让网页进程去碰 MMIO 安全（overlay 只能在一个进程里）。
 RUN_PATH = os.environ.get("FIR_PL_RUN", "/dev/shm/fir_pl_run.txt")
+
+# ---- C3 抓取缓冲（2026-10-30）----
+# 0x43C60000 一块 4096×32 BRAM：低 16 位进核、高 16 位出核（限幅后左耳）。
+# 0x64 的 bit0 是 snap（1 = 冻结写指针），0x6C 读回写指针。
+# 读完写 /dev/shm/fir_scope.json，网页从 /api/scope 取。
+SCOPE_PATH = os.environ.get("FIR_PL_SCOPE", "/dev/shm/fir_scope.json")
+CAP_BASE_DEFAULT = 0x43C60000
+OFF_SCOPE_CTL = 0x64
+OFF_SCOPE_WR = 0x6C
+
+# ---- 循环播放固定音频（2026-10-30）----
+# 波表 BRAM 0x43C50000，16384 字环形；样本放 [31:16]。RTL 按采样节拍读，
+# PS 必须同速往前填 —— 每小时钟 21.33 ms 填 1024 字。ctrl[5] 切音源。
+PLAY_PATH = os.environ.get("FIR_PL_PLAY", "/dev/shm/fir_pl_play.txt")
+PLY_BASE_DEFAULT = 0x43C50000
+OFF_PLY_CTL = 0x24
+OFF_PLY_LEN = 0x28
+CTRL_SRC = 1 << 5
+PLAY_RING = 16384
+PLAY_CHUNK = 1024
 
 BIT_DEFAULT = "/home/xilinx/dma_exp/fir_pl.bit"
 CTRL_BASE_DEFAULT = 0x43C00000  # gpio_ctrl，ctrl 位仍走这里
@@ -215,6 +236,107 @@ def write_run(on):
         return False
 
 
+# ---------------------------------------------------------------- 抓取缓冲
+def read_scope(regs, cap, path=None):
+    """冻指针 → 读 4096 字 → 解锁 → 写 scope json。返回样本数，0 = 失败。
+
+    必须先冻再读：读 16 KB 要几毫秒，不冻的话新样本会盖掉环形缓冲的一截，
+    画出来是断的。冻结只停抓取，音频通路照跑。
+    """
+    path = path or SCOPE_PATH
+    import array
+    regs.wr(OFF_SCOPE_CTL, 1)
+    time.sleep(0.002)
+    ptr = regs.rd(OFF_SCOPE_WR) & 0xFFF
+    raw = cap.read(0, 4096 * 4)
+    regs.wr(OFF_SCOPE_CTL, 0)
+    if len(raw) != 4096 * 4:
+        return 0
+    v = array.array("I")
+    v.frombytes(raw)
+    rot = ptr % 4096                # cap_wr 是下一个要写的地址，从它开始 = 最旧在前
+    v = v[rot:] + v[:rot]
+    ins = [((x & 0xFFFF) ^ 0x8000) - 0x8000 for x in v]
+    outs = [(((x >> 16) & 0xFFFF) ^ 0x8000) - 0x8000 for x in v]
+    obj = {"ok": True, "t": time.time(), "fs": 48828.0, "n": len(ins),
+           "in": ins, "out": outs}
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(obj, f)
+        os.replace(tmp, path)
+    except Exception:
+        return 0
+    return len(ins)
+
+
+# ---------------------------------------------------------------- 循环播放
+def read_play():
+    """网页写的播放请求：文件路径 / "off"。不存在 = 不播。"""
+    try:
+        with open(PLAY_PATH, "r") as f:
+            s = f.read().strip()
+    except Exception:
+        return None
+    return s if s and s.lower() != "off" else None
+
+
+def load_wav_words(path):
+    """16 位 WAV → 波表字序列（样本放 [31:16]）。取左声道，重采样到 48 kHz。"""
+    import array
+    import wave
+    w = wave.open(path, "rb")
+    nch, sw, sr, nf = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
+    raw = w.readframes(nf)
+    w.close()
+    if sw != 2:
+        raise ValueError("只支持 16 位 WAV：%s" % path)
+    a = array.array("h")
+    a.frombytes(raw)
+    if nch > 1:
+        a = a[0::nch]
+    if sr != FS and len(a) > 1:
+        m = int(len(a) * FS / float(sr))
+        a = array.array("h", [a[min(len(a) - 1, int(i * sr / FS))] for i in range(m)])
+    return array.array("I", [(int(v) & 0xFFFF) << 16 for v in a])
+
+
+def _slice_bytes(words, pos, k):
+    """从环形缓冲取 k 个字（越界绕回），返回小端字节串。"""
+    n = len(words)
+    q = pos % n
+    if q + k <= n:
+        return words[q:q + k].tobytes()
+    return words[q:].tobytes() + words[:q + k - n].tobytes()
+
+
+class Player(threading.Thread):
+    """按采样节拍往波表环里填。绝对时刻调度，不积累漂移（同 ply_upload.py）。"""
+
+    def __init__(self, bram, words):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.bram = bram
+        self.w = words
+        self.stop_ev = threading.Event()
+        self.err = None
+
+    def run(self):
+        # 先到点再写：写头永远走在读头前面（落后 4 块 = 85 ms 起跑），不会改到正在播的字
+        try:
+            pos = PLAY_RING
+            nxt = time.monotonic() + (PLAY_RING - 4 * PLAY_CHUNK) / float(FS)
+            while not self.stop_ev.is_set():
+                now = time.monotonic()
+                if now < nxt:
+                    time.sleep(nxt - now)
+                self.bram.write((pos % PLAY_RING) * 4, _slice_bytes(self.w, pos, PLAY_CHUNK))
+                pos += PLAY_CHUNK
+                nxt += PLAY_CHUNK / float(FS)
+        except Exception as ex:
+            self.err = "%s: %s" % (type(ex).__name__, ex)
+
+
 # ---------------------------------------------------------------- 寄存器访问
 class Regs(object):
     """一层薄封装：只认 32 位整字的读写，方便 --selftest 用假 MMIO 顶替。"""
@@ -250,6 +372,9 @@ def apply_tune(regs, tune, last=None):
     tone_sel = int(tone.get("band") or 0) & 0x3
     tone_amp = db_to_amp15(tone.get("amp_db", -22.0))
 
+    # B6 MPO 限幅：输出上限（dBFS）。0 dBFS = 满量程 = 不动作，正是寄存器出厂值 32767。
+    mpo_th = db_to_amp15(float(tune.get("mpo_db", 0.0)))
+
     # 2026-10-29 双耳：tune["b1"] 存在就用它当右耳的处方，不存在就左右同一套
     # （默认行为不变 —— 单耳时两只耳机听到的内容必须完全一样）。
     b1 = tune.get("b1") or {}
@@ -274,6 +399,7 @@ def apply_tune(regs, tune, last=None):
         "tone_on": tone_on,
         "tone_sel": tone_sel,
         "tone_amp": tone_amp,
+        "mpo_th": mpo_th,
     }
 
     # 2026-10-29 修：bypass 原来直接把 ctrl[1] 清零，而 ctrl[1] 是**整条 DRC 链路**
@@ -332,21 +458,27 @@ def apply_tune(regs, tune, last=None):
     if last is None or cur["tone_amp"] != last.get("tone_amp"):
         regs.wr(OFF_TONE_AMP, cur["tone_amp"])
         changed = True
+    if last is None or cur["mpo_th"] != last.get("mpo_th"):
+        regs.wr(OFF_MPO_TH, cur["mpo_th"])
+        changed = True
 
     # ctrl 不在这个窗口里 —— 它走 gpio_ctrl（0x43C00000），和探针/演示脚本一致。
     # BD 里 fir_pl_regs 的 ctrl 输出没有接到 fir_pl_direct（避免两个驱动源）。
     return cur, changed
 
 
-def ctrl_for(cur):
+def ctrl_for(cur, src=False):
     """DRC 链路（含四段增益）永远开；"直通"靠压缩器不动作实现，不靠关链路。
 
     原来这里返回 CTRL_RUN（清掉 CTRL_DRC）→ 输出直接是前端原始样本，
     四段增益和压缩一起被跳过，用户以为增益坏了。
+    src=True 时切到波表音源（ctrl[5]），用于循环播放固定音频。
     """
     v = CTRL_RUN | CTRL_DRC
     if cur.get("tone_on"):
         v |= CTRL_TONE
+    if src:
+        v |= CTRL_SRC
     return v
 
 
@@ -388,7 +520,7 @@ def cr_of(env, gr, thr_reg):
     return out
 
 
-def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=None):
+def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=None, play=None):
     """组装 status json。字段照 fir_live.publish_status 的约定，页面不用改。
 
     2026-10-28 批 2：多给一组观察量（peak_in/out、四段 env/gr）。
@@ -403,11 +535,18 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=N
     peak_in, peak_out, env, gr, env_r, gr_r = read_obs(regs)
     cr    = cr_of(env,   gr,   (tune_cur or {}).get("thr",    [0] * 4))
     cr_r  = cr_of(env_r, gr_r, (tune_cur or {}).get("thr_b1", [0] * 4))
+    # B6：MPO 限幅计数（flush 清零）与见过的最大输出
+    mpo_cnt  = regs.rd(OFF_MPO_CNT)
+    mpo_peak = regs.rd(OFF_MPO_PEAK) & 0xFFFF
+    mpo_th_v = (tune_cur or {}).get("mpo_th", 32767)
     (sink or write_status)({
         "t": now,
         "n": 0,                      # 没有"块"这个概念了
         "pid": os.getpid(),
         "running": bool(run),
+        # 循环播放：playing=True 时音源是波表而不是麦克风（ctrl[5]）
+        "playing": bool(play),
+        "play_file": os.path.basename(play) if play else None,
         "ok": err is None,
         "mode": "pl",                # 网页用它显示"PL 直连"徽标
         "gain_db": [round(gain_to_db(g), 2) for g in gains],
@@ -438,6 +577,11 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=N
         "env_r_db": [amp_to_db(v, 1.0) for v in env_r],
         "gr_r": gr_r,
         "gr_r_db": [amp_to_db(v, 1.0) for v in gr_r],
+        # B6 MPO 限幅：阈值（dBFS，0 = 不动作）、被限幅的采样数、见过的最大输出
+        "mpo_th_db": amp_to_db(mpo_th_v, 32768.0),
+        "mpo_cnt": mpo_cnt,
+        "mpo_peak": mpo_peak,
+        "mpo_peak_db": amp_to_db(mpo_peak, 32768.0),
         "dual": any(abs(env_r[i] - env[i]) > 1e-4 for i in range(4)) if env else False,
         # 电平表/抓取还没接进 RTL，先给 0，页面会显示空条而不是乱跳
         "in_rms": 0.0,
@@ -632,6 +776,8 @@ def open_pl(bit):
 
     ctrl_base = CTRL_BASE_DEFAULT
     regs_base = REGS_BASE_DEFAULT
+    cap_base = CAP_BASE_DEFAULT
+    ply_base = PLY_BASE_DEFAULT
     for name, d in ol.ip_dict.items():
         base = d.get("phys_addr")
         if base is None:
@@ -640,8 +786,14 @@ def open_pl(bit):
             regs_base = base
         elif name.startswith("gpio_ctrl"):
             ctrl_base = base
-    print("fir_pl_regs @ 0x%08X   gpio_ctrl @ 0x%08X" % (regs_base, ctrl_base))
-    return ol, Regs(MMIO(regs_base, 0x1000)), MMIO(ctrl_base, 0x1000)
+        elif name.startswith("cap_ctrl"):
+            cap_base = base
+        elif name.startswith("ply_ctrl"):
+            ply_base = base
+    print("fir_pl_regs @ 0x%08X   gpio_ctrl @ 0x%08X   cap @ 0x%08X   ply @ 0x%08X"
+          % (regs_base, ctrl_base, cap_base, ply_base))
+    return (ol, Regs(MMIO(regs_base, 0x1000)), MMIO(ctrl_base, 0x1000),
+            MMIO(cap_base, 0x4000), MMIO(ply_base, 0x10000))
 
 
 def main():
@@ -658,7 +810,7 @@ def main():
 
     import dma_audio_probe as P
 
-    ol, regs, gpio = open_pl(args.bit)
+    ol, regs, gpio, cap, ply = open_pl(args.bit)
     print("codec init ...")
     P.codec_init(1)
 
@@ -672,6 +824,10 @@ def main():
     last = None
     busy = 0
     err = None
+    player = None
+    play_want = None
+    src_on = False
+    scope_tick = 0.0
 
     # 先把 run + drc 打开，再让 tune 决定具体参数
     set_ctrl(ctrl_for({}))
@@ -691,20 +847,57 @@ def main():
                     # 3960/4096），不 flush 的话输出的一直是 ~81 ms 之前的样本 ——
                     # 实测端到端延迟 85 ms 而不是 2.3 ms。这里先打一拍 flush
                     # （ctrl[2] 自清）把积压清掉，再正常放行。
-                    set_ctrl(ctrl_for(last or {}) | CTRL_FLUSH)
+                    set_ctrl(ctrl_for(last or {}, src_on) | CTRL_FLUSH)
                     time.sleep(0.02)
-                    set_ctrl(ctrl_for(last or {}))
+                    set_ctrl(ctrl_for(last or {}, src_on))
                 else:
                     set_ctrl(0)
+
+            # ---- 循环播放固定音频：请求变了就切音源 ----
+            want = read_play()
+            if want != play_want:
+                play_want = want
+                if player is not None:
+                    player.stop_ev.set()
+                    player.join(0.5)
+                    player = None
+                regs.wr(OFF_PLY_CTL, 0)          # 停读，RTL 把波表地址归零
+                perr = None
+                if want:
+                    try:
+                        words = load_wav_words(want)
+                        for j in range(0, PLAY_RING, PLAY_CHUNK):
+                            ply.write(j * 4, _slice_bytes(words, j, PLAY_CHUNK))
+                        regs.wr(OFF_PLY_LEN, PLAY_RING)
+                        player = Player(ply, words)
+                        player.start()
+                        regs.wr(OFF_PLY_CTL, 3)  # en | loop
+                    except Exception as ex:
+                        perr = "%s: %s" % (type(ex).__name__, ex)
+                src_on = player is not None
+                if perr:
+                    err = perr
+                if run:
+                    # 切音源必须 flush：两个源相位不同，不 flush 有半秒错位
+                    set_ctrl(ctrl_for(last or {}, src_on) | CTRL_FLUSH)
+                    time.sleep(0.02)
+                    set_ctrl(ctrl_for(last or {}, src_on))
+
             tune = read_tune() or {}
             cur, changed = apply_tune(regs, tune, last)
             if changed:
                 last = cur
-                # ctrl 的第 0/1/3 位都由 ctrl_for 统一算（run / 压缩 / 测试音）
+                # ctrl 的第 0/1/3/5 位都由 ctrl_for 统一算（run / 压缩 / 测试音 / 音源）
                 if run:
-                    set_ctrl(ctrl_for(cur))
+                    set_ctrl(ctrl_for(cur, src_on))
             busy = read_busy(regs)
-            publish(regs, last, t0, busy, err, run=run, ctrl=gpio)
+
+            # ---- C3 抓取缓冲：1 Hz 刷一次，页面画波形/频谱 ----
+            if time.time() - scope_tick >= 1.0:
+                scope_tick = time.time()
+                read_scope(regs, cap)
+
+            publish(regs, last, t0, busy, err, run=run, ctrl=gpio, play=play_want)
             err = None
         except Exception as ex:            # 板子上的异常不要静默，写进 status
             err = "%s: %s" % (type(ex).__name__, ex)
@@ -717,6 +910,10 @@ def main():
             break
         time.sleep(0.1)
 
+    if player is not None:
+        player.stop_ev.set()
+        player.join(0.5)
+        regs.wr(OFF_PLY_CTL, 0)
     set_ctrl(0)
     print("stopped, ctrl=0")
     return 0

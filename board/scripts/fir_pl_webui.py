@@ -18,7 +18,10 @@
     GET  /api/status       读 fir_status.json（超过 stale 秒没更新就报 stale）
     GET  /api/tune         读 fir_tune.json（没有则 null，页面会填默认值）
     POST /api/tune         写 fir_tune.json（这里做范围钳制，和第一档一致）
-    GET  /api/scope        PL 直连没有波形缓冲（RTL 里是桩），返回 ok=false
+    GET  /api/scope        读抓取缓冲快照（fir_pl_live.py 每秒写一次）
+    GET  /api/play         可播放的 WAV 列表 + 当前播放项
+    POST /api/play         循环播放固定音频 {"file": "xxx.wav"}
+    POST /api/play/stop    切回麦克风
     GET  /api/health       位流/进程/新鲜度
     POST /api/start        写 run=1
     POST /api/stop         写 run=0
@@ -48,6 +51,10 @@ TUNE_PATH = os.environ.get("FIR_TUNE", "/dev/shm/fir_tune.json")
 STATUS_PATH = os.environ.get("FIR_STATUS", "/dev/shm/fir_status.json")
 RUN_PATH = os.environ.get("FIR_PL_RUN", "/dev/shm/fir_pl_run.txt")
 BIT_PATH = os.environ.get("FIR_PL_BIT", "/home/xilinx/dma_exp/fir_pl.bit")
+# C3 抓取缓冲 / 循环播放（2026-10-30）
+SCOPE_PATH = os.environ.get("FIR_PL_SCOPE", "/dev/shm/fir_scope.json")
+PLAY_PATH = os.environ.get("FIR_PL_PLAY", "/dev/shm/fir_pl_play.txt")
+WAV_DIR = os.environ.get("FIR_PL_WAV_DIR", "/home/xilinx/dma_exp/wav")
 
 VERSION = "pl-webui 2026-10-28"
 STALE_S = 3.0            # status 超过这么久没更新 = 后端进程不在
@@ -58,16 +65,20 @@ R_THR = (-60.0, 0.0)
 R_RATIO = (0.0, 0.95)
 R_ATK = (0.0, 50.0)
 R_REL = (0.0, 500.0)
+R_MPO = (-40.0, 0.0)           # 输出上限（dBFS）；0 = 不动作
 
 # 第一次打开页面时给什么。三个 DRC 参数 = 寄存器出厂值（419456 / 2936064 /
-# 17408 / 896 换算成 dB、ratio、ms），增益用演示口径 +30 dB。
+# 17408 / 896 换算成 dB、ratio、ms）。
+# 增益默认 +22 dB：模拟 PGA 已经抬到 +35.25 dB（比出厂的 +21 高 14 dB），
+# 数字这边同量减回去，总响度不变、底噪里能被数字抬起来的那部分少 14 dB。
 DEFAULT_TUNE = {
-    "gain_db": [36.0, 36.0, 36.0, 36.0],
+    "gain_db": [22.0, 22.0, 22.0, 22.0],
     "thr_db": [-20.0, -20.0, -20.0, -20.0],
     "ratio": [0.7, 0.7, 0.7, 0.7],
     "attack_ms": [5.0, 5.0, 5.0, 5.0],
     "release_ms": [100.0, 100.0, 100.0, 100.0],
     "bypass": False,
+    "mpo_db": 0.0,
 }
 
 
@@ -135,6 +146,7 @@ def sanitize_tune(body):
         "attack_ms":  [round(x, 2) for x in _four(t.get("attack_ms"), R_ATK[0], R_ATK[1], 5.0)],
         "release_ms": [round(x, 2) for x in _four(t.get("release_ms"), R_REL[0], R_REL[1], 100.0)],
         "bypass":     bool(t.get("bypass")),
+        "mpo_db":     round(_clamp(t.get("mpo_db", 0.0), R_MPO[0], R_MPO[1], 0.0), 1),
     }
     # B4 测听：tone.on 时 PL 输出被四段中心频率的方波顶替
     tn = t.get("tone")
@@ -318,9 +330,32 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True,
                                    "tune": _read_json(TUNE_PATH) or dict(DEFAULT_TUNE)})
             if p == "/api/scope":
-                # 抓取缓冲是 RTL 里的桩（C3/C4 未做），这里不编数据骗页面
-                return self._json({"ok": False,
-                                   "msg": "PL 直连版没有波形缓冲（C3/C4 未实现）"})
+                # C3：fir_pl_live.py 每秒把抓取缓冲写成 SCOPE_PATH。
+                # 文件不在 = 后端没跑/位流还是旧的，别编数据骗页面。
+                sc = _read_json(SCOPE_PATH)
+                if not sc or not sc.get("in"):
+                    return self._json({"ok": False,
+                                       "msg": "还没有抓取数据（fir_pl_live.py 在跑吗？位流是不是新编的？）"})
+                sc = dict(sc)
+                sc["age"] = round(max(0.0, time.time() - (sc.get("t") or 0)), 2)
+                return self._json(sc)
+            if p == "/api/play":
+                files = []
+                try:
+                    for fn in sorted(os.listdir(WAV_DIR)):
+                        if fn.lower().endswith(".wav"):
+                            files.append(fn)
+                except Exception:
+                    pass
+                cur = None
+                try:
+                    cur = open(PLAY_PATH).read().strip() or None
+                except Exception:
+                    pass
+                if cur and cur.lower() == "off":
+                    cur = None
+                return self._json({"ok": True, "files": files,
+                                   "playing": os.path.basename(cur) if cur else None})
             if p == "/api/health":
                 return self._json(health())
             if p == "/api/rec":
@@ -360,6 +395,24 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/stop":
                 write_run(False)
                 return self._json({"ok": True, "msg": "已把 run 写 0（PL 通路停）"})
+            if p == "/api/play":
+                # 循环播放固定音频：只认 WAV_DIR 里的文件名，别把路径穿出去
+                fn = os.path.basename(str(body.get("file") or ""))
+                path = os.path.join(WAV_DIR, fn)
+                if not fn or not os.path.isfile(path):
+                    return self._json({"ok": False, "msg": "没有这个音频文件：%s" % (fn or "（空）")}, 400)
+                tmp = PLAY_PATH + ".tmp"
+                with open(tmp, "w") as f:
+                    f.write(path)
+                os.replace(tmp, PLAY_PATH)
+                return self._json({"ok": True, "file": fn,
+                                   "msg": "已请求循环播放（fir_pl_live 每 0.1 秒看一次）"})
+            if p == "/api/play/stop":
+                tmp = PLAY_PATH + ".tmp"
+                with open(tmp, "w") as f:
+                    f.write("off")
+                os.replace(tmp, PLAY_PATH)
+                return self._json({"ok": True, "msg": "已请求停止播放，切回麦克风"})
             if p == "/api/hearing/tone":
                 # B4：按四段中心频率放测试音。band 0..3 → 250/750/1500/3000 Hz
                 # 两种调用方式都认：{band:0..3} 或 {freq_hz:250}
@@ -403,12 +456,18 @@ def selftest():
     import urllib.error
     import urllib.request
 
-    global TUNE_PATH, STATUS_PATH, RUN_PATH, BIT_PATH
+    global TUNE_PATH, STATUS_PATH, RUN_PATH, BIT_PATH, SCOPE_PATH, PLAY_PATH, WAV_DIR
     tmpdir = tempfile.mkdtemp(prefix="plwebui_")
     TUNE_PATH = os.path.join(tmpdir, "fir_tune.json")
     STATUS_PATH = os.path.join(tmpdir, "fir_status.json")
     RUN_PATH = os.path.join(tmpdir, "fir_pl_run.txt")
     BIT_PATH = os.path.join(tmpdir, "fir_pl.bit")
+    SCOPE_PATH = os.path.join(tmpdir, "fir_scope.json")
+    PLAY_PATH = os.path.join(tmpdir, "fir_pl_play.txt")
+    WAV_DIR = os.path.join(tmpdir, "wav")
+    os.makedirs(WAV_DIR)
+    with open(os.path.join(WAV_DIR, "demo.wav"), "wb") as f:
+        f.write(b"RIFF")
     with open(BIT_PATH, "wb") as f:
         f.write(b"\x00" * 1024)
 
@@ -429,8 +488,11 @@ def selftest():
         data = json.dumps(body or {}).encode("utf-8")
         req = urllib.request.Request(base + path, data=data,
                                      headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=5) as r:
-            return r.status, json.loads(r.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return r.status, json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:       # 4xx/5xx 也要能读到 body
+            return e.code, json.loads(e.read().decode("utf-8"))
 
     bad = 0
 
@@ -448,7 +510,7 @@ def selftest():
     code, html = get_text("/")
     chk("GET / 返回 pl.html", code == 200 and "/api/status" in html
         and "pl.html" not in html[:200], code)
-    chk("pl.html 有 PL 档的粘合层", "PL 档暂无抓取缓冲" in html or "obs-mini" in html)
+    chk("pl.html 有 PL 档的粘合层", 'id="gains-r"' in html and 'id="c-mpo"' in html)
     code2, old_html = get_text("/page.html")
     chk("GET /page.html 也还在", code2 == 200 and len(old_html) > 1000, code2)
 
@@ -459,7 +521,7 @@ def selftest():
     t0 = j.get("tune") if isinstance(j, dict) else None
     chk("tune 无文件 -> ok/tune 包装 + 演示默认",
         j.get("ok") is True and isinstance(t0, dict)
-        and t0.get("gain_db") == [36.0] * 4
+        and t0.get("gain_db") == [22.0] * 4
         and t0.get("thr_db") == [-20.0] * 4 and t0.get("ratio") == [0.7] * 4, t0)
     code, j = get("/api/health")
     chk("health.ok=false", j.get("ok") is False and j.get("mode") == "pl")
@@ -480,6 +542,15 @@ def selftest():
     chk("release 钳到 [0,500]", t.get("release_ms") == [100.0, 0.0, 500.0, 100.0], t.get("release_ms"))
     chk("bypass 转 bool", t.get("bypass") is True)
     chk("写进去能读回", (get("/api/tune")[1] or {}).get("tune") == t)
+
+    code, j = post("/api/tune", {"gain_db": [30] * 4, "mpo_db": -100})
+    chk("mpo_db 钳到 [-40,0]", (j.get("tune") or {}).get("mpo_db") == -40.0,
+        (j.get("tune") or {}).get("mpo_db"))
+    code, j = post("/api/tune", {"gain_db": [30] * 4, "mpo_db": 3})
+    chk("mpo_db 上界 0", (j.get("tune") or {}).get("mpo_db") == 0.0,
+        (j.get("tune") or {}).get("mpo_db"))
+    code, j = post("/api/tune", {"gain_db": [30] * 4})
+    chk("不带 mpo_db 时默认 0", (j.get("tune") or {}).get("mpo_db") == 0.0)
 
     print("== 3b. 右耳处方 b1 ==")
     code, j = post("/api/tune", {"gain_db": [30] * 4, "b1": {"gain_db": [0, 6, 12, 18]}})
@@ -516,9 +587,28 @@ def selftest():
     code, j = post("/api/start")
     chk("start 能看到 backend_alive", j.get("backend_alive") is True)
 
-    print("== 7. 没实现的接口要明说 / 测听接口 ==")
+    print("== 7. 抓取缓冲 / 测听接口 ==")
     code, j = get("/api/scope")
-    chk("scope ok=false 且有 msg", j.get("ok") is False and j.get("msg"))
+    chk("没抓取数据时 scope 明说 ok=false", j.get("ok") is False and j.get("msg"))
+    _write_json(SCOPE_PATH, {"ok": True, "t": time.time(), "fs": 48828, "n": 4,
+                             "in": [0, 1, -1, 32767], "out": [0, 2, -2, 30000]})
+    code, j = get("/api/scope")
+    chk("scope 透传快照并带 age",
+        j.get("ok") is True and j.get("in") == [0, 1, -1, 32767] and j.get("age") is not None)
+
+    print("== 7b. 循环播放接口 ==")
+    code, j = get("/api/play")
+    chk("play 列出 WAV", "demo.wav" in (j.get("files") or []))
+    code, j = post("/api/play", {"file": "../../etc/passwd"})
+    chk("play 拒绝路径穿越", j.get("ok") is False, code)
+    code, j = post("/api/play", {"file": "nope.wav"})
+    chk("play 拒绝不存在的文件", j.get("ok") is False, code)
+    code, j = post("/api/play", {"file": "demo.wav"})
+    chk("play 接受已有文件", j.get("ok") is True)
+    chk("play 写的是 WAV_DIR 里的绝对路径",
+        open(PLAY_PATH).read().strip() == os.path.join(WAV_DIR, "demo.wav"))
+    code, j = post("/api/play/stop")
+    chk("play/stop 写 off", open(PLAY_PATH).read().strip() == "off")
     code, j = post("/api/hearing/tone", {"band": 2, "amp_db": -30})
     chk("hearing/tone 打开测听", j.get("ok") is True and j.get("hz") == 1500
         and (j.get("tone") or {}).get("band") == 2)

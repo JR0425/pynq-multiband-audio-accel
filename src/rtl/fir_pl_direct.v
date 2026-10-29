@@ -83,7 +83,7 @@ module fir_pl_direct #(
 
     /* ---- 2026-10-28 批 1：观察量 + 板上 WAV 音源 ----
      * env_b0/gr_b0：四段包络/衰减量（Q2.22，24 位符号扩展到 32），段0 在低位。
-     *   bank1 那套是批 2 双耳的事，现在只有一份 DRC，寄存器侧读 env_b1/gr_b1 恒 0。
+     *   env_b0/gr_b0 是左耳（bank0），env_b1/gr_b1 是右耳（bank1），两套 DRC 各一份。
      * peak_in/peak_out：每 768 采样（16 ms @48 kHz）窗内 |max|，窗末锁存。
      * ply_*：波表 BRAM 的 B 口（只读）。PS 经 axi_bram_ctrl 把 WAV 写进去
      *   （16 位样本放 [31:16]，与发送字同格式），ply_ctl[0]=en、[1]=loop，
@@ -99,6 +99,17 @@ module fir_pl_direct #(
     input  wire [31:0]  ply_rdata,
     input  wire [31:0]  ply_ctl,
     input  wire [31:0]  ply_len,
+
+    /* ---- 2026-10-30：C3 抓取缓冲（波形/频谱）----
+     * BD 里一块 4096×32 的 BRAM 挂在 axi_bram_ctrl 上（0x43C60000），
+     * 这里只出写口：低 16 位 = 进核样本，高 16 位 = 限幅后左耳。
+     * scope_snap=1 时停止采集（只停抓取，不影响音频），写指针经 0x6C 读回。
+     * PS 侧从 ptr 往回读 4096 字就是快照前约 84 ms 的连续历史。 */
+    output wire [11:0]  cap_addr,
+    output wire [31:0]  cap_din,
+    output wire         cap_we,
+    input  wire         scope_snap,
+    output wire [12:0]  scope_wr,
 
     /* ---- 2026-10-29 夜：测试音（B4 听力图闭环）+ MPO 限幅（B6） ----
      * tone_sel 选四段中心频率（0=250 1=750 2=1500 3=3000 Hz），tone_amp 是
@@ -552,35 +563,148 @@ module fir_pl_direct #(
      * 用户在网页上把 MPO 拉到 -10 dBFS 之类的值，超出的动态范围就被压住，
      * 保护耳朵（也是验配软件里的标准做法）。
      */
+    /* ---- 一级流水：out_l/out_r 先打一拍再进限幅 ----
+     * 2026-10-29 时序：tone_amp → 测试音 mux → MPO（取绝对值、比门限、减、右移 2、
+     * 加、钳位、恢复符号）→ pr_l 串了 18 级逻辑 / 11.9 ns，WNS −2.25 ns。
+     * 在 ctrl[3] 与门限之后切一刀，两段各 ~6 ns。
+     * out_vld 每帧才来一次，多一拍只是端到端多 10 ns（噪声级）。 */
+    reg signed [15:0] xl_q, xr_q;
+    reg               xvld_q;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n || flush) begin
+            xl_q   <= 16'sd0;
+            xr_q   <= 16'sd0;
+            xvld_q <= 1'b0;
+        end else begin
+            xl_q   <= out_l;
+            xr_q   <= out_r;
+            xvld_q <= out_vld;
+        end
+    end
+
     wire signed [16:0] th17  = {1'b0, mpo_th[14:0]};
-    wire signed [16:0] x17_l = {out_l[15], out_l};
-    wire signed [16:0] x17_r = {out_r[15], out_r};
+    wire signed [16:0] x17_l = {xl_q[15], xl_q};
+    wire signed [16:0] x17_r = {xr_q[15], xr_q};
     wire signed [16:0] a17_l = x17_l[16] ? -x17_l : x17_l;
     wire signed [16:0] a17_r = x17_r[16] ? -x17_r : x17_r;
-    wire signed [16:0] y17_l = (a17_l > th17) ? (th17 + ((a17_l - th17) >>> 2)) : a17_l;
-    wire signed [16:0] y17_r = (a17_r > th17) ? (th17 + ((a17_r - th17) >>> 2)) : a17_r;
+    wire signed [16:0] d17_l = a17_l - th17;
+    wire signed [16:0] d17_r = a17_r - th17;
+
+    /* ---- 第二级流水：膝部运算再切一刀 ----
+     * 第一拍做 |x|、比门限、算差值；第二拍做 >>>2、加 th、钳位、恢复符号。
+     * 只切一刀时最差路径变成 xl_q→MPO→pr_l，WNS 还剩 −0.19 ns。 */
+    reg signed [16:0] aq_l, aq_r, dq_l, dq_r;
+    reg               gtq_l, gtq_r, sq_l, sq_r;
+    reg               vld2_q;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n || flush) begin
+            aq_l  <= 17'sd0;  aq_r  <= 17'sd0;
+            dq_l  <= 17'sd0;  dq_r  <= 17'sd0;
+            gtq_l <= 1'b0;    gtq_r <= 1'b0;
+            sq_l  <= 1'b0;    sq_r  <= 1'b0;
+            vld2_q <= 1'b0;
+        end else begin
+            aq_l  <= a17_l;
+            aq_r  <= a17_r;
+            dq_l  <= d17_l;
+            dq_r  <= d17_r;
+            gtq_l <= (a17_l > th17);
+            gtq_r <= (a17_r > th17);
+            sq_l  <= xl_q[15];
+            sq_r  <= xr_q[15];
+            vld2_q <= xvld_q;
+        end
+    end
+
+    wire signed [16:0] y17_l = gtq_l ? (th17 + (dq_l >>> 2)) : aq_l;
+    wire signed [16:0] y17_r = gtq_r ? (th17 + (dq_r >>> 2)) : aq_r;
     wire signed [16:0] yc_l  = (y17_l > 17'sd32767) ? 17'sd32767 : y17_l;
     wire signed [16:0] yc_r  = (y17_r > 17'sd32767) ? 17'sd32767 : y17_r;
-    wire signed [15:0] mpo_l = out_l[15] ? -yc_l[15:0] : yc_l[15:0];
-    wire signed [15:0] mpo_r = out_r[15] ? -yc_r[15:0] : yc_r[15:0];
+    wire signed [15:0] mpo_l = sq_l ? -yc_l[15:0] : yc_l[15:0];
+    wire signed [15:0] mpo_r = sq_r ? -yc_r[15:0] : yc_r[15:0];
 
-    wire mpo_hit = (a17_l > th17) || (a17_r > th17);
+    wire mpo_hit = gtq_l || gtq_r;
 
     reg  [31:0] mpo_cnt_r;
     reg  [16:0] mpo_peak_r;
 
+    /* 峰值量的是**限幅之后**的输出（寄存器表 0x054「限幅后输出峰值」），
+     * 而且要取两只耳朵里大的那个 —— 2026-10-29 板上探针发现原来量的是
+     * aq_l（限幅前的左耳），于是"限幅明明在动、峰值却不变"。
+     *
+     * 直接拿 pr_l/pr_r（真正写进输出 FIFO 的那两个采样）算：既符合"限幅后"，
+     * 又不会让 mpo_th 穿过整条限幅器再进新触发器 —— 接在组合的 mpo_l/mpo_r
+     * 上试过，路径 mpo_th_reg→abs_q_reg 串太长，WNS 掉到 −1.574 ns。 */
+    reg [15:0] pr_l, pr_r;
+
+    /* 取负前必须先**符号扩展**到 17 位：{1'b0, pr_l} 是零扩展，-8000 会变成
+     * 57536，取负再得 73536，于是任何负采样都被钳成 32767（2026-10-29 板上
+     * 探针读到的 PEAK 恒等于 32767 就是这个）。 */
+    wire [16:0] abs_l = pr_l[15] ? (17'd0 - {pr_l[15], pr_l}) : {1'b0, pr_l};
+    wire [16:0] abs_r = pr_r[15] ? (17'd0 - {pr_r[15], pr_r}) : {1'b0, pr_r};
+    wire [16:0] abs_m = (abs_r > abs_l) ? abs_r : abs_l;
+
+    reg [16:0] abs_q;
+    reg        vld3_q, vld4_q;
+
+    /* pr_* 比 vld2_q 晚一拍、abs_q 再晚一拍，所以取峰值看的是 vld4_q。 */
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n || flush) begin
+            abs_q      <= 17'd0;
+            vld3_q     <= 1'b0;
+            vld4_q     <= 1'b0;
             mpo_cnt_r  <= 32'd0;
             mpo_peak_r <= 17'd0;
-        end else if (out_vld) begin
-            if (mpo_hit)                mpo_cnt_r  <= mpo_cnt_r + 32'd1;
-            if (a17_l > mpo_peak_r)      mpo_peak_r <= a17_l;
+        end else begin
+            abs_q  <= abs_m;
+            vld3_q <= vld2_q;
+            vld4_q <= vld3_q;
+            if (vld2_q && mpo_hit)            mpo_cnt_r  <= mpo_cnt_r + 32'd1;
+            if (vld4_q && abs_q > mpo_peak_r) mpo_peak_r <= abs_q;
         end
     end
 
     assign mpo_cnt  = mpo_cnt_r;
     assign mpo_peak = (mpo_peak_r > 17'd32767) ? 16'h7FFF : mpo_peak_r[15:0];
+
+    /* ================= 抓取缓冲写口（C3，2026-10-30） ================= */
+    /* 每采样写一个字：低 16 位进核、高 16 位出核（限幅后左耳）。
+     * 先打一拍再写 BRAM —— mpo_l 和 fe_din 都是组合来的，直接进 BRAM 端口会
+     * 多一条"组合逻辑 → BRAM 建立时间"的路径，而当前 WNS 只有 +0.1 ns。
+     * scope_snap=1 冻结写指针：页面读 16 KB 要几毫秒，不冻的话读到的一半已经
+     * 被新样本覆盖，波形会断成几截。只停抓取，音频通路照跑。 */
+    reg signed [15:0] fe_din_q;
+    reg [31:0] cap_q;
+    reg        cap_qv;
+    reg [11:0] cap_wr;
+    reg [11:0] cap_ptr;
+
+    always @(posedge clk) begin
+        if (fe_din_vld) fe_din_q <= fe_din;
+    end
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n || flush) begin
+            cap_q   <= 32'd0;
+            cap_qv  <= 1'b0;
+            cap_wr  <= 12'd0;
+            cap_ptr <= 12'd0;
+        end else begin
+            cap_qv <= 1'b0;
+            if (vld2_q && !scope_snap) begin
+                cap_q   <= {mpo_l, fe_din_q};
+                cap_qv  <= 1'b1;
+                cap_wr  <= cap_wr + 12'd1;
+            end
+            if (scope_snap) cap_ptr <= cap_wr;
+        end
+    end
+
+    assign cap_we   = cap_qv;
+    assign cap_din  = cap_q;
+    assign cap_addr = cap_wr;
+    assign scope_wr = {1'b0, cap_ptr};
 
     /* ================= 输出 FIFO ================= */
     /* 前端输出没有 ready，而 i2s_duplex 的播放入口可能有一拍不 ready
@@ -604,14 +728,17 @@ module fir_pl_direct #(
      * 用 2 位计数而不是"写一次立刻再写一次"：写使能是寄存的，同一个 always
      * 块里连写两拍会让第二拍的数据来源在计数翻转后变掉。
      */
-    reg [15:0] pr_l, pr_r;
     reg [1:0]  dup_left;      // 还剩几个字没写（2 = 左、右都还没写）
     reg        dup_wr;
     reg        dup_drop;      // 一对没写出去（正常恒 0）
     wire [15:0] ofifo_din;
 
     assign ofifo_wr  = dup_wr;
-    assign ofifo_din = (dup_left == 2'd2) ? pr_l : pr_r;
+    /* 写的时候 dup_left 已经是"还剩几个没写"：先写的那拍是 1、后写的是 0。
+     * 2026-10-29 板上测出两只耳朵听到的是同一路 —— dup_wr 比 dup_left 的递减
+     * 晚一拍，原来按 (dup_left==2) 选左，实际写的时候早就是 1/0 了，两次都取了
+     * pr_r。改成按 0/非 0 选，才是"先左后右"。 */
+    assign ofifo_din = (dup_left == 2'd0) ? pr_r : pr_l;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n || flush) begin
@@ -629,7 +756,7 @@ module fir_pl_direct #(
                     dup_left <= dup_left - 2'd1;
                 end
             end
-            if (out_vld) begin
+            if (vld2_q) begin
                 if (dup_left == 2'd0) begin
                     pr_l     <= mpo_l;
                     pr_r     <= mpo_r;

@@ -28,6 +28,9 @@ import sys
 import tempfile
 import time
 import urllib.request
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -125,9 +128,29 @@ class Injector(BaseHTTPRequestHandler):
     """把目标页的 HTML 抓下来、插一段测量脚本、再吐回去；/api/* 原样转发。"""
 
     base = ""
+    extra_js = ""
+    posts = []
 
     def log_message(self, *a):
         pass
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(n)
+        Injector.posts.append((self.path, body))
+        req = urllib.request.Request(self.base.rstrip("/") + self.path, data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                out = r.read()
+        except Exception as ex:
+            self.send_error(502, str(ex))
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
 
     def do_GET(self):
         try:
@@ -140,7 +163,7 @@ class Injector(BaseHTTPRequestHandler):
             return
         if "text/html" in ctype:
             txt = body.decode("utf-8", "replace")
-            txt = txt.replace("</body>", PROBE_JS + "</body>")
+            txt = txt.replace("</body>", PROBE_JS + self.extra_js + "</body>")
             body = txt.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", ctype)
@@ -150,8 +173,10 @@ class Injector(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def measure(url, browser, size):
+def measure(url, browser, size, extra_js="", budget=6000):
     w, h = [int(x) for x in size.lower().split("x")]
+    Injector.posts = []
+    Injector.extra_js = extra_js
     srv = ThreadingHTTPServer(("127.0.0.1", 0), Injector)
     Injector.base = url
     port = srv.server_address[1]
@@ -160,7 +185,7 @@ def measure(url, browser, size):
     try:
         out = subprocess.run(
             [browser, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-             "--window-size=%d,%d" % (w, h), "--virtual-time-budget=6000",
+             "--window-size=%d,%d" % (w, h), "--virtual-time-budget=%d" % budget,
              "--dump-dom", "http://127.0.0.1:%d/" % port],
             capture_output=True, timeout=90)
     finally:
@@ -175,6 +200,64 @@ def measure(url, browser, size):
     raw = raw[:raw.find("</title>")]
     raw = raw.replace("&quot;", '"').replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
     return json.loads(raw)
+
+
+CONTRACT_JS = r"""
+<script>
+(function(){
+  /* 先动压缩门限，再动增益 —— 页面如果只发增益，后端会把门限刷回默认，
+   * 下面这段就是为这个类 bug 留的回归。 */
+  function fire(el){
+    el.dispatchEvent(new Event('input', {bubbles:true}));
+    el.dispatchEvent(new Event('change', {bubbles:true}));
+  }
+  setTimeout(function(){
+    var t = document.querySelector('#c-thr');
+    if (t){ t.value = -23.5; fire(t); }
+    setTimeout(function(){
+      var g = document.querySelector('#gains input');
+      if (g){ g.value = 6; fire(g); }
+    }, 700);
+  }, 1500);
+})();
+</script>
+"""
+
+
+def check_contract(url, browser, size="1600x900"):
+    """浏览器真的拖一次增益滑杆，看它发出去的 tune 是不是整份。"""
+    try:
+        with urllib.request.urlopen(url.rstrip("/") + "/api/tune", timeout=10) as r:
+            orig = json.loads(r.read().decode())["tune"]
+    except Exception as ex:
+        return False, "拿不到原调音：%s" % ex
+
+    measure(url, browser, size, extra_js=CONTRACT_JS, budget=9000)
+    tunes = [b for (p, b) in Injector.posts if p.startswith("/api/tune")]
+    ok, detail = False, "页面一次 tune 都没发"
+    if tunes:
+        try:
+            t = json.loads(tunes[-1].decode())
+        except Exception as ex:
+            t, ok, detail = None, False, "最后一次 tune 不是 JSON：%s" % ex
+        if t is not None:
+            need = ("gain_db", "thr_db", "ratio", "attack_ms", "release_ms", "mpo_db")
+            miss = [k for k in need if k not in t]
+            keep_thr = t.get("thr_db") == [-23.5] * 4
+            moved = any(abs(x - 6.0) < 0.01 for x in (t.get("gain_db") or []))
+            ok = not miss and keep_thr and moved
+            detail = ("漏字段 %s；门限 %s；增益 %s"
+                      % (miss or "无", t.get("thr_db"), t.get("gain_db")))
+
+    # 不管对错，把原调音写回去
+    try:
+        req = urllib.request.Request(
+            url.rstrip("/") + "/api/tune", data=json.dumps(orig).encode(),
+            headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10).read()
+    except Exception:
+        pass
+    return ok, detail
 
 
 def shot(url, browser, size, path):
@@ -199,6 +282,8 @@ def main():
     ap.add_argument("--size", default="1600x900")
     ap.add_argument("--shot", default="")
     ap.add_argument("--no-selftest", action="store_true")
+    ap.add_argument("--contract", action="store_true",
+                    help="再跑一遍：浏览器拖增益滑杆，查发出去的 tune 是否整份（会临时改板上的调音，跑完恢复）")
     a = ap.parse_args()
 
     browser = find_browser()
@@ -245,6 +330,12 @@ def main():
         chk("健康 6 项", m["has_health"] == 6)
         chk("电平有读数", m["val_in"] not in ("", "—", "—dBFS"))
         chk("无 JS 错误", not m["errs"])
+
+        if a.contract:
+            print("== 调音契约（拖滑杆发的是整份 tune）==")
+            ok, detail = check_contract(base, browser, a.size)
+            print("  %s" % detail)
+            chk("增益滑杆不发丢压缩参数", ok)
 
         if a.shot:
             shot(base, browser, a.size, a.shot)
