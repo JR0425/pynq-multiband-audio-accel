@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
     fwd.close();
 
     /* 两版逐点比一下：WDRC 的包络从 0 爬起来，所以开头会比无记忆版"压得少"；
-     * 稳态之后差别应当收敛。这里只报数，判定交给 tools/ref_model_wdrc.py。 */
+     * 稳态之后差别应当收敛。这里只报数，判定交给 sim/model/ref_model_wdrc.py。 */
     long  ndiff  = 0;
     long  maxdiff = 0;
     for (int i = 0; i < length; i++) {

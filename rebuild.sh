@@ -57,7 +57,7 @@ if [ "$step" = "all" ] || [ "$step" = "csim" ]; then
     echo "==== 1/3  HLS C 仿真 ===="
     run_hls build/hls/run_csim.tcl
     echo "---- 和整数参考模型逐点比对 ----"
-    python tools/ref_model_wdrc.py --mode wdrc
+    python sim/model/ref_model_wdrc.py --mode wdrc
 fi
 
 if [ "$step" = "all" ] || [ "$step" = "ip" ]; then

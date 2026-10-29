@@ -7,10 +7,10 @@
  * 差 1 个 LSB 时，输出文件会有几百个采样点对不上，看起来跟"移位下标写错"
  * 一模一样，靠耳朵或者看波形根本分不出来。
  *
- * 数值契约（来历见 tools/gen_rtl_coeffs.py 与 tools/ref_model_int.py 的文件头）：
+ * 数值契约（来历见 sim/model/gen_rtl_coeffs.py 与 sim/model/ref_model_int.py 的文件头）：
  *
  *     din    int16，Q1.15。就是音频采样的那串比特，不是"数值换算"。
- *     coef   int18，Q1.17，有符号。系数表由 tools/gen_rtl_coeffs.py 生成，
+ *     coef   int18，Q1.17，有符号。系数表由 sim/model/gen_rtl_coeffs.py 生成，
  *            规则是 round_half_away(x * 2^17) —— 这条规则是拿 HLS 综合出来的
  *            系数 ROM 反推出来的，579 个系数逐个比，0 处不符。
  *     乘积   16 + 18 = 34 位有符号，**精确**，不丢位。

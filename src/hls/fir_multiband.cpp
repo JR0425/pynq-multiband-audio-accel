@@ -222,7 +222,7 @@ static drc_t drc(drc_t x, drc_t thr, drc_t ratio) {
  *         |x| - (|x|-thr)(1-ratio) = thr + (|x|-thr) * ratio
  *
  * ⚠️ 定点下每一步都按 AP_TRN 截断（向负无穷取整），不是四舍五入。
- *    参考模型 tools/ref_model_wdrc.py 必须用 floor 除法，差一个 LSB 就对不上。 */
+ *    参考模型 sim/model/ref_model_wdrc.py 必须用 floor 除法，差一个 LSB 就对不上。 */
 static inline drc_t wdrc(drc_t x, drc_t thr, drc_t ratio,
                          drc_t atk, drc_t rel, drc_t &env) {
     drc_t a = x;
