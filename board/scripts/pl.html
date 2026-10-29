@@ -272,18 +272,40 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
 html,body{height:100%;overflow:hidden}
 main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:column;
      padding:6px 10px 8px}
-#grid{flex:1;min-height:0;grid-template-rows:auto minmax(0,1fr) minmax(0,1fr) auto}
-#fr-box{height:20vh}
+/* 四行：①频响/电平 ②波形/增益 ③频谱/压缩 ④健康
+   第 2、3 行都是 1fr → 波形和频谱**等高**（之前一个 248px 一个 220px 又互相压） */
+#grid{flex:1;min-height:0;
+      grid-template-rows:minmax(0,21vh) minmax(0,1fr) minmax(0,1fr) auto}
+#fr-box{height:100%}
 #fr-cv{height:100%}
 #grid .sect{padding:6px 12px}
-.scope-col{min-height:0;gap:8px}
-.scope-col>.sect{flex:1;min-height:0;display:flex;flex-direction:column}
-.scope-box{flex:1;min-height:0}
-.scope-box .cvwrap{height:100%}
-.a-wave .cvwrap,.a-spec .cvwrap{height:auto}
+
+/* 左栏两个示波器面板直接落到栅格上（原来的容器只用来竖排，现在不需要） */
+.scope-col{display:contents}
+.a-wave{grid-column:1;grid-row:2}
+.a-spec{grid-column:1;grid-row:3}
+.scope-panel{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.scope-panel .scope-box{flex:1 1 auto;min-height:0}
+.scope-panel .scope-box .cvwrap{height:100%!important}
+.scope-panel canvas{height:100%!important;width:100%}
+
+/* 右栏：两组增益共 8 行，压紧一点，保证一屏放得下 */
+/* 1080p 上 8 行放得下；小屏万一不够，宁可卡片内部滚，也别把第 ④ 段裁掉 */
+.a-gain{overflow:auto}
+.a-gain .gain-row{padding:1px 0;grid-template-columns:108px 1fr 74px;gap:8px}
+.a-gain .gain-row .band{font-size:12.5px}
+.a-gain .gain-row .band small{display:none}
+.a-gain .gain-row .val{font-size:13.5px;line-height:1.15}
+.a-gain input[type=range]{height:16px}
+.grp-hdr{display:flex;align-items:center;gap:8px;color:var(--faint);
+  font-size:11.5px;margin:6px 0 0;padding-top:5px;border-top:1px dashed var(--line)}
+.grp-hdr .sub{color:var(--faint);opacity:.7}
+.grp-hdr .ck-dual{margin-left:auto;margin-top:0}
+.ck-dual{display:flex;align-items:center;gap:5px;color:var(--faint);font-size:11.5px}
+.ck-dual input{accent-color:var(--acc)}
+
 #lat-sel,#src-sel,#rec-lab,#gain-presets,#comp-presets,#hear-box{display:none!important}
 
-/* 观察量：塞进"电平"卡里，两行小字，不额外占一行栅格 */
 .obs-mini{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);
   font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.75}
 .obs-mini b{color:var(--text);font-weight:400}
@@ -380,12 +402,11 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
   <!-- 四段增益（右栏） -->
   <section class="sect a-gain">
     <h3>四段增益 <span class="sub">±24 dB · 步进 0.5</span></h3>
+    <div class="grp-hdr"><span>左耳</span><span class="sub">bank0</span></div>
     <div id="gains"></div>
-    <label class="ck-dual"><input type="checkbox" id="ck-dual"> 双耳（右耳独立增益）</label>
-    <div id="gain-dual">
-      <div class="hdr">右耳 <span>只写 bank1</span></div>
-      <div id="gains-r"></div>
-    </div>
+    <div class="grp-hdr"><span>右耳</span><span class="sub">bank1</span>
+      <label class="ck-dual"><input type="checkbox" id="ck-dual"> 跟随左耳</label></div>
+    <div id="gains-r"></div>
     <div class="preset-row" id="gain-presets"></div>
 
     <details class="hear" id="hear-box">
@@ -1322,22 +1343,20 @@ function applyTune(t){
 /* ===================================================================
  * PL 直连档的粘合层（2026-10-29）
  *
- * 这一页是 page.html 的拷贝 + 少量改动，主脚本一行没动。所有 PL 特有
- * 的东西都放在这里：
- *   · 按钮语义：PL 没有"启动处理进程"，只有 接通路 / 静音
- *   · 波形/频谱：没有抓取缓冲（RTL 里 scope_* 是桩），保留框子做占位并写清原因
- *   · 电平卡底部补两行观察量（ENV / GR，都是 PL 里的真信号）
- *   · 双耳：右耳四条增益，勾上才出现；发 tune 时带 b1
+ * 这一页是 page.html 的拷贝 + 定点改动，主脚本一行没动：
+ *   · 按钮语义：PL 没有处理进程，只有 接通路 / 静音
+ *   · 波形/频谱：没有抓取缓冲（scope_* 是桩），框子占位并写清原因
+ *   · 电平底部两行观察量（ENV / GR），都是 PL 里的真信号
+ *   · 增益两组：左耳 bank0 / 右耳 bank1 各四条，都可直接拖；
+ *     "跟随左耳"勾上时右耳跟着左耳走（默认不勾 = 各调各的）
  * =================================================================== */
 (function(){
   "use strict";
 
-  /* ---- 按钮语义 ---- */
   const bs = document.getElementById("btn-start"), bp = document.getElementById("btn-stop");
   if (bs) bs.textContent = "接通路";
   if (bp) bp.textContent = "静音";
 
-  /* ---- 波形 / 频谱：占位，不假装有数据 ---- */
   document.querySelectorAll(".scope-panel .empty-note").forEach((el) => {
     el.textContent = "PL 档暂无抓取缓冲（RTL 里 scope_* 还是桩）· 波形/频谱待实现";
   });
@@ -1345,17 +1364,26 @@ function applyTune(t){
     el.textContent = el.textContent + " · 占位";
   });
 
-  /* ---- 电平卡底部的读数换成 PL 的口径 ---- */
   const sl = document.querySelector(".a-lvl .statline");
   if (sl) sl.innerHTML =
     '<span>峰值窗 <b>15.7 ms</b></span>' +
     '<span>分频 <b>500 / 1000 / 2000 Hz</b></span>' +
     '<span>压缩 <b>左右各一套</b></span>';
 
-  /* ---- 双耳：右耳四条增益 ---- */
-  const dual = document.getElementById("ck-dual");
-  const dbox = document.getElementById("gain-dual");
+  /* ---------------- 右耳那一组增益 ---------------- */
+  const follow = document.getElementById("ck-dual");     // "跟随左耳"
   const rRows = [];
+
+  function paint(el, v){
+    el.innerHTML = (v > 0 ? "+" : "") + Number(v).toFixed(1) + ' <small>dB</small>';
+  }
+  function ensureB1(){
+    if (typeof S === "undefined") return {gain_db: [0,0,0,0]};
+    if (!S.b1) S.b1 = {gain_db: S.tune.gain_db.slice(0, 4)};
+    if (!S.b1.gain_db || S.b1.gain_db.length < 4) S.b1.gain_db = S.tune.gain_db.slice(0, 4);
+    return S.b1;
+  }
+
   (function buildRight(){
     const host = document.getElementById("gains-r");
     if (!host) return;
@@ -1377,55 +1405,63 @@ function applyTune(t){
     });
   })();
 
-  function paint(el, v){
-    el.innerHTML = (v > 0 ? "+" : "") + Number(v).toFixed(1) + ' <small>dB</small>';
-  }
-  function ensureB1(){
-    if (typeof S === "undefined") return {gain_db: [0, 0, 0, 0]};
-    if (!S.b1) S.b1 = {gain_db: S.tune.gain_db.slice(0, 4)};
-    if (!S.b1.gain_db || S.b1.gain_db.length < 4) S.b1.gain_db = S.tune.gain_db.slice(0, 4);
-    return S.b1;
-  }
   function syncRight(){
     const b = ensureB1();
     rRows.forEach((r, i) => { r.sl.value = b.gain_db[i]; paint(r.val, b.gain_db[i]); });
   }
 
-  if (dual){
-    dual.addEventListener("change", () => {
-      S.dual = dual.checked;
-      dbox.style.display = S.dual ? "block" : "none";
-      if (S.dual){ ensureB1(); syncRight(); }
-      flushTune();
+  /* 两组都摆着 → 永远带 b1（右耳独立写 bank1） */
+  if (typeof S !== "undefined") S.dual = true;
+
+  function mirrorLeftToRight(){
+    if (!follow || !follow.checked) return;
+    if (typeof S === "undefined") return;
+    const b = ensureB1();
+    S.tune.gain_db.forEach((v, i) => { b.gain_db[i] = v; });
+    rRows.forEach((r, i) => {
+      r.sl.value = S.tune.gain_db[i];
+      paint(r.val, S.tune.gain_db[i]);
     });
   }
 
-  /* 发 tune 时带上右耳处方；不带 b1 时后端把 bank0 镜像到 bank1 */
+  /* 拖左耳时，若勾了"跟随左耳"，右耳跟着动 */
+  if (typeof gainEls !== "undefined"){
+    gainEls.forEach((el) => el.slider.addEventListener("input", mirrorLeftToRight));
+  }
+  if (follow){
+    follow.addEventListener("change", () => {
+      if (follow.checked){ mirrorLeftToRight(); flushTune(); }
+    });
+  }
+
+  /* 发 tune 时带上右耳处方 */
   const orig = window.tuneBody;
   if (typeof orig === "function"){
     window.tuneBody = function(){
       const t = orig();
-      if (S.dual){
-        const b = ensureB1();
-        t.b1 = {gain_db: b.gain_db.slice(0, 4),
-                thr_db: t.thr_db.slice(), ratio: t.ratio.slice(),
-                attack_ms: t.attack_ms.slice(), release_ms: t.release_ms.slice()};
-      }
+      const b = ensureB1();
+      t.b1 = {gain_db: b.gain_db.slice(0, 4),
+              thr_db: t.thr_db.slice(), ratio: t.ratio.slice(),
+              attack_ms: t.attack_ms.slice(), release_ms: t.release_ms.slice()};
       return t;
     };
   }
 
-  /* 打开页面时读回处方：有 b1 就把双耳开关打开 */
-  fetch("/api/tune", {cache: "no-store"}).then((r) => r.json()).then((j) => {
-    const t = (j && j.tune) || j;
-    if (t && t.b1 && Array.isArray(t.b1.gain_db) && dual && !dual.checked){
-      S.b1 = {gain_db: t.b1.gain_db.slice(0, 4)};
-      dual.checked = true;
-      dual.dispatchEvent(new Event("change"));
-    }
-  }).catch(() => {});
+  /* 打开页面时读回处方：有 b1 用 b1，没有就把左耳复制过来 */
+  function boot(){
+    fetch("/api/tune", {cache: "no-store"}).then((r) => r.json()).then((j) => {
+      const t = (j && j.tune) || j || {};
+      if (t.b1 && Array.isArray(t.b1.gain_db)){
+        S.b1 = {gain_db: t.b1.gain_db.slice(0, 4)};
+      } else if (typeof S !== "undefined"){
+        S.b1 = {gain_db: S.tune.gain_db.slice(0, 4)};
+      }
+      syncRight();
+    }).catch(() => { syncRight(); });
+  }
+  setTimeout(boot, 300);      // 等主脚本把 /api/tune 读回来
 
-  /* ---- 观察量：ENV / GR（真信号），和状态同节奏 ---- */
+  /* ---------------- 观察量 ---------------- */
   const f1 = (v) => (v == null ? "—" : v.toFixed(1));
   const one = (arr) => arr.map((v, i) => "①②③④"[i] + f1(v) + "  ").join("");
   async function tick(){
