@@ -140,8 +140,8 @@ sudo sh /home/xilinx/dma_exp/pl_webui_up.sh   # 起第三档：live → webui
 
 | 项 | 做法 |
 |---|---|
-| 一屏显示 | `html,body{height:100%;overflow:hidden}`、`main` 定高、`#grid` 按行分配、canvas 吃剩余高度 → **不出现纵向滚动** |
-| 波形 / 频谱 | 保留原来的框子做**占位**，说明写死"暂无抓取缓冲（scope_* 是桩）"，不画假数据 |
+| 一屏显示 | `html,body{height:100%;overflow:hidden}`、`main` 定高、`#grid` 是**两列 flex** → **不出现纵向滚动** |
+| 波形 / 频谱 | 保留原来的框子做**占位**，固定 158px 矮条，说明写死"暂无抓取缓冲（scope_* 是桩）"，不画假数据 |
 | 电平条 | 原来读 `in_rms/out_rms`（PS 档才有），改成 `peak_in/peak_out / 32768` —— 用 PL 里的 PEAK 真信号 |
 | 观察量 | 塞进"电平"卡底部两行：`ENV ①②③④` / `GR ①②③④`，双耳时追加右耳 |
 | 双耳 | 增益卡里加一个开关 + 右耳四条增益（勾上才出现），发 tune 时带 `b1` |
@@ -155,3 +155,27 @@ sudo sh /home/xilinx/dma_exp/pl_webui_up.sh   # 起第三档：live → webui
 电平条永远空、徽标永远"未运行"。
 
 现在 `/api/status` 同时给两套（嵌套 + 扁平），页面的判断和我的探针都能用。
+
+### 布局约定（别再改成行栅格）
+
+第一版用 `grid-template-rows: 21vh 1fr 1fr auto` 让波形/频谱"等高"，结果**两个没有数据的
+空框把整屏吃掉**，右列控件被挤到重叠、健康块被裁出屏幕 —— 被用户打回。
+
+现在固定为两列 flex，**左右互不影响**：
+
+```
+#grid (flex)
+├─ .col-l  flex:1.62   ├─ 频响  flex:1（吃剩余）
+│                      ├─ 波形  flex:0 0 158px
+│                      └─ 频谱  flex:0 0 158px
+└─ .col-r  flex:1      ├─ 电平 / 四段增益(两组) / 压缩 / 系统健康  自然堆叠
+```
+
+- 占位框只露个脸，不许抢高度；有数据的频响才配吃剩余空间。
+- 页面上**只能存在一套**布局规则。`.scope-col` 那套已经删了，别再加回来。
+- 加内容后必须复量：右列各卡高度之和 + gap 要 ≤ `#grid` 高度。
+  量法（不用手算）：
+  ```bash
+  # 把每块 getBoundingClientRect().height 拼进 document.title，headless --dump-dom 读
+  ```
+- 矮屏（`max-height:850px`）有一档更紧的覆盖，1366×768 笔记本也放得下。
