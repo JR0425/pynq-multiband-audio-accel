@@ -92,13 +92,10 @@ main{padding:8px 12px 10px;max-width:none}
   padding:8px 14px 8px}
 /* 左列：频响 + 波形/频谱容器；右列：电平/增益/压缩直接落网格（恢复原始布局） */
 .a-fr{grid-column:1;grid-row:1}
-.scope-col{grid-column:1;grid-row:2/span 2;
-  display:flex;flex-direction:column;gap:10px}
 .a-lvl{grid-column:2;grid-row:1}
 .a-gain{grid-column:2;grid-row:2}
 .a-comp{grid-column:2;grid-row:3}
 .a-health{grid-column:2;grid-row:4}
-.scope-col>.sect{margin:0}
 
 /* 系统健康：两列小表，数值右对齐 */
 .hl-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
@@ -252,10 +249,12 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
 
 /* 窄屏：单列堆叠，DOM 顺序即阅读顺序（频响→电平→增益→压缩→波形→频谱） */
 @media (max-width:900px){
-  #grid{grid-template-columns:1fr}
-  .a-fr{grid-column:1;grid-row:auto}
-  .scope-col{grid-column:1;grid-row:auto;display:contents}
-  .a-lvl,.a-gain,.a-comp,.a-health{grid-column:1;grid-row:auto}
+  html,body{overflow:auto}
+  main{height:auto;overflow:visible}
+  #grid{flex-direction:column;min-height:0}
+  .col-l,.col-r{flex:none}
+  .scope-panel{flex:none}
+  .col-l>.a-fr{flex:none}
   .gain-row{grid-template-columns:120px 1fr 96px}
   header{height:auto;padding:8px 12px;gap:8px}
   .chips{display:none}
@@ -271,34 +270,49 @@ footer{color:var(--faint);font-size:11px;display:flex;justify-content:space-betw
    c) 块长/来源/录音/预设/测听这几块是第一/二档才有的，PL 档不占位 */
 html,body{height:100%;overflow:hidden}
 main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:column;
-     padding:6px 10px 8px}
-/* 四行：①频响/电平 ②波形/增益 ③频谱/压缩 ④健康
-   第 2、3 行都是 1fr → 波形和频谱**等高**（之前一个 248px 一个 220px 又互相压） */
-#grid{flex:1;min-height:0;
-      grid-template-rows:minmax(0,21vh) minmax(0,1fr) minmax(0,1fr) auto}
+     padding:6px 10px 6px}
+/* 左右两列各自竖向排：左列曲线吃剩余高度、两个占位框固定矮；
+   右列控件按自然高度排，谁高谁矮互不影响（之前用行栅格强制等高，
+   结果左列空框把右列挤到重叠，这是我的错） */
+#grid{flex:1;min-height:0;display:flex;gap:10px;align-items:stretch}
+.col{display:flex;flex-direction:column;min-width:0;min-height:0}
+.col-l{flex:1.62;gap:8px}
+.col-r{flex:1;gap:2px}
+.col-l>.a-fr{flex:1 1 auto;min-height:0}
 #fr-box{height:100%}
 #fr-cv{height:100%}
-#grid .sect{padding:6px 12px}
+#grid .sect{padding:4px 11px 3px}
+.scope-panel{flex:0 0 158px;min-height:0;display:flex;flex-direction:column}
+.scope-panel .scope-box{flex:1;min-height:0}
+.scope-panel .scope-box .cvwrap{height:100%}
+.scope-panel canvas{height:100%;width:100%}
+.col-r>.sect{flex:0 0 auto}
 
-/* 左栏两个示波器面板直接落到栅格上（原来的容器只用来竖排，现在不需要） */
-.scope-col{display:contents}
-.a-wave{grid-column:1;grid-row:2}
-.a-spec{grid-column:1;grid-row:3}
-.scope-panel{display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.scope-panel .scope-box{flex:1 1 auto;min-height:0}
-.scope-panel .scope-box .cvwrap{height:100%!important}
-.scope-panel canvas{height:100%!important;width:100%}
+/* 右列要在一屏 805px 里塞下四块：逐块压紧，宁紧不裁 */
+.a-lvl .levels{gap:5px}
+.a-lvl .statline{margin-top:0;padding-top:3px;gap:2px 10px}
+.obs-mini{display:flex;gap:18px;margin-top:3px;padding-top:3px}
+.obs-mini>div{display:flex;align-items:baseline;gap:6px}
+.a-gain h3,.a-comp h3,.a-lvl h3,.a-health h3{margin-bottom:2px}
+.a-gain .gain-row{padding:0;height:25px;grid-template-columns:150px 1fr 76px;gap:6px}
+.a-gain .gain-row .band{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a-gain .gain-row .val{font-size:12.5px;line-height:1}
+.a-gain input[type=range]{height:14px;margin:1px 0}
+.grp-hdr{margin:2px 0 0;padding-top:2px}
+#comp-grid{gap:3px 10px}
+.comp-cell .lab{margin-bottom:1px;font-size:11.5px}
+.comp-cell input[type=range]{height:14px;margin:1px 0}
+/* "直通"勾选仍独占一行，但压到最紧 */
+.comp-row2{margin-top:2px}
+/* 健康 6 项摊成 3 列 2 行，比 2 列 3 行矮一半 */
+.hl-grid{grid-template-columns:repeat(3,1fr);gap:1px 14px}
+.a-health .hl-grid>div{line-height:1.4}
 
 /* 右栏：两组增益共 8 行，压紧一点，保证一屏放得下 */
-/* 1080p 上 8 行放得下；小屏万一不够，宁可卡片内部滚，也别把第 ④ 段裁掉 */
-.a-gain{overflow:auto}
-.a-gain .gain-row{padding:1px 0;grid-template-columns:108px 1fr 74px;gap:8px}
-.a-gain .gain-row .band{font-size:12.5px}
+.a-gain{overflow:visible}
 .a-gain .gain-row .band small{display:none}
-.a-gain .gain-row .val{font-size:13.5px;line-height:1.15}
-.a-gain input[type=range]{height:16px}
 .grp-hdr{display:flex;align-items:center;gap:8px;color:var(--faint);
-  font-size:11.5px;margin:6px 0 0;padding-top:5px;border-top:1px dashed var(--line)}
+  font-size:11px;margin:2px 0 0;padding-top:2px;border-top:1px dashed var(--line)}
 .grp-hdr .sub{color:var(--faint);opacity:.7}
 .grp-hdr .ck-dual{margin-left:auto;margin-top:0}
 .ck-dual{display:flex;align-items:center;gap:5px;color:var(--faint);font-size:11.5px}
@@ -306,8 +320,8 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
 
 #lat-sel,#src-sel,#rec-lab,#gain-presets,#comp-presets,#hear-box{display:none!important}
 
-.obs-mini{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);
-  font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.75}
+.obs-mini{border-top:1px dashed var(--line);
+  font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.6}
 .obs-mini b{color:var(--text);font-weight:400}
 .obs-mini .k{color:var(--faint);margin-right:6px;display:inline-block;width:30px}
 
@@ -318,6 +332,19 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
 #gain-dual .gain-row{padding:1px 0}
 .ck-dual{display:flex;align-items:center;gap:7px;color:var(--faint);font-size:12px;margin-top:6px}
 .ck-dual input{accent-color:var(--acc)}
+
+/* 矮屏（笔记本 1366×768 之类）：再压一档，宁可字号小一点也不出滚动 */
+@media (max-height:850px){
+  #grid .sect{padding:3px 10px}
+  .col-r{gap:2px}
+  .a-gain .gain-row{height:23px}
+  .a-gain .gain-row .val{font-size:12px}
+  .a-lvl .levels{gap:4px}
+  .a-lvl .statline{padding-top:2px}
+  .obs-mini{padding-top:2px;margin-top:2px}
+  .a-health .hl-grid>div{line-height:1.25}
+  .scope-panel{flex-basis:142px}
+}
 </style>
 </head>
 <body>
@@ -360,12 +387,37 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
   <details id="errlog"><summary>启动日志</summary><pre id="errlog-pre"></pre></details>
 
   <div id="grid">
+  <div class="col col-l">
   <!-- 频响（左栏） -->
   <section class="sect a-fr">
     <h3>频响曲线 <span class="sub">20 Hz – 20 kHz · 阶梯分频，段内增益恒定</span></h3>
     <div id="fr-box"><canvas id="fr-cv"></canvas></div>
   </section>
 
+  <!-- 波形（左栏，占位） -->
+  <section class="sect scope-panel a-wave">
+    <h3>波形 <span class="sub">20 ms 窗 · 进核 / 出核，已做群延迟对齐</span></h3>
+    <div class="scope-box">
+      <div class="cvwrap"><canvas id="wave-cv"></canvas>
+        <div class="legend"><span class="a"><i></i>进核</span><span class="b"><i></i>出核</span></div>
+        <div class="empty-note">实时通路没在跑，启动后这里显示波形</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 频谱（左栏，占位） -->
+  <section class="sect scope-panel a-spec">
+    <h3>频谱 <span class="sub">0 – 4 kHz</span></h3>
+    <div class="scope-box">
+      <div class="cvwrap"><canvas id="spec-cv"></canvas>
+        <div class="legend"><span class="a"><i></i>进核</span><span class="b"><i></i>出核</span></div>
+        <div class="empty-note">实时通路没在跑，启动后这里显示频谱</div>
+      </div>
+    </div>
+  </section>
+  </div><!-- /col-l -->
+
+  <div class="col col-r">
   <!-- 电平（右栏） -->
   <section class="sect a-lvl">
     <h3>电平 <span class="sub">dBFS，满量程 0</span></h3>
@@ -486,31 +538,7 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
       <div><span class="k">位流</span><b id="hl-bit" class="num">—</b></div>
     </div>
   </section>
-
-  <!-- 波形 + 频谱：左栏跨行容器，内部固定 10px 间距紧贴堆叠 -->
-  <div class="scope-col">
-    <!-- 波形（左栏） -->
-    <section class="sect scope-panel a-wave">
-    <h3>波形 <span class="sub">20 ms 窗 · 进核 / 出核，已做群延迟对齐</span></h3>
-    <div class="scope-box">
-      <div class="cvwrap"><canvas id="wave-cv"></canvas>
-        <div class="legend"><span class="a"><i></i>进核</span><span class="b"><i></i>出核</span></div>
-        <div class="empty-note">实时通路没在跑，启动后这里显示波形</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 频谱（左栏） -->
-  <section class="sect scope-panel a-spec">
-    <h3>频谱 <span class="sub">0 – 4 kHz</span></h3>
-    <div class="scope-box">
-      <div class="cvwrap"><canvas id="spec-cv"></canvas>
-        <div class="legend"><span class="a"><i></i>进核</span><span class="b"><i></i>出核</span></div>
-        <div class="empty-note">实时通路没在跑，启动后这里显示频谱</div>
-      </div>
-    </div>
-  </section>
-  </div><!-- /scope-col -->
+  </div><!-- /col-r -->
   </div><!-- /#grid -->
 
   <footer>
@@ -1387,7 +1415,7 @@ function applyTune(t){
   (function buildRight(){
     const host = document.getElementById("gains-r");
     if (!host) return;
-    [["①","20–500 Hz"],["②","500–1k"],["③","1–2k"],["④","2–20k"]].forEach((b, i) => {
+    [["①","0 – 500 Hz"],["②","500 Hz – 1 kHz"],["③","1 – 2 kHz"],["④","2 – 24 kHz"]].forEach((b, i) => {
       const row = document.createElement("div");
       row.className = "gain-row";
       row.innerHTML = '<div class="band"><span class="cir">' + b[0] + '</span>' + b[1] + '</div>' +
