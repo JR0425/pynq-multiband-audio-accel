@@ -14,15 +14,15 @@ frontmatter 里一句能被检索到的描述、正文开头写明什么时候�
 ## 分档：换一个题目还能不能用
 
 判据是**不与该项目绑定、换项目换板卡仍可用**。
-按这个判据，本目录的 19 篇分三档：
+按这个判据，本目录的 23 篇分三档：
 
 | 档 | 含义 | 条目数 |
 |---|---|---|
-| A | 与题目、板卡都无关，任何 FPGA/嵌入式题目可用 | 7 |
+| A | 与题目、板卡都无关，任何 FPGA/嵌入式题目可用 | 9 |
 | B | 任意 PYNQ-Z2 题目可用（换板卡要改端口和 IP） | 8 |
-| C | 音频/信号处理类题目可用（依赖 PYNQ 出厂 base overlay 的音频通路） | 4 |
+| C | 音频/信号处理类题目可用（依赖 PYNQ 出厂 base overlay 的音频通路） | 6 |
 
-没有第四档。**没有一篇是绑死在本项目的 DRC/FIR 设计上的**——即使 C 档那三篇，讲的也是
+没有第四档。**没有一篇是绑死在本项目的 DRC/FIR 设计上的**——即使 C 档那几篇，讲的也是
 base overlay 的音频通路怎么用，换个音频题目照样成立。
 
 ## 索引
@@ -39,6 +39,7 @@ base overlay 的音频通路怎么用，换个音频题目照样成立。
 | `vivado-windows-batch-build`<br>`pitfalls/vivado_windows_build.md` | 批处理构建随机报 `couldn't read file ...`，每次点到的文件都不一样；加了自动重试反而更差；重试报 OK 但产物时间戳不动 | 先数进程：是不是有两个构建循环、两个 vivado；再看报错里有没有 `: No error`（那是 CWD 被删）；最后核对"成功"判据是不是 grep 了脚本自己的回显 | 3600 次打开 12 个脚本 0 失败证明文件系统无辜；单实例重跑 `create_bd_design` 一次过、validate 也过 | 编译本身报语法错（那是代码问题）；单次偶发失败（重试壳本来就该吸收） |
 | `audio-algorithm-prompts`<br>`prompts/audio_algorithm_prompt.md` | 让模型设计滤波器、出频谱图、实现 DRC | 套模板，注意模板里标出的参数陷阱 | 本项目算法初版由这些提示词产出，随后人工修正 | 要参数本身——唯一定义处是 `src/python/band_design.py` |
 | `hls-testbench-template`<br>`templates/hls_testbench_template.md` | 新起一个 HLS 测试台，先要骨架 | 复制骨架，按接口填端口 | 本项目 `src/hls/fir_tb.cpp` 由它起步 | 改现有测试台（真实接口在 `fir_tb.cpp`） |
+| `refactor-path-breakage`<br>`pitfalls/refactor_path_breakage.md` | 拆/并顶层目录之后脚本报「找不到文件」但文件明明在；`git status` 里一堆 `RD`；批量改路径只改了一半 | 先搜 `dirname(dirname(__file__))`；`git mv` 目标建空再搬内容；清单用 `grep -rln`；替换规则按长度从长到短；`mkdir -p` 自建锁目录 | `tools/` 拆进 `board/probes/` 与 `sim/model/` 后，六个脚本补一层 `dirname` 全部恢复，两个模型脚本重跑对拍仍通过 | 只是改文件名、目录层级没变；有打包机制的项目（路径不该由脚本算） |
 
 ### B 档：任意 PYNQ-Z2 题目可用
 
@@ -80,6 +81,9 @@ base overlay 的音频通路怎么用，换个音频题目照样成立。
 - `hls-fixed-point-types`：定点版反而多出 LUT，追下去是饱和逻辑的开销，不是"定点本身"。
 - `pynq-headset-mic-detection`：领夹麦在笔记本上是好的、插板子就没声。五样东西一起换分不清谁的问题，
   最后是"四段耳机直插能用"这一个对照把范围缩到插接件上，再靠"绿色那一路有没有 32 Ω"定案。
+- `refactor-path-breakage`：把 `tools/` 拆成 `board/probes/` 和 `sim/model/` 之后，
+  「往上两级找仓库根」的六个脚本一声不响指到了 `board/`，`git mv` 还多套了一层目录。
+  五条规则各对应那天的一次静默失败。
 
 ## 验证过的环境
 
