@@ -166,7 +166,7 @@ paramiko 的 SFTP 收到的是 `C:\...` 风格的反斜杠路径,文件推到了
 3. ksoftirqd/kworker 的周期重扫从 systemd timer 改成常驻进程 `ksoftirqd_rt_watch.py`。
 4. `ksoftirqd_rt.sh` 只在失败时记 warning;成功一次都不写。
 5. 安装脚本顺手删掉旧的 timer 文件,避免升级后它继续每 30 秒写 journal。
-6. 探针、矩阵、钉核三个工具落到 `tools/board_debug/`,一次推板、一条命令跑一臂。
+6. 探针、矩阵、钉核三个工具落到 `board/probes/`,一次推板、一条命令跑一臂。
 
 【沉淀】
 

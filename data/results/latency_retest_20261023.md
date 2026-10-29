@@ -6,7 +6,7 @@
 命令（主机侧）：
 
 ```bash
-python tools/board_debug/perf_probe.py latency 20
+python board/probes/perf_probe.py latency 20
 ```
 
 板上 `fir.bit` 的 md5 `5aa079f29e8d66c21d1d34f1302c3695`，与仓库

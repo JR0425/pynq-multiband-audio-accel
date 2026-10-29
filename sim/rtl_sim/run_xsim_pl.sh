@@ -28,7 +28,7 @@ done
 
 for e in 500 1000 2000; do
     [ -f "$ROOT/src/rtl/coeffs_lp${e}_n193.mem" ] || {
-        echo "缺 coeffs_lp${e}_n193.mem，先跑 python tools/gen_rtl_coeffs.py"
+        echo "缺 coeffs_lp${e}_n193.mem，先跑 python sim/model/gen_rtl_coeffs.py"
         exit 1; }
 done
 

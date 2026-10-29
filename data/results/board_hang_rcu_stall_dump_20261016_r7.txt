@@ -1,6 +1,6 @@
 ===== 2026-10-16 深夜「N_short」那一轮的 RCU stall 全任务转储（串口原文，一个字节没改）
 =====
-===== 来自 tools/_tmp/round7/console.log 的前 1457 行（第 1460 行起是重启后的 U-Boot）。
+===== 来自 build/tmp/probes_rounds/round7/console.log 的前 1457 行（第 1460 行起是重启后的 U-Boot）。
 ===== 配置是基线（实时优先级开着，没关），起跑 up=526，**用的是默认的 stall 超时**。
 =====   · 正文第 22 行的 `fqs=3000` ⇒ 这一轮超时是默认 **60 秒**
 =====     （对照 round6 那份的 `fqs=500`：那一臂带了 `FASTSTALL=1`，压到 10 秒）

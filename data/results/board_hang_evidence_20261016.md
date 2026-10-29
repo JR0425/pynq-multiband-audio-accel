@@ -13,7 +13,7 @@ panic 的机制抓到了两份完整转储；但把实时优先级关掉照样�
 
 ## 一、逐轮记账
 
-每一轮的原始主机侧日志在本地 `tools/_tmp/roundN/round_host.log`（未入库，见文末复现命令）。
+每一轮的原始主机侧日志在本地 `build/tmp/probes_rounds/roundN/round_host.log`（未入库，见文末复现命令）。
 
 | 轮 | 配置 | 起跑 up | 板子最后应声 | 结果 | 转储 | 备注 |
 |---|---|---|---|---|---|---|
@@ -198,7 +198,7 @@ Check interval:           0 (<none>)
 `lifetime_write_kbytes`）。这三条已经加进 `sd_probe.py` 和 `next_round.py` 的
 `pre_probe()`，**下次板子一上电就会自动记下来**。
 
-### 3.4 死前的主机侧快照（`tools/_tmp/roundN/mon_*.log`）
+### 3.4 死前的主机侧快照（`build/tmp/probes_rounds/roundN/mon_*.log`）
 
 每臂最后一份成功拉到的快照：
 
@@ -263,11 +263,11 @@ round6/mon_A_dump_1.stamp   末次 ok [22:57:58] up=314.38   →  [22:58:33] 失
 
 ```sh
 # 串口抓现场(必须开着,不然 panic_print 打出来也没人接)
-python tools/board_debug/pynq_serial_capture.py COM6 21600 tools/_tmp/round8/console.log
+python board/probes/pynq_serial_capture.py COM6 21600 build/tmp/probes_rounds/round8/console.log
 
 # 另一头跑对照。NEXT_SETTLE 把每臂起跑 uptime 对齐 —— 这次的教训就在这
 NEXT_SETTLE=180 NEXT_WAITMIN=180 NEXT_HANGWAIT=6 \
-  python tools/board_debug/next_round.py tools/_tmp/round8 2 Z_idle N_long
+  python board/probes/next_round.py build/tmp/probes_rounds/round8 2 Z_idle N_long
 ```
 
 板上（`one_run.sh` 是驱动，`next_round.py` 自己推上去）：

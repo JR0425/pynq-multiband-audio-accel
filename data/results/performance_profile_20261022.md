@@ -34,7 +34,7 @@
 不含 codec 模拟端、不含耳机。
 
 ```bash
-python tools/board_debug/perf_probe.py latency 20
+python board/probes/perf_probe.py latency 20
 ```
 
 每跑完一个配置，`fir_live.py` 的自检会照常跑一遍（`[OK ] 960000 / 960000`
@@ -210,7 +210,7 @@ p95 15.04、p99 15.30、最大 20.77，**超过 25 ms 的 0 块**（L=480 那档
 ## 2. CPU 占用
 
 ```bash
-python tools/board_debug/perf_probe.py cpu 60
+python board/probes/perf_probe.py cpu 60
 ```
 
 板上跑 60 秒实时（麦克风音源、稳定档），每秒采一次 `/proc/stat` 和进程/线程
@@ -284,11 +284,11 @@ python tools/board_debug/perf_probe.py cpu 60
 
 ### 4.1 THD+N
 
-走的是和核逐位相同的整数模型（`tools/ref_model_wdrc.py`，csim 对拍 1000/1000）。
+走的是和核逐位相同的整数模型（`sim/model/ref_model_wdrc.py`，csim 对拍 1000/1000）。
 相干采样，1 kHz × 0.5 s = 24 个整周期，不加窗。
 
 ```bash
-python tools/quality_metrics.py --csv data/results/four_band_response_20261022.csv
+python sim/model/quality_metrics.py --csv data/results/four_band_response_20261022.csv
 ```
 
 | 条件 | 输入 | THD+N (dB) | 基波 (dBFS) | 最大谐波 (dBc) |
@@ -357,12 +357,12 @@ python tools/quality_metrics.py --csv data/results/four_band_response_20261022.c
 
 新增/改动的工具：
 
-- `tools/board_debug/perf_probe.py` — 主机侧，`latency` / `cpu` 两个子命令。
+- `board/probes/perf_probe.py` — 主机侧，`latency` / `cpu` 两个子命令。
   推文件后**校验 md5**，也不信"rc=0"——今天踩过一次 rc=0 但板上还是旧文件。
-- `tools/board_debug/cpu_watch.py` — 板上侧采样。找进程时要求 `argv[0]` 是
+- `board/probes/cpu_watch.py` — 板上侧采样。找进程时要求 `argv[0]` 是
   python3 且 `argv[1]` 是 `fir_live.py`（只匹配字符串会先撞上 sudo 的 `sh -c` 外壳），
   进程消失会重新找。
-- `tools/quality_metrics.py` — THD+N 与频响。
+- `sim/model/quality_metrics.py` — THD+N 与频响。
 - `board/scripts/fir_live.py` — 加了 `LAT_TRACE` 时刻戳和线程命名
   （`prctl(PR_SET_NAME)`；板上 libc 没导出 `pthread_setname_np`）。
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把 RTL 仿真吐出来的文件，和 tools/ref_model_int.py 的参考模型逐位比对。
+"""把 RTL 仿真吐出来的文件，和 sim/model/ref_model_int.py 的参考模型逐位比对。
 
   用法：python sim/rtl_sim/check.py [--taps 193] [--edges 500,1000,2000]
 

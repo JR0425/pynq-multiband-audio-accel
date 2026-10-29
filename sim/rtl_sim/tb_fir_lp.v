@@ -6,7 +6,7 @@
  * 运行脚本（run_xsim.sh）负责把要用的文件摆成这几个名字。
  *
  * 为什么全部走文件、而不是在 testbench 里直接判对错：
- *     参考模型是 Python 写的（tools/ref_model_int.py），对拍也在 Python 里做。
+ *     参考模型是 Python 写的（sim/model/ref_model_int.py），对拍也在 Python 里做。
  *     testbench 只干两件事 —— 按拍喂数据、按拍收数据。
  *     判据一旦写进 testbench，改判据就要重编 RTL，容易把"平台"和"被测物"搅在一起。
  *

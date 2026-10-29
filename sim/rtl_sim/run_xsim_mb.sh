@@ -4,9 +4,9 @@
 #   bash sim/rtl_sim/run_xsim_mb.sh
 #
 # 前置：先跑过
-#   python tools/gen_rtl_coeffs.py
-#   python tools/ref_model_int.py     # 它顺手写出 in_q15.mem
-#   python tools/ref_model_mb.py
+#   python sim/model/gen_rtl_coeffs.py
+#   python sim/model/ref_model_int.py     # 它顺手写出 in_q15.mem
+#   python sim/model/ref_model_mb.py
 #
 # 和 run_xsim.sh 的区别：三组系数**同时**摆在目录里，模块一次读完，
 # 所以整个前端只跑一次仿真（不是像 fir_lp 那样跑三遍）。
@@ -29,11 +29,11 @@ for f in "$XV" "$XE" "$XS"; do
     [ -f "$f" ] || { echo "找不到 $f"; exit 1; }
 done
 
-[ -f "$SIM/in_q15.mem" ] || { echo "缺 $SIM/in_q15.mem —— 先跑 python tools/ref_model_int.py"; exit 1; }
-[ -f "$SIM/ref_fe_sum.mem" ] || { echo "缺参考文件 —— 先跑 python tools/ref_model_mb.py"; exit 1; }
+[ -f "$SIM/in_q15.mem" ] || { echo "缺 $SIM/in_q15.mem —— 先跑 python sim/model/ref_model_int.py"; exit 1; }
+[ -f "$SIM/ref_fe_sum.mem" ] || { echo "缺参考文件 —— 先跑 python sim/model/ref_model_mb.py"; exit 1; }
 for E in 500 1000 2000; do
     [ -f "$ROOT/src/rtl/coeffs_lp${E}_n193.mem" ] || {
-        echo "缺 coeffs_lp${E}_n193.mem —— 先跑 python tools/gen_rtl_coeffs.py"; exit 1; }
+        echo "缺 coeffs_lp${E}_n193.mem —— 先跑 python sim/model/gen_rtl_coeffs.py"; exit 1; }
 done
 
 rm -rf "$WORK"
@@ -89,6 +89,6 @@ PYTHONIOENCODING=utf-8 python "$SIM/check_mb.py" || RC=1
 
 echo
 echo "参考模型自己那三条自检（含和 HLS csim bypass 的逐位比）跑这个看："
-echo "  python tools/ref_model_mb.py"
+echo "  python sim/model/ref_model_mb.py"
 
 exit $RC

@@ -17,7 +17,7 @@
 
 ## 一、逐轮记账
 
-原始主机侧日志在本地 `tools/_tmp/roundN/round_host.log`（未入库）。
+原始主机侧日志在本地 `build/tmp/probes_rounds/roundN/round_host.log`（未入库）。
 所有臂都用 `NEXT_SETTLE=180`，起跑 uptime 对齐。
 
 ### round8：机器 vs 管线
@@ -206,11 +206,11 @@ for pid in $(pgrep -f "^kworker/[01]:"); do chrt -p $pid; done           # 全�
 
 ```sh
 # 终端 A：串口录制（必须常开）
-python tools/board_debug/pynq_serial_capture.py COM6 21600 tools/_tmp/roundN/console.log
+python board/probes/pynq_serial_capture.py COM6 21600 build/tmp/probes_rounds/roundN/console.log
 
 # 终端 B：一臂一臂跑
 NEXT_SETTLE=180 NEXT_WAITMIN=180 NEXT_HANGWAIT=6 \
-  python tools/board_debug/next_round.py tools/_tmp/roundN 2 N_long
+  python board/probes/next_round.py build/tmp/probes_rounds/roundN 2 N_long
 ```
 
 对照臂用 `Z_idle`（什么都不跑）。关实时用 `R_long` / `R_rtoff`

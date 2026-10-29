@@ -79,8 +79,8 @@ duration 600.03  lost_total 4  deficit 3.5 ms/60s  final_n 60009  ok True  gap_m
 
 五、产物目录
 
-  tools/_tmp/drop_matrix_20261021_215641  (第一轮 12 臂)
-  tools/_tmp/drop_matrix_20261021_221604  (队列 A/B)
-  tools/_tmp/drop_matrix_20261021_221944  (600 秒,旧 timer)
-  tools/_tmp/drop_matrix_20261021_223903  (60 秒,新 daemon)
-  tools/_tmp/drop_matrix_20261021_224104  (600 秒,新 daemon)
+  build/tmp/probes_rounds/drop_matrix_20261021_215641  (第一轮 12 臂)
+  build/tmp/probes_rounds/drop_matrix_20261021_221604  (队列 A/B)
+  build/tmp/probes_rounds/drop_matrix_20261021_221944  (600 秒,旧 timer)
+  build/tmp/probes_rounds/drop_matrix_20261021_223903  (60 秒,新 daemon)
+  build/tmp/probes_rounds/drop_matrix_20261021_224104  (600 秒,新 daemon)

@@ -62,7 +62,7 @@ metadata:
 6. 才放音
 ```
 
-脚本见 `tools/board_debug/pl_demo_check.py`（就是照这个顺序写的）。
+脚本见 `board/probes/pl_demo_check.py`（就是照这个顺序写的）。
 
 ## 判据：两组"codec 活着"的基准数
 

@@ -77,7 +77,7 @@ Get-Process vivado | Select-Object Id, StartTime, @{n='MB';e={[int]($_.WorkingSe
 修法：锁必须**带 PID**，只有锁的主人能删，僵死锁可接管。
 
 ```bash
-LOCK=tools/board_debug/_tmp/build.lock
+LOCK=build/tmp/probes/build.lock
 if [ -f "$LOCK" ]; then
   old=$(cat "$LOCK" 2>/dev/null)
   if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then

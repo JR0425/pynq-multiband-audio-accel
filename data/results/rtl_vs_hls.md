@@ -111,7 +111,7 @@ RTL 想怎么摆加法树都行，**不需要**去模仿 HLS 的加法顺序。
 ### 饱和规则已经对实了
 
 输出截断/饱和（`acc >>> 17` 再饱和）原来只有 `ap_fixed` 的 `AP_TRN`/`AP_SAT`
-文档依据。2026-10-20 用 `tools/ref_model_mb.py` 把它做实了：整数模型的输出
+文档依据。2026-10-20 用 `sim/model/ref_model_mb.py` 把它做实了：整数模型的输出
 和 HLS csim 的 bypass 通路（`data/results/hw_transparent_i16.txt`）逐位比，
 **1000/1000 相同**。这条规则不再是"照文档猜的"。
 
@@ -246,8 +246,8 @@ DSP 是 189 而不是 195：有几个抽头的三组系数正好都是 0 或 2 �
 
 ## 6. 怎么跑
 
-    python tools/gen_rtl_coeffs.py --check-rom   # 生成系数表，并和 HLS 的 ROM 对一遍
-    python tools/ref_model_int.py                # 生成逐位参考模型 + 输入
+    python sim/model/gen_rtl_coeffs.py --check-rom   # 生成系数表，并和 HLS 的 ROM 对一遍
+    python sim/model/ref_model_int.py                # 生成逐位参考模型 + 输入
     bash   sim/rtl_sim/run_xsim.sh               # 编 RTL、跑三个滤波器、逐位比对
 
 `run_xsim.sh` 最后调 `sim/rtl_sim/check.py` 做比对，逐位不一致会返回非 0。

@@ -104,7 +104,7 @@ python3 core_dump.py --compare /tmp/core_fir.npy /tmp/core_dma.npy
 检测一次就锁存，这是这个项目之前踩过的坑，当时要反复插拔到电平跳起来才出声。
 当晚没有回到那个状态。
 
-**下一步（准备好但没跑）**：`tools/board_debug/codec_jack.py` —— 把 `0x4000`~
+**下一步（准备好但没跑）**：`board/probes/codec_jack.py` —— 把 `0x4000`~
 `0x4029` 按名字读一遍，再看 `0x40E0`~`0x40EF` 的状态位，判断 codec 认为耳机插没插、
 DAC 和耳机放大器有没有上电。这一步之前，上面所有版本**都不能算做过人耳验收**。
 

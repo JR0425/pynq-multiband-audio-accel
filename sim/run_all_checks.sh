@@ -13,7 +13,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-LOG=tools/board_debug/_tmp
+LOG=build/tmp/probes
 mkdir -p "$LOG"
 rc=0
 
@@ -61,7 +61,7 @@ check "网页第三档自检" "$LOG/all_5_webui.log" "SELFTEST PASS"
 
 echo
 if [ $rc -eq 0 ]; then
-    echo "全部通过。板上那两条另算：tools/board_debug/pl_regs_check.py、pl_drc_probe.py / pl_drc_ply_probe.py"
+    echo "全部通过。板上那两条另算：board/probes/pl_regs_check.py、pl_drc_probe.py / pl_drc_ply_probe.py"
 else
     echo "有失败，日志在 $LOG/all_*.log"
 fi

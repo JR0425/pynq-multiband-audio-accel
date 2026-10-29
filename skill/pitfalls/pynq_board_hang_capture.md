@@ -279,4 +279,4 @@ systemctl is-active ksoftirqd-rt.service       # active
 - 断电与关机、卡有没有被拔坏：`skill/pitfalls/pynq_shutdown_and_power.md`
 - 串口控制台：`skill/pitfalls/pynq_serial_console.md`
 - 连通性自检：`skill/checkers/check_board_connection.bat`
-- 可复用的脚本：`tools/board_debug/`（README 里写明哪些在主机侧跑、哪些在板上跑）
+- 可复用的脚本：`board/probes/`（README 里写明哪些在主机侧跑、哪些在板上跑）

@@ -1,6 +1,6 @@
 ===== 2026-10-16 深夜「A_dump」那一轮的 RCU stall 全任务转储（串口原文，一个字节没改）
 =====
-===== 取自 tools/_tmp/round6/console.log 的头部（正文 1468 行；后面是板子自己重启后的 U-Boot）。
+===== 取自 build/tmp/probes_rounds/round6/console.log 的头部（正文 1468 行；后面是板子自己重启后的 U-Boot）。
 ===== 这一份是用 kernel.panic_print=31 逼出来的 —— 等价于 panic 那一刻自动按了一下 sysrq-t。
 ===== 为什么非要绕这一下：panic_on_rcu_stall=1 是在 rcu_dump_cpu_stacks() **之前** panic 的，
 ===== 卡住那颗核的栈本来永远打不出来；而板上 hung_task / softlockup / sysrq(BREAK) / ftrace /

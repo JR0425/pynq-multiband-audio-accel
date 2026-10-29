@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把 fir_mb_fe 的仿真输出和 tools/ref_model_mb.py 的参考逐位比对。
+"""把 fir_mb_fe 的仿真输出和 sim/model/ref_model_mb.py 的参考逐位比对。
 
   用法：python sim/rtl_sim/check_mb.py
 

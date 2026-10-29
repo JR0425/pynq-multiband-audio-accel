@@ -23,11 +23,11 @@
 ## 跑之前
 
 ```bash
-python tools/gen_rtl_coeffs.py     # 生成 src/rtl/*.mem 和 sim/rtl_sim/in_q15.mem
-python tools/ref_model_int.py      # 整数参考模型 → ref_acc_* / ref_out_*
+python sim/model/gen_rtl_coeffs.py     # 生成 src/rtl/*.mem 和 sim/rtl_sim/in_q15.mem
+python sim/model/ref_model_int.py      # 整数参考模型 → ref_acc_* / ref_out_*
 ```
 
-第二条对多频段那一半要换成 `python tools/ref_model_mb.py`。
+第二条对多频段那一半要换成 `python sim/model/ref_model_mb.py`。
 
 ## 跑仿真
 

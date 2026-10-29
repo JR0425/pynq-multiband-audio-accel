@@ -4,7 +4,7 @@
 配置：`fir_webui.py` 开着、页面用 headless Chrome 真实打开（150 ms 拉状态、
 250 ms 拉波形）、`LIVE_SCOPE=1`，和开网页工作时一致。命令：
 
-    python tools/board_debug/run_drop_matrix.py --seconds 60 --arms <臂名>
+    python board/probes/run_drop_matrix.py --seconds 60 --arms <臂名>
 
 每臂起跑都对齐到板子 `uptime % 30 ∈ [1.0, 2.5]`，避免上一臂的 30 秒定时器
 落在下一臂的开头。

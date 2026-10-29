@@ -95,7 +95,7 @@ list 追加；`GAP_TRACE` 每块三次 `perf_counter()` + 一个六元组 + 一�
 
 ## 改了什么
 
-`tools/board_debug/drop_probe.py`：
+`board/probes/drop_probe.py`：
 
 1. 加 `--no-trace`：不给子进程开 `DROP_TRACE`/`GAP_TRACE`。**短配置一律用它。**
 2. 两处除零保护：线程表和进程族在同一个循环周期里第一次被发现时，

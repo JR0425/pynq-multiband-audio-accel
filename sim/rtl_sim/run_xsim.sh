@@ -4,8 +4,8 @@
 #   bash sim/rtl_sim/run_xsim.sh
 #
 # 前置：先跑过
-#   python tools/gen_rtl_coeffs.py
-#   python tools/ref_model_int.py
+#   python sim/model/gen_rtl_coeffs.py
+#   python sim/model/ref_model_int.py
 #
 # 为什么三个滤波器分三次跑、而不是在 testbench 里例化三次：
 #   系数表是**按文件名读**的（见 src/rtl/fir_lp.v 里那段说明），三份一起
@@ -31,9 +31,9 @@ for f in "$XV" "$XE" "$XS"; do
     [ -f "$f" ] || { echo "找不到 $f"; exit 1; }
 done
 [ -f "$SIM/in_q15.mem" ] || {
-    echo "缺 $SIM/in_q15.mem —— 先跑 python tools/ref_model_int.py"; exit 1; }
+    echo "缺 $SIM/in_q15.mem —— 先跑 python sim/model/ref_model_int.py"; exit 1; }
 [ -f "$ROOT/src/rtl/coeffs_lp500_n193.mem" ] || {
-    echo "缺系数表 —— 先跑 python tools/gen_rtl_coeffs.py"; exit 1; }
+    echo "缺系数表 —— 先跑 python sim/model/gen_rtl_coeffs.py"; exit 1; }
 
 rm -rf "$WORK"
 mkdir -p "$WORK"
