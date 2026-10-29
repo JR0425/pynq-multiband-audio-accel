@@ -11,9 +11,10 @@
                      实际把参数变成寄存器动作的是 `fir_pl_live.py`（独立进程，
                      它才持有 overlay）。这个进程只做网页和文件协议之间的翻译。
 
-页面复用 `page.html`，接口只实现它在用的那几个：
+页面是 PL 档专用的 `pl.html`（2026-10-29 起），接口只实现它在用的那几个：
 
-    GET  /                 page.html
+    GET  /                 pl.html（PL 专用页）
+    GET  /page.html        第一/二档那份页面，留着对照用
     GET  /api/status       读 fir_status.json（超过 stale 秒没更新就报 stale）
     GET  /api/tune         读 fir_tune.json（没有则 null，页面会填默认值）
     POST /api/tune         写 fir_tune.json（这里做范围钳制，和第一档一致）
@@ -230,8 +231,12 @@ def health():
 
 
 # ---------------------------------------------------------------- HTTP
-def page_html():
-    with open(os.path.join(HERE, "page.html"), "r", encoding="utf-8") as f:
+def page_html(name="pl.html"):
+    """PL 档专用页优先；文件不在就退回 page.html（板上没推新页时不至于 404）。"""
+    path = os.path.join(HERE, name)
+    if name == "pl.html" and not os.path.exists(path):
+        path = os.path.join(HERE, "page.html")
+    with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
 
@@ -260,18 +265,31 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         p = urlparse(self.path).path
         try:
-            if p in ("/", "/index.html", "/page.html"):
-                return self._send(200, page_html(), "text/html; charset=utf-8")
+            if p in ("/", "/index.html", "/pl.html"):
+                return self._send(200, page_html("pl.html"), "text/html; charset=utf-8")
+            if p == "/page.html":
+                return self._send(200, page_html("page.html"), "text/html; charset=utf-8")
             if p == "/api/status":
                 st = _read_json(STATUS_PATH)
                 if not st:
                     return self._json({"ok": False, "running": False,
+                                       "status": {"ok": False, "running": False, "mode": "pl"},
+                                       "proc": {"running": False},
                                        "error": "no status file (%s)" % STATUS_PATH})
                 st = dict(st)
-                st["age"] = status_age(st)
-                st["stale"] = (st["age"] is None) or (st["age"] >= STALE_S)
+                age = status_age(st)
+                st["age"] = age
+                st["stale"] = (age is None) or (age >= STALE_S)
                 st["mode"] = "pl"
-                return self._json(st)
+                # 页面(page.html/pl.html)读的是 {"status": {...}, "proc": {...}, "age": n}；
+                # 我的探针/脚本按扁平字段读。两边都给，别二选一。
+                # 2026-10-29：只给扁平的时候页面的 audioOn 永远是 false，
+                # 于是"停止"按钮一直是灰的 —— 用户看到的就是"断开不了"。
+                return self._json(dict(st,
+                                       status=st,
+                                       proc={"running": False, "starting": False,
+                                             "stopping": False, "log": ""},
+                                       age=age))
             if p == "/api/tune":
                 # 结构必须和第一档一致：{"ok": true, "tune": {...}}。
                 # 页面初始化是 `if (r.ok && r.tune) applyTune(r.tune); else flushTune()`
@@ -389,11 +407,18 @@ def selftest():
         bad += 0 if cond else 1
         print("  %-34s %s%s" % (name, "OK" if cond else "FAIL", (" " + str(extra)) if extra else ""))
 
+    def get_text(path):
+        """拿 HTML 原文（get() 只吃 json）。"""
+        with urllib.request.urlopen(base + path, timeout=5) as r:
+            return r.status, r.read().decode("utf-8")
+
     print("== 1. 页面 ==")
-    with urllib.request.urlopen(base + "/", timeout=5) as r:
-        html = r.read().decode("utf-8")
-    chk("GET / 返回 page.html", r.status == 200 and "html" in html[:200].lower()
-        and "/api/status" in html)
+    code, html = get_text("/")
+    chk("GET / 返回 pl.html", code == 200 and "/api/status" in html
+        and "pl.html" not in html[:200], code)
+    chk("pl.html 有 PL 档的粘合层", "PL 档暂无抓取缓冲" in html or "obs-mini" in html)
+    code2, old_html = get_text("/page.html")
+    chk("GET /page.html 也还在", code2 == 200 and len(old_html) > 1000, code2)
 
     print("== 2. 没有后端时 ==")
     code, j = get("/api/status")
