@@ -178,6 +178,11 @@ def read_obs(regs):
     return peak_in, peak_out, env, gr, env_r, gr_r
 
 
+def read_busy(regs):
+    """两个 bank 的斜坡 busy。地址是 bank0 内偏移 +0x74，写成绝对地址才读得到。"""
+    return regs.rd(BANK0 + OFF_RAMP_BUSY) & 0x3
+
+
 def read_run():
     """网页写的 run 标志。文件不存在 = 1（独立跑时默认开）。"""
     try:
@@ -310,7 +315,7 @@ def _four(v):
     return [x, x, x, x]
 
 
-def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True):
+def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=None):
     """组装 status json。字段照 fir_live.publish_status 的约定，页面不用改。
 
     2026-10-28 批 2：多给一组观察量（peak_in/out、四段 env/gr）。
@@ -334,7 +339,11 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True):
         # 正在爬坡时 applied 还不等于目标；爬完（≈6 ms）就相等
         "gain_applied_db": [round(gain_to_db(g), 2) for g in gains],
         "ramp_busy": 1 if busy else 0,
-        "bypass": bool(regs.rd(REG_CTRL) & CTRL_DRC) is False,
+        # 2026-10-29 修：fir_pl_regs 的 CTRL(0x004) 恒读 0 —— 真正的 ctrl 端口接的是
+        # gpio_ctrl(0x43C00000)，不是这个寄存器。原来读 REG_CTRL 导致网页上的
+        # "旁路"永远显示为开（实际在压缩）。有 ctrl 对象就读它，没有就退回读寄存器。
+        "bypass": (not bool(ctrl.read(0) & CTRL_DRC)) if ctrl is not None
+                  else (bool(regs.rd(REG_CTRL) & CTRL_DRC) is False),
         "attack_ms": [coef_to_ms(c) for c in (tune_cur or {}).get("atk", [0] * 4)],
         "release_ms": [coef_to_ms(c) for c in (tune_cur or {}).get("rel", [0] * 4)],
         # ---- 观察量（真信号）----
@@ -477,6 +486,12 @@ def selftest():
     print("  缺字段：%s  %s" % (sorted(miss) if miss else "无", "OK" if not miss else "FAIL"))
     print("  mode=%s lat_ms=%s gain_db=%s" % (got.get("mode"), got.get("lat_ms"), got.get("gain_db")))
 
+    fake.mem[BANK0 + OFF_RAMP_BUSY] = 0x2
+    got_busy = read_busy(regs)
+    ok = (got_busy == 2)
+    bad += 0 if ok else 1
+    print("  read_busy(0x174) = %s  %s" % (got_busy, "OK" if ok else "FAIL"))
+
     print("== 6. 观察量与 run 开关 ==")
     fake.mem[REG_PEAK_IN] = 16384            # 半满量程 = -6.0 dBFS
     fake.mem[REG_PEAK_OUT] = 23170
@@ -589,8 +604,8 @@ def main():
                 # ctrl[1] 由 bypass 决定
                 if run:
                     set_ctrl(CTRL_RUN | (0 if cur["bypass"] else CTRL_DRC))
-            busy = regs.rd(REG_RAMP_BUSY) & 0x3
-            publish(regs, last, t0, busy, err, run=run)
+            busy = read_busy(regs)
+            publish(regs, last, t0, busy, err, run=run, ctrl=gpio)
             err = None
         except Exception as ex:            # 板子上的异常不要静默，写进 status
             err = "%s: %s" % (type(ex).__name__, ex)

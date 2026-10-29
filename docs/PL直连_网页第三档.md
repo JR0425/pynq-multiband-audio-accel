@@ -103,3 +103,29 @@ start/stop 真的改 `run` 文件、status 透出观察量、没实现的接口�
 - 双耳**只有增益**能各调各的（网页上四条右耳滑杆）。右耳的门限/压缩比/时间常数
   目前只能通过 `b1` 直接写 json，还没做滑杆。
 - `EAR_CTL[0]` 只是一个软件约定，RTL 里两份 DRC 一直在跑、没有硬件门控。
+
+## 0. 端口冲突：8080 开机被第一档占着（2026-10-29）
+
+板子上有个 systemd 服务 `fir-webui.service`，**每次开机都会把第一档**
+（`/home/xilinx/jupyter_notebooks/fir_webui.py`，PS 在环那版）拉到 8080。
+所以重启完直接开 `http://192.168.2.99:8080/` 看到的是**第一档页面**，
+没有 PL 观察量面板 —— 不是第三档没生效。
+
+```bash
+sudo systemctl stop fir-webui        # 腾出 8080（重启后会自己回来）
+sudo sh /home/xilinx/dma_exp/pl_webui_up.sh   # 起第三档：live → webui
+```
+
+想让它永久优先第三档：`sudo systemctl disable fir-webui`。
+
+判据：`curl :8080/api/tune` 必须返回 `{"ok": true, "tune": {...}}`
+（第一档也返回这个结构，所以再看 `/api/status` 里有没有 `env_r` / `gr_r` / `dual`；
+有就是第三档）。
+
+### 另一个坑：旧页面会把 0 dB 写回板子
+
+页面初始化是 `if (r.ok && r.tune) applyTune(r.tune); else flushTune()`。
+第一档/缓存的旧页面拿到 `tune: null`（或自己的默认值）就会**把增益 0 dB、
+门限 −10 dBFS 写进 /dev/shm/fir_tune.json**，于是"网页正常但听不见"。
+第三档后端已经改成永远返回 `{"ok":true,"tune":演示默认}`，
+但**换版本后仍要在浏览器里 Ctrl+F5 强刷一次**，否则跑的是缓存里的旧 JS。
