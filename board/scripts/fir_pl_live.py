@@ -70,6 +70,11 @@ OFF_ATK       = 0x30
 OFF_REL       = 0x40
 OFF_ENV       = 0x50           # RO
 OFF_GR        = 0x60           # RO
+OFF_TONE_SEL  = 0x58           # RW，0=250 1=750 2=1500 3=3000 Hz
+OFF_TONE_AMP  = 0x5C           # RW，Q1.15 幅度，0 = 静音
+OFF_MPO_TH    = 0x48           # RW，限幅阈值（线性幅度）
+OFF_MPO_CNT   = 0x50           # RO，被限幅的采样数
+OFF_MPO_PEAK  = 0x54           # RO，见过的最大 |输出|
 OFF_RAMP_DIV  = 0x70
 OFF_RAMP_BUSY = 0x74           # RO，bit0 = bank0，bit1 = bank1
 
@@ -78,6 +83,7 @@ REG_PEAK_OUT  = 0x044
 
 CTRL_RUN   = 1 << 0
 CTRL_DRC   = 1 << 1
+CTRL_TONE  = 1 << 3          # 测试音注入：输出被四段中心频率的方波顶替（B4 测听）
 CTRL_FLUSH = 1 << 2
 CTRL_CLR   = 1 << 8
 
@@ -121,6 +127,12 @@ def dbfs_to_thr(db):
     q15 = int(round(32768.0 * (10.0 ** (float(db) / 20.0))))
     q15 = max(0, min(32767, q15))
     return q15 << 7
+
+
+def db_to_amp15(db):
+    """dBFS → Q1.15 幅度（0..32767）。用于测听音的幅度。"""
+    v = int(round(32768.0 * (10.0 ** (float(db) / 20.0))))
+    return max(0, min(32767, v))
 
 
 def ratio_to_reg(r):
@@ -232,6 +244,12 @@ def apply_tune(regs, tune, last=None):
     rel = tune.get("release_ms") or [100.0] * 4
     byp = bool(tune.get("bypass"))
 
+    # B4 测听：tone.on 时输出被指定频段的方波顶替（ctrl[3]），幅度由 tone.amp_db 定
+    tone = tune.get("tone") or {}
+    tone_on  = bool(tone.get("on"))
+    tone_sel = int(tone.get("band") or 0) & 0x3
+    tone_amp = db_to_amp15(tone.get("amp_db", -22.0))
+
     # 2026-10-29 双耳：tune["b1"] 存在就用它当右耳的处方，不存在就左右同一套
     # （默认行为不变 —— 单耳时两只耳机听到的内容必须完全一样）。
     b1 = tune.get("b1") or {}
@@ -253,6 +271,9 @@ def apply_tune(regs, tune, last=None):
         "atk_b1": [ms_to_coef(x) for x in _four(atk1)],
         "rel_b1": [ms_to_coef(x) for x in _four(rel1)],
         "bypass": byp,
+        "tone_on": tone_on,
+        "tone_sel": tone_sel,
+        "tone_amp": tone_amp,
     }
 
     # 2026-10-29 修：bypass 原来直接把 ctrl[1] 清零，而 ctrl[1] 是**整条 DRC 链路**
@@ -265,7 +286,8 @@ def apply_tune(regs, tune, last=None):
         cur["thr_b1"]   = [dbfs_to_thr(0.0)] * 4
         cur["ratio_b1"]  = [0] * 4
 
-    changed = (last is None) or (cur["bypass"] != last.get("bypass"))
+    changed = ((last is None) or (cur["bypass"] != last.get("bypass"))
+               or (cur["tone_on"] != last.get("tone_on")))
     for i in range(4):
         if last is None or cur["gain"][i] != last["gain"][i]:
             # RAMP_DIV=5：指数斜坡，时间常数 32 采样 ≈ 0.7 ms，拖滑块不咔。
@@ -304,6 +326,13 @@ def apply_tune(regs, tune, last=None):
             regs.wr(BANK1 + OFF_REL + 4 * i, cur["rel_b1"][i])
             changed = True
 
+    if last is None or cur["tone_sel"] != last.get("tone_sel"):
+        regs.wr(OFF_TONE_SEL, cur["tone_sel"])
+        changed = True
+    if last is None or cur["tone_amp"] != last.get("tone_amp"):
+        regs.wr(OFF_TONE_AMP, cur["tone_amp"])
+        changed = True
+
     # ctrl 不在这个窗口里 —— 它走 gpio_ctrl（0x43C00000），和探针/演示脚本一致。
     # BD 里 fir_pl_regs 的 ctrl 输出没有接到 fir_pl_direct（避免两个驱动源）。
     return cur, changed
@@ -315,7 +344,10 @@ def ctrl_for(cur):
     原来这里返回 CTRL_RUN（清掉 CTRL_DRC）→ 输出直接是前端原始样本，
     四段增益和压缩一起被跳过，用户以为增益坏了。
     """
-    return CTRL_RUN | CTRL_DRC
+    v = CTRL_RUN | CTRL_DRC
+    if cur.get("tone_on"):
+        v |= CTRL_TONE
+    return v
 
 
 def _four(v):
@@ -327,6 +359,33 @@ def _four(v):
         return out
     x = float(v)
     return [x, x, x, x]
+
+
+def cr_of(env, gr, thr_reg):
+    """A4 实时压缩比：由 ENV/GR 反推压缩器**实际**在按多少比压。
+
+    压缩器是 y = thr + (x-thr)·k，其中 k = 1-1/R，寄存器里存的就是 k。
+    衰减量 gr = (x-thr)·(1-k)，所以
+        k = 1 - gr/(x-thr)      →  R = 1/(1-k)
+    这是"读出来的真实压缩比"，不是界面上那个设定值 —— 设定 2:1 而实测
+    1.8:1 时，说明包络还没跟上或信号没真正过阈值。
+
+    x 没超过阈值（d<=0）、或根本没衰减时，返回 None（比值无意义）。
+    """
+    out = []
+    for i in range(4):
+        try:
+            x = float(env[i]); g = float(gr[i]); t = float(thr_reg[i]) / 4194304.0
+        except (IndexError, TypeError, ValueError, ZeroDivisionError):
+            out.append(None); continue
+        d = x - t
+        if d <= 1e-5 or g <= 1e-6:
+            out.append(None); continue
+        k = 1.0 - g / d
+        if k <= 0.001 or k >= 0.999:      # 反推不可信（除零附近）
+            out.append(None); continue
+        out.append(round(1.0 / (1.0 - k), 2))
+    return out
 
 
 def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=None):
@@ -342,6 +401,8 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=N
     gains = tune_cur["gain"] if tune_cur else [256] * 4
     busy = bool(ramp_busy)
     peak_in, peak_out, env, gr, env_r, gr_r = read_obs(regs)
+    cr    = cr_of(env,   gr,   (tune_cur or {}).get("thr",    [0] * 4))
+    cr_r  = cr_of(env_r, gr_r, (tune_cur or {}).get("thr_b1", [0] * 4))
     (sink or write_status)({
         "t": now,
         "n": 0,                      # 没有"块"这个概念了
@@ -370,6 +431,9 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=N
         "gr": gr,                        # 四段衰减量，线性幅度
         "gr_db": [amp_to_db(v, 1.0) for v in gr],   # 负值 = 压掉的 dB
         # ---- 右耳（bank1）同一组量 ----
+        # A4：实测压缩比（1:1 = 没压），None = 该段没过阈值
+        "cr": cr,
+        "cr_r": cr_r,
         "env_r": env_r,
         "env_r_db": [amp_to_db(v, 1.0) for v in env_r],
         "gr_r": gr_r,
@@ -607,7 +671,7 @@ def main():
     err = None
 
     # 先把 run + drc 打开，再让 tune 决定具体参数
-    set_ctrl(CTRL_RUN | CTRL_DRC)
+    set_ctrl(ctrl_for({}))
     time.sleep(0.05)
 
     print("running: tune -> regs, regs -> status (Ctrl-C to stop)")
@@ -619,15 +683,14 @@ def main():
             run_now = read_run()
             if run_now != run:
                 run = run_now
-                set_ctrl((CTRL_RUN | (0 if (last or {}).get("bypass") else CTRL_DRC))
-                         if run else 0)
+                set_ctrl(ctrl_for(last or {}) if run else 0)
             tune = read_tune() or {}
             cur, changed = apply_tune(regs, tune, last)
             if changed:
                 last = cur
-                # ctrl[1] 由 bypass 决定
+                # ctrl 的第 0/1/3 位都由 ctrl_for 统一算（run / 压缩 / 测试音）
                 if run:
-                    set_ctrl(CTRL_RUN | (0 if cur["bypass"] else CTRL_DRC))
+                    set_ctrl(ctrl_for(cur))
             busy = read_busy(regs)
             publish(regs, last, t0, busy, err, run=run, ctrl=gpio)
             err = None

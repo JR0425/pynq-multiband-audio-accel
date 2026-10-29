@@ -136,6 +136,15 @@ def sanitize_tune(body):
         "release_ms": [round(x, 2) for x in _four(t.get("release_ms"), R_REL[0], R_REL[1], 100.0)],
         "bypass":     bool(t.get("bypass")),
     }
+    # B4 测听：tone.on 时 PL 输出被四段中心频率的方波顶替
+    tn = t.get("tone")
+    if isinstance(tn, dict):
+        out["tone"] = {
+            "on":     bool(tn.get("on")),
+            "band":   int(_clamp(tn.get("band", 0), 0, 3, 0)),
+            "amp_db": round(_clamp(tn.get("amp_db", -22.0), -60.0, 0.0, -22.0), 1),
+        }
+
     b = t.get("b1")
     if isinstance(b, dict):
         # 缺哪项就用左耳的值顶上，避免"只给增益"时右耳被写成 0
@@ -152,6 +161,16 @@ def sanitize_tune(body):
                                                      R_REL[0], R_REL[1], 100.0)],
         }
     return out
+
+
+def patch_tune(upd):
+    """在当前 tune 上打补丁再写回（测听接口用，不想覆盖用户其它参数）。"""
+    t = _read_json(TUNE_PATH) or dict(DEFAULT_TUNE)
+    t = dict(t)
+    t.update(upd)
+    t = sanitize_tune(t)
+    _write_json(TUNE_PATH, t)
+    return t
 
 
 def status_age(st):
@@ -342,10 +361,23 @@ class Handler(BaseHTTPRequestHandler):
                 write_run(False)
                 return self._json({"ok": True, "msg": "已把 run 写 0（PL 通路停）"})
             if p == "/api/hearing/tone":
-                return self._json({"ok": False,
-                                   "msg": "听力测试要按频率放音，PL 直连版暂时没有这条路径"})
+                # B4：按四段中心频率放测试音。band 0..3 → 250/750/1500/3000 Hz
+                # 两种调用方式都认：{band:0..3} 或 {freq_hz:250}
+                if body.get("band") is not None:
+                    band = int(body["band"]) & 3
+                elif body.get("freq_hz") is not None:
+                    f = float(body["freq_hz"])
+                    band = min(range(4), key=lambda i: abs([250, 750, 1500, 3000][i] - f))
+                else:
+                    band = 0
+                amp = _clamp(body.get("amp_db", body.get("level_db", -22.0)),
+                             -60.0, 0.0, -22.0)
+                t = patch_tune({"tone": {"on": True, "band": band, "amp_db": amp}})
+                return self._json({"ok": True, "tone": t.get("tone"),
+                                   "hz": [250, 750, 1500, 3000][band]})
             if p == "/api/hearing/end":
-                return self._json({"ok": True})
+                t = patch_tune({"tone": {"on": False, "band": 0, "amp_db": -22.0}})
+                return self._json({"ok": True, "tone": t.get("tone")})
             return self._json({"ok": False, "msg": "no such endpoint: " + p}, 404)
         except Exception as ex:
             return self._json({"ok": False, "msg": "%s: %s" % (type(ex).__name__, ex)}, 500)
@@ -484,11 +516,16 @@ def selftest():
     code, j = post("/api/start")
     chk("start 能看到 backend_alive", j.get("backend_alive") is True)
 
-    print("== 7. 没实现的接口要明说 ==")
+    print("== 7. 没实现的接口要明说 / 测听接口 ==")
     code, j = get("/api/scope")
     chk("scope ok=false 且有 msg", j.get("ok") is False and j.get("msg"))
-    code, j = post("/api/hearing/tone", {"hz": 1000})
-    chk("hearing/tone 明确拒绝", j.get("ok") is False and j.get("msg"))
+    code, j = post("/api/hearing/tone", {"band": 2, "amp_db": -30})
+    chk("hearing/tone 打开测听", j.get("ok") is True and j.get("hz") == 1500
+        and (j.get("tone") or {}).get("band") == 2)
+    chk("测听音幅度钳到 [-60,0]",
+        (post("/api/hearing/tone", {"band": 0, "amp_db": 5})[1].get("tone") or {}).get("amp_db") == 0.0)
+    code, j = post("/api/hearing/end", {})
+    chk("hearing/end 关掉测听", j.get("ok") is True and (j.get("tone") or {}).get("on") is False)
     code, j = get("/api/nope")
     chk("未知接口 404", code == 404 and j.get("ok") is False, code)
 

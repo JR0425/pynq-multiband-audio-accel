@@ -211,6 +211,17 @@ connect_bd_net [get_bd_pins ply_bram/doutb]            [get_bd_pins fir_pl_direc
 connect_bd_net [get_bd_pins fir_pl_regs_0/ply_ctl] [get_bd_pins fir_pl_direct_0/ply_ctl]
 connect_bd_net [get_bd_pins fir_pl_regs_0/ply_len] [get_bd_pins fir_pl_direct_0/ply_len]
 
+# 2026-10-29 夜：测试音（B4 测听）+ MPO 限幅（B6）
+#   0x58 TONE_SEL / 0x5C TONE_AMP → direct 内部的相位累加器与幅度
+#   0x48 MPO_TH  / 0x4C MPO_REL   → 输出软限幅的阈值
+#   0x50 MPO_CNT / 0x54 MPO_PEAK  ← 被限幅的采样数 / 见过的最大输出
+connect_bd_net [get_bd_pins fir_pl_regs_0/tone_sel]  [get_bd_pins fir_pl_direct_0/tone_sel]
+connect_bd_net [get_bd_pins fir_pl_regs_0/tone_amp]  [get_bd_pins fir_pl_direct_0/tone_amp]
+connect_bd_net [get_bd_pins fir_pl_regs_0/mpo_th]    [get_bd_pins fir_pl_direct_0/mpo_th]
+connect_bd_net [get_bd_pins fir_pl_regs_0/mpo_rel]   [get_bd_pins fir_pl_direct_0/mpo_rel]
+connect_bd_net [get_bd_pins fir_pl_direct_0/mpo_cnt] [get_bd_pins fir_pl_regs_0/mpo_cnt]
+connect_bd_net [get_bd_pins fir_pl_direct_0/mpo_peak] [get_bd_pins fir_pl_regs_0/mpo_peak]
+
 puts "==== fir_pl_regs_0 的 AXI 接口 ===="
 foreach ip [get_bd_intf_pins -quiet fir_pl_regs_0/*] { puts "  intf $ip" }
 if {[catch {

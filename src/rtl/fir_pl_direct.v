@@ -100,6 +100,20 @@ module fir_pl_direct #(
     input  wire [31:0]  ply_ctl,
     input  wire [31:0]  ply_len,
 
+    /* ---- 2026-10-29 夜：测试音（B4 听力图闭环）+ MPO 限幅（B6） ----
+     * tone_sel 选四段中心频率（0=250 1=750 2=1500 3=3000 Hz），tone_amp 是
+     * Q1.15 幅度（0 = 静音）。原先这里写死 440 Hz / ±8000，只能证明"链路通"，
+     * 没法按频段做测听。
+     * mpo_th 是输出幅度上限（线性，0x7FFF = 满量程 = 不动作）；超过的部分
+     * 按 1/4 斜率压（膝部软限）。mpo_cnt 是被限幅的采样数，mpo_peak 是见过的
+     * 最大 |输出| —— 两个都是给网页读的。 */
+    input  wire [1:0]   tone_sel,
+    input  wire [15:0]  tone_amp,
+    input  wire [15:0]  mpo_th,
+    input  wire [31:0]  mpo_rel,
+    output wire [31:0]  mpo_cnt,
+    output wire [15:0]  mpo_peak,
+
     /* I2S pads */
     output wire        bclk,
     output wire        lrclk,
@@ -475,24 +489,28 @@ module fir_pl_direct #(
      */
     reg  [16:0] tone_acc;
     reg         tone_sq;
-    localparam integer TONE_INC  = 440;        // 440 Hz
     localparam integer FS_NOM    = 48828;      // 48.828 kHz（100 MHz / 2048）
+    /* 四段中心频率的相位增量（17 位累加器）：
+       250→671  750→2013  1500→4027  3000→8054   （误差 < 0.05 Hz） */
+    wire [16:0] tone_inc = (tone_sel == 2'd0) ? 17'd671  :
+                           (tone_sel == 2'd1) ? 17'd2013 :
+                           (tone_sel == 2'd2) ? 17'd4027 : 17'd8054;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             tone_acc <= 17'd0;
             tone_sq  <= 1'b0;
         end else if (out_vld) begin
-            if (tone_acc + TONE_INC >= FS_NOM) begin
-                tone_acc <= tone_acc + TONE_INC - FS_NOM;
+            if (tone_acc + tone_inc >= FS_NOM[16:0]) begin
+                tone_acc <= tone_acc + tone_inc - FS_NOM[16:0];
                 tone_sq  <= ~tone_sq;
             end else begin
-                tone_acc <= tone_acc + TONE_INC;
+                tone_acc <= tone_acc + tone_inc;
             end
         end
     end
 
-    localparam signed [15:0] TONE_AMP = 16'sd8000;
+    wire signed [15:0] tone_amp_s = {1'b0, tone_amp[14:0]};
 
     /* ================= 输出固定增益（2026-10-28 加） =================
      *
@@ -517,8 +535,52 @@ module fir_pl_direct #(
                                  (g_mul_r < -32'sd32768) ? -16'sd32768 :
                                  g_mul_r[15:0];
 
-    wire signed [15:0] out_l = ctrl[3] ? (tone_sq ? TONE_AMP : -TONE_AMP) : g_sat_l;
-    wire signed [15:0] out_r = ctrl[3] ? (tone_sq ? TONE_AMP : -TONE_AMP) : g_sat_r;
+    wire signed [15:0] tone_out = ctrl[3] ? (tone_sq ? tone_amp_s : -tone_amp_s) : 16'sd0;
+
+    wire signed [15:0] out_l = ctrl[3] ? tone_out : g_sat_l;
+    wire signed [15:0] out_r = ctrl[3] ? tone_out : g_sat_r;
+
+    /* ================= MPO 限幅（B6，2026-10-29 夜） =================
+     *
+     * 听力保护的输出上限：|x| 超过 mpo_th 的部分按 1/4 斜率继续涨（膝部软限），
+     * 不硬削 —— 硬削出方波，谐波一片，听感是"破音"而不是"被限制"。
+     *
+     *   |x| <= th :  y = x
+     *   |x| >  th :  y = sign(x)·( th + (|x|-th)/4 )
+     *
+     * mpo_th 出厂 0x7FFF（满量程）→ 阈值等于最大值，等于不动作。
+     * 用户在网页上把 MPO 拉到 -10 dBFS 之类的值，超出的动态范围就被压住，
+     * 保护耳朵（也是验配软件里的标准做法）。
+     */
+    wire signed [16:0] th17  = {1'b0, mpo_th[14:0]};
+    wire signed [16:0] x17_l = {out_l[15], out_l};
+    wire signed [16:0] x17_r = {out_r[15], out_r};
+    wire signed [16:0] a17_l = x17_l[16] ? -x17_l : x17_l;
+    wire signed [16:0] a17_r = x17_r[16] ? -x17_r : x17_r;
+    wire signed [16:0] y17_l = (a17_l > th17) ? (th17 + ((a17_l - th17) >>> 2)) : a17_l;
+    wire signed [16:0] y17_r = (a17_r > th17) ? (th17 + ((a17_r - th17) >>> 2)) : a17_r;
+    wire signed [16:0] yc_l  = (y17_l > 17'sd32767) ? 17'sd32767 : y17_l;
+    wire signed [16:0] yc_r  = (y17_r > 17'sd32767) ? 17'sd32767 : y17_r;
+    wire signed [15:0] mpo_l = out_l[15] ? -yc_l[15:0] : yc_l[15:0];
+    wire signed [15:0] mpo_r = out_r[15] ? -yc_r[15:0] : yc_r[15:0];
+
+    wire mpo_hit = (a17_l > th17) || (a17_r > th17);
+
+    reg  [31:0] mpo_cnt_r;
+    reg  [16:0] mpo_peak_r;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n || flush) begin
+            mpo_cnt_r  <= 32'd0;
+            mpo_peak_r <= 17'd0;
+        end else if (out_vld) begin
+            if (mpo_hit)                mpo_cnt_r  <= mpo_cnt_r + 32'd1;
+            if (a17_l > mpo_peak_r)      mpo_peak_r <= a17_l;
+        end
+    end
+
+    assign mpo_cnt  = mpo_cnt_r;
+    assign mpo_peak = (mpo_peak_r > 17'd32767) ? 16'h7FFF : mpo_peak_r[15:0];
 
     /* ================= 输出 FIFO ================= */
     /* 前端输出没有 ready，而 i2s_duplex 的播放入口可能有一拍不 ready
@@ -569,8 +631,8 @@ module fir_pl_direct #(
             end
             if (out_vld) begin
                 if (dup_left == 2'd0) begin
-                    pr_l     <= out_l;
-                    pr_r     <= out_r;
+                    pr_l     <= mpo_l;
+                    pr_r     <= mpo_r;
                     dup_left <= 2'd2;
                 end else begin
                     dup_drop <= 1'b1;     // 上一对还没写完又来一个（不该发生）

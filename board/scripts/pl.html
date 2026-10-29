@@ -221,6 +221,9 @@ input[type=range]:focus-visible{outline:1px solid var(--acc-dim);outline-offset:
 .comp-cell .lab b{font-size:16px;font-weight:400;font-family:var(--mono);
   font-variant-numeric:tabular-nums}
 .comp-row2{display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap}
+.cr-live{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--dim);
+  padding:1px 6px;border:1px solid var(--line2);border-radius:2px;white-space:nowrap}
+.cr-live.on{color:var(--acc);border-color:var(--acc-dim)}
 .ck{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;
   user-select:none}
 .ck input{width:15px;height:15px;accent-color:var(--acc);cursor:pointer}
@@ -318,7 +321,33 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
 .ck-dual{display:flex;align-items:center;gap:5px;color:var(--faint);font-size:11.5px}
 .ck-dual input{accent-color:var(--acc)}
 
-#lat-sel,#src-sel,#rec-lab,#gain-presets,#comp-presets,#hear-box{display:none!important}
+#lat-sel,#src-sel,#rec-lab,#comp-presets{display:none!important}
+
+/* B3 预设：贴在"四段增益"标题行右侧，一排小按钮，不占额外高度 */
+.a-gain{position:relative}
+.a-gain h3{padding-right:400px}
+#gain-presets{position:absolute;top:4px;right:124px;margin:0;padding:0;border:none;
+  display:flex;gap:3px;flex-wrap:nowrap}
+#gain-presets .preset{padding:2px 6px;font-size:10.5px;line-height:1.35;
+  border-radius:2px;white-space:nowrap}
+
+/* B4 测听：折叠时只是标题行右侧一个小按钮；展开时用 fixed 浮成模态，
+   一屏布局完全不受影响（details 的盒模型不参与 .a-gain 的流） */
+#hear-box{position:absolute;top:4px;right:10px;margin:0;padding:0;border:none;
+  background:none}
+#hear-box>summary{list-style:none;cursor:pointer;white-space:nowrap;
+  padding:2px 7px;font-size:10.5px;line-height:1.35;color:var(--acc);
+  border:1px solid var(--acc-dim);border-radius:2px;background:#241c10}
+#hear-box>summary::-webkit-details-marker{display:none}
+#hear-box>summary .sub{display:none}
+#hear-box>summary:hover{color:#fff;border-color:var(--acc)}
+#hear-box[open]{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(560px,92vw);max-height:82vh;overflow:auto;z-index:60;padding:14px 18px;
+  background:var(--panel);border:1px solid var(--acc-dim);border-radius:6px;
+  box-shadow:0 0 0 100vmax rgba(0,0,0,.62), 0 18px 60px #000c}
+#hear-box[open]>summary{margin-bottom:10px;background:none;border:none;
+  color:var(--faint);font-size:12px;padding:0}
+#hear-box[open]>summary .sub{display:inline;margin-left:6px;opacity:.75}
 
 .obs-mini{border-top:1px dashed var(--line);
   font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.6}
@@ -453,7 +482,7 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
 
   <!-- 四段增益（右栏） -->
   <section class="sect a-gain">
-    <h3>四段增益 <span class="sub">±24 dB · 步进 0.5</span></h3>
+    <h3>四段增益 <span class="sub">±24 dB</span></h3>
     <div class="grp-hdr"><span>左耳</span><span class="sub">bank0</span></div>
     <div id="gains"></div>
     <div class="grp-hdr"><span>右耳</span><span class="sub">bank1</span>
@@ -462,7 +491,7 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
     <div class="preset-row" id="gain-presets"></div>
 
     <details class="hear" id="hear-box">
-      <summary>测听 → 自动配增益 <span class="sub">每个频段一个测试音，约 1 分钟</span></summary>
+      <summary>测听 → 配增益<span class="sub">每个频段一个测试音，四段共约 1 分钟</span></summary>
       <div class="hear-body">
         <p class="hint">测试音从板子的耳机口放出，<b>先把实时停掉</b>。量的是
           <b>相对听阈</b>：以你听得最好的那一段为 0 dB，不做绝对声压校准
@@ -523,6 +552,7 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
     <div class="comp-row2">
       <div class="preset-row" id="comp-presets" style="border:none;margin:0;padding:0"></div>
       <label class="ck"><input type="checkbox" id="ck-bypass"> 直通（只跳过压缩，四段增益仍然生效）</label>
+      <span class="cr-live" id="cr-live" title="由 ENV/GR 反推的实测压缩比：设定 2:1 而这里显示 1.2:1，说明信号还没真正过阈值">实测 —</span>
     </div>
   </section>
 
@@ -564,11 +594,11 @@ const BAND_TXT = [
 ];
 const FR_EDGES = [20, 500, 1000, 2000, 20000];   // 相减式分频的实际边界
 const GAIN_PRESETS = [
-  ["平坦：不动（0 dB）",            [0, 0, 0, 0]],
-  ["高频下降：典型老年性听力图",     [-4, -2, 6, 14]],
-  ["只抬辅音：清辅音都在 2 kHz 以上", [-10, -2, 6, 10]],
-  ["压掉低频轰鸣",                  [-16, -6, 2, 4]],
-  ["极端对照：一拖就听出区别",        [-20, -10, 10, 20]],
+  ["平坦",   [0, 0, 0, 0],            "平坦：四段都 0 dB，听原始声音"],
+  ["老年",   [-4, -2, 6, 14],         "老年性听损：2 kHz 以上补起来（典型高频陡降）"],
+  ["辅音",   [-10, -2, 6, 10],        "只抬清辅音：s/f/th 都在 2 kHz 以上，低频不动"],
+  ["压低频", [-16, -6, 2, 4],         "压掉低频轰鸣：空调、车流那种 500 Hz 以下的糊"],
+  ["极端",   [-20, -10, 10, 20],      "极端对照：左右拉满，一耳朵就听出区别"],
 ];
 const COMP_PRESETS = [["关", 0, 0], ["常用 5/100", 5, 100], ["慢 10/300", 10, 300]];
 
@@ -683,11 +713,21 @@ function paintAllGains(){ for (let i = 0; i < 4; i++) paintGain(i); }
 const gainPresetBtns = [];
 (function buildGainPresets(){
   const host = $("#gain-presets");
-  GAIN_PRESETS.forEach(([name, arr]) => {
+  GAIN_PRESETS.forEach(([name, arr, tip]) => {
     const b = document.createElement("button");
-    b.className = "preset"; b.textContent = name; b.title = name;
+    b.className = "preset"; b.textContent = name; b.title = tip || name;
     b.addEventListener("click", () => {
       S.tune.gain_db = [...arr];
+      // 勾了"跟随左耳"就一起改右耳，否则右耳保留他自己的处方
+      const followEl = document.getElementById("ck-dual");
+      if (followEl && followEl.checked && typeof S !== "undefined" && S.b1) {
+        S.b1.gain_db = [...arr];
+        document.querySelectorAll("#gains-r .gain-row").forEach((row, i) => {
+          const sl = row.querySelector("input"); if (sl) sl.value = arr[i];
+          const v = row.querySelector(".val");
+          if (v) v.innerHTML = (arr[i] > 0 ? "+" : "") + Number(arr[i]).toFixed(1) + ' <small>dB</small>';
+        });
+      }
       gainEls.forEach((el, i) => { el.slider.value = arr[i]; });
       paintAllGains(); drawFR(); markPreset(); flushTune();
       if (S.ab) resetAB();
@@ -695,13 +735,12 @@ const gainPresetBtns = [];
     host.appendChild(b); gainPresetBtns.push(b);
   });
   const ab = document.createElement("button");
-  ab.className = "preset"; ab.id = "btn-ab"; ab.textContent = "A/B 对照";
+  ab.className = "preset"; ab.id = "btn-ab"; ab.textContent = "A/B";
   ab.title = "先保存当前增益并全部归零，再点恢复";
   ab.addEventListener("click", toggleAB);
   host.appendChild(ab);
-  const note = document.createElement("span");
-  note.className = "note"; note.textContent = "A/B：与原始声音对比";
-  host.appendChild(note);
+  /* PL 档一行放不下说明文字，A/B 的含义挪到 title 里 */
+  ab.title = "A/B 对照：点一下把四段增益归零听原始声，再点恢复";
 })();
 function markPreset(){
   const cur = S.tune.gain_db.map(v => +v.toFixed(1));
@@ -772,7 +811,7 @@ async function hearPlay(){
 }
 function hearStart(){
   if (S.audioOn || S.starting || S.stopping){
-    hearMsg("实时通路在跑，先点顶上的「停止」再测听。");
+    hearMsg("测听时输出会被测试音顶替（麦克风暂时听不到），测完自动恢复。");
     $("#hear-box").open = true;
     return;
   }
@@ -802,6 +841,7 @@ function hearNext(){
   hearPlay();
 }
 function hearFinish(){
+  postJSON("/api/hearing/end", {}).catch(() => {});   // 测完立刻停音
   const ref = Math.min.apply(null, H.thr);
   H.gains = H.thr.map(v => clamp(Math.round((v - ref) * 0.5 * 2) / 2, 0, 20));
   $("#hear-tbody").innerHTML = H.thr.map((v, i) =>
@@ -816,6 +856,9 @@ function hearQuit(){
   hearMsg("");
   postJSON("/api/hearing/end", {}).catch(() => {});
 }
+$("#hear-box").addEventListener("toggle", e => {
+  if (!e.target.open) postJSON("/api/hearing/end", {}).catch(() => {});
+});
 $("#hear-start").addEventListener("click", hearStart);
 $("#hear-yes").addEventListener("click", hearHeard);
 $("#hear-no").addEventListener("click", hearMissed);
@@ -1504,6 +1547,12 @@ function applyTune(t){
       const st = j.status || j;
       const elE = document.getElementById("om-env");
       const elG = document.getElementById("om-gr");
+      const crEl = document.getElementById("cr-live");
+      if (crEl) {
+        const crs = (st.cr || []).filter(v => v != null && v > 1.02);
+        crEl.textContent = crs.length ? "实测 " + crs[0].toFixed(1) + " : 1" : "实测 —";
+        crEl.classList.toggle("on", crs.length > 0);
+      }
       if (elE) elE.textContent = one(st.env_db || []) + (st.dual ? " | 右 " + one(st.env_r_db || []) : "");
       if (elG) elG.textContent = one(st.gr_db || []) + (st.dual ? " | 右 " + one(st.gr_r_db || []) : "");
     }catch(e){ /* 板子掉了下一拍再来 */ }
