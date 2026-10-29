@@ -589,7 +589,9 @@ const S = {
 
 /* ---------- 数值格式化：统一 1 位小数，正数带 + ---------- */
 const f1   = v => (v > 0 ? "+" : "") + Number(v).toFixed(1);
-const dbOf = rms => (rms > 0 ? 20 * Math.log10(rms / 32768) : -120);
+/* 入参已经是 0~1 的满量程比例（调用处先除过 32768）。这里再除一次 32768
+   会让电平条永远显示 -114 dBFS 左右 —— 2026-10-29 修。 */
+const dbOf = rms => (rms > 0 ? 20 * Math.log10(rms) : -120);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const R2wire = R => Math.round((1 - 1 / R) * 10000) / 10000; // 压缩比 → “压掉多少”
 const wire2R = q => { q = clamp(q, 0, 0.9); return Math.round(1 / (1 - q) * 2) / 2; };
@@ -920,7 +922,11 @@ function drawFR(){
   const fit = fitCanvas(frCv); if (!fit) return;
   const {ctx, w, h} = fit;
   const L = 34, R = 10, T = 14, B = 22, W = w - L - R, H = h - T - B;
-  const yOf = db => T + (24 - db) / 48 * H;
+  /* 纵轴范围跟着实际增益走：固定 ±24 时，演示用的 +30 dB 会画到画布外面，
+     四段填充把整块涂成一片橙色（看着像坏了）。至少 ±24，最多 ±48。 */
+  const peak = Math.max.apply(null, S.tune.gain_db.map(v => Math.abs(Number(v) || 0)));
+  const TOP = Math.min(48, Math.max(24, Math.ceil((peak + 3) / 12) * 12));
+  const yOf = db => T + (TOP - db) / (2 * TOP) * H;
   ctx.clearRect(0, 0, w, h);
 
   ctx.font = "10px Consolas, monospace";
@@ -939,13 +945,13 @@ function drawFR(){
     ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + H); ctx.stroke();
     ctx.setLineDash([]);
   });
-  /* 纵轴 ±24 / 0 中线 */
-  [-24, -12, 0, 12, 24].forEach(db => {
+  /* 纵轴刻度：±TOP / 半程 / 0 中线 */
+  [-TOP, -TOP / 2, 0, TOP / 2, TOP].forEach(db => {
     const y = yOf(db);
     ctx.strokeStyle = db === 0 ? "#3a4148" : "#22282d";
     ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + W, y); ctx.stroke();
     ctx.fillStyle = "#565e66"; ctx.textAlign = "right";
-    ctx.fillText((db > 0 ? "+" : "") + db, L - 5, y + 3);
+    ctx.fillText((db > 0 ? "+" : "") + Math.round(db), L - 5, y + 3);
   });
 
   const g = S.tune.gain_db, y0 = yOf(0);
