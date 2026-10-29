@@ -42,6 +42,23 @@ def find_ip(ol, prefix):
         if name.startswith(prefix) and d.get("phys_addr") is not None:
             return name, d["phys_addr"]
     return None, None
+def find_bram(ol):
+    """播放环的地址。
+
+    2026-10-29 板上实测：`ply_ctrl` **不在 ip_dict 里**（BRAM 被 PYNQ 归到存储器，
+    ip_dict 只有 fir_pl_regs_0 / gpio_* 这几个），所以原来按名字找会一直拿到 None。
+    这里先试 ip_dict，再试 mem_dict，最后退回固定地址 —— 和已经在用的
+    `ply_upload.py` 是同一个常量。
+    """
+    for name, d in ol.ip_dict.items():
+        if name.startswith("ply") and d.get("phys_addr") is not None:
+            return name, d["phys_addr"]
+    for name, d in getattr(ol, "mem_dict", {}).items():
+        if name.startswith("ply") and d.get("phys_addr") is not None:
+            return name, d["phys_addr"]
+    return "ply_bram(fixed)", 0x43C50000
+
+
 
 
 def wr4(r, off, vals):
@@ -82,7 +99,7 @@ def main():
     P.codec_init()
 
     name, rbase = find_ip(ol, "fir_pl_regs")
-    bname, bbase = find_ip(ol, "ply_ctrl")
+    bname, bbase = find_bram(ol)
     cname, cbase = find_ip(ol, "gpio_ctrl")
     if rbase is None or bbase is None or cbase is None:
         print("!! missing IP: regs=%s bram=%s ctrl=%s" % (rbase, bbase, cbase))
@@ -116,8 +133,11 @@ def main():
         d = env[i] - D_THR
         if d > 0 and gr[i] > 0:
             ratio.append(round(float(gr[i]) / d, 2))
-    print("    GR/(ENV-THR) = %s   expect ~0.7" % ratio)
-    ok = max(gr) > 0 and ratio and all(0.5 <= x <= 0.95 for x in ratio)
+    # gr_o 是**衰减量**：y = thr + (a-thr)·ratio  →  gr = (a-thr)·(1-ratio)。
+    # 出厂 ratio=0.7 所以这里应该是 0.3，不是 0.7（2026-10-29 板上实测 0.30，
+    # 原来按 0.7 判，白报了一次 FAIL）。
+    print("    GR/(ENV-THR) = %s   expect ~%.2f (= 1-ratio)" % (ratio, 1.0 - D_RATIO / 4194304.0))
+    ok = max(gr) > 0 and ratio and all(0.18 <= x <= 0.45 for x in ratio)
     bad += 0 if ok else 1
     print("[3] 出厂参数下压缩器工作  %s" % ("OK" if ok else "FAIL"))
 

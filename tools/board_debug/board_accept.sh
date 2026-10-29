@@ -8,7 +8,9 @@
 # 前提：板子开机、能 SSH（192.168.2.99，xilinx/xilinx）、耳机插在板上。
 # 输出是全 ASCII 的 PASS/FAIL 表；中文只出现在本脚本的提示里。
 set -u
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# pwd -W 给的是 D:/... 形式（Python 只认这个）；纯 pwd 在 Git Bash 下是 /d/...，
+# 传给 paramiko 会 file-not-found —— 2026-10-29 第一次跑就踩到了。
+ROOT="$(cd "$(dirname "$0")/../.." && (pwd -W 2>/dev/null || pwd))"
 BD="$ROOT/tools/board_debug"
 PY="${PYTHON:-python}"
 REMOTE=/home/xilinx/dma_exp

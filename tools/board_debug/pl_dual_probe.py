@@ -48,6 +48,23 @@ def find_ip(ol, prefix):
         if name.startswith(prefix) and d.get("phys_addr") is not None:
             return name, d["phys_addr"]
     return None, None
+def find_bram(ol):
+    """播放环的地址。
+
+    2026-10-29 板上实测：`ply_ctrl` **不在 ip_dict 里**（BRAM 被 PYNQ 归到存储器，
+    ip_dict 只有 fir_pl_regs_0 / gpio_* 这几个），所以原来按名字找会一直拿到 None。
+    这里先试 ip_dict，再试 mem_dict，最后退回固定地址 —— 和已经在用的
+    `ply_upload.py` 是同一个常量。
+    """
+    for name, d in ol.ip_dict.items():
+        if name.startswith("ply") and d.get("phys_addr") is not None:
+            return name, d["phys_addr"]
+    for name, d in getattr(ol, "mem_dict", {}).items():
+        if name.startswith("ply") and d.get("phys_addr") is not None:
+            return name, d["phys_addr"]
+    return "ply_bram(fixed)", 0x43C50000
+
+
 
 
 def wrb(r, bank, off, vals):
@@ -89,7 +106,7 @@ def main():
     P.codec_init()
 
     _, rbase = find_ip(ol, "fir_pl_regs")
-    _, bbase = find_ip(ol, "ply_ctrl")
+    _, bbase = find_bram(ol)
     _, cbase = find_ip(ol, "gpio_ctrl")
     if None in (rbase, bbase, cbase):
         print("!! missing IP: regs=%s bram=%s ctrl=%s" % (rbase, bbase, cbase))
@@ -127,9 +144,11 @@ def main():
 
     d_env = max(abs(el[i] - er[i]) for i in range(4))
     d_gr = max(abs(gl[i] - gr[i]) for i in range(4))
-    ok = d_env <= 1 and d_gr <= 1
+    # 两路读数是先后读的，而包络本身跟着 |正弦| 抖（DRC 每个采样都更新），
+    # 所以不能用 ±1 LSB 判，要用相对容差（实测 0.17%）。
+    ok = (d_env <= max(2000, max(el) // 100) and d_gr <= max(2000, max(gl) // 50))
     bad += 0 if ok else 1
-    print("[2] L/R identical  max|dENV|=%d max|dGR|=%d  %s" %
+    print("[2] L/R identical (rel) max|dENV|=%d max|dGR|=%d  %s" %
           (d_env, d_gr, "OK" if ok else "FAIL"))
 
     if max(el) < 1000:
@@ -137,9 +156,12 @@ def main():
         ctrl.write(0, 0)
         return 1
 
-    # 只改右耳：门限压低 + 压缩比拉大
+    # 只改右耳：门限压低 + 压缩比**变小**。
+    # 注意方向：GR 是衰减量 = (env-thr)·(1-ratio)，ratio 越**小**压得越狠、GR 越大。
+    # 原来写 0.9（压得更轻），判据却是"右边 GR 更大"，方向反了 —— 2026-10-29 板上
+    # 两边都是 87778/87792 才看出来。
     wrb(r, BANK1, OFF_THR, [50000] * 4)
-    wrb(r, BANK1, OFF_RATIO, [3774873] * 4)     # 0.9
+    wrb(r, BANK1, OFF_RATIO, [1258291] * 4)     # 0.3
     time.sleep(0.5)
     el2, gl2, er2, gr2 = stat(r)
     print("[3] right only: envL=%s grL=%s" % (el2, gl2))

@@ -196,14 +196,18 @@ module fir_pl_regs #(
                 if (w_strb == 4'hF) begin
                     /* ---- 参数组:0x1xx / 0x2xx ---- */
                     if (wa[11:7] == 5'b00010 || wa[11:7] == 5'b00100) begin
-                        /* wa[11:8]: 1 = bank0, 2 = bank1 */
+                        /* bank0 = 0x1xx(bit8)、bank1 = 0x2xx(bit9)。
+                         * 2026-10-29 板上抓到的 bug：这里原来用 wa[11] 选 bank，
+                         * 而 0x100/0x200 的 bit11 都是 0 —— 于是**所有写给右耳的
+                         * 参数都落到左耳上**（读 0x2xx 也读到左耳）。现象是"双耳
+                         * 两套处方怎么调都一起变"，看着像参数没接进通路。 */
                         case (wa[6:4])
-                            3'd0: gain_r[{wa[11], wa[3:2]}]  <= w_data;
-                            3'd1: thr_r [{wa[11], wa[3:2]}]  <= w_data;
-                            3'd2: ratio_r[{wa[11], wa[3:2]}] <= w_data;
-                            3'd3: atk_r [{wa[11], wa[3:2]}]  <= w_data;
-                            3'd4: rel_r [{wa[11], wa[3:2]}]  <= w_data;
-                            3'd7: if (wa[3:2] == 2'd0) ramp_r[wa[11]] <= w_data[15:0];
+                            3'd0: gain_r[{wa[9], wa[3:2]}]  <= w_data;
+                            3'd1: thr_r [{wa[9], wa[3:2]}]  <= w_data;
+                            3'd2: ratio_r[{wa[9], wa[3:2]}] <= w_data;
+                            3'd3: atk_r [{wa[9], wa[3:2]}]  <= w_data;
+                            3'd4: rel_r [{wa[9], wa[3:2]}]  <= w_data;
+                            3'd7: if (wa[3:2] == 2'd0) ramp_r[wa[9]] <= w_data[15:0];
                             default: ;   /* 0x50/0x60 是 RO */
                         endcase
                     end else begin
@@ -250,21 +254,21 @@ module fir_pl_regs #(
     assign s_axi_rdata   = r_data;
     assign s_axi_rresp   = 2'b00;
 
-    /* 参数组读:bank 由 addr[11] 选,段号 addr[3:2] */
+    /* 参数组读:bank 由 addr[9] 选(0x1xx=0, 0x2xx=1),段号 addr[3:2] */
     function [31:0] bank_rd;
         input [11:0] a;
         input [2:0]  grp;
         reg   [2:0]  idx;
         begin
-            idx = {a[11], a[3:2]};
+            idx = {a[9], a[3:2]};
             case (grp)
                 3'd0: bank_rd = gain_r[idx];
                 3'd1: bank_rd = thr_r[idx];
                 3'd2: bank_rd = ratio_r[idx];
                 3'd3: bank_rd = atk_r[idx];
                 3'd4: bank_rd = rel_r[idx];
-                3'd5: bank_rd = (a[11] ? env_b1 : env_b0) >> ({a[3:2], 5'd0});
-                3'd6: bank_rd = (a[11] ? gr_b1  : gr_b0 ) >> ({a[3:2], 5'd0});
+                3'd5: bank_rd = (a[9] ? env_b1 : env_b0) >> ({a[3:2], 5'd0});
+                3'd6: bank_rd = (a[9] ? gr_b1  : gr_b0 ) >> ({a[3:2], 5'd0});
                 default: bank_rd = 32'd0;
             endcase
         end
@@ -276,9 +280,9 @@ module fir_pl_regs #(
             rd_mux = 32'd0;
             if (a[11:7] == 5'b00010 || a[11:7] == 5'b00100) begin
                 if (a[6:4] == 3'd7) begin
-                    if (a[3:2] == 2'd0) rd_mux = {16'd0, ramp_r[a[11]]};
+                    if (a[3:2] == 2'd0) rd_mux = {16'd0, ramp_r[a[9]]};
                     else if (a[3:2] == 2'd1)
-                        rd_mux = {31'd0, a[11] ? ramp_busy_b1 : ramp_busy_b0};
+                        rd_mux = {31'd0, a[9] ? ramp_busy_b1 : ramp_busy_b0};
                 end else begin
                     rd_mux = bank_rd(a, a[6:4]);
                 end

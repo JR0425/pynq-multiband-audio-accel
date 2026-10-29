@@ -52,6 +52,10 @@ module tb_fir_pl_regs;
     reg  [31:0] stat0 = 32'hDEAD_BEEF;
     reg  [127:0] env_b0 = 128'h0000_0004_0000_0003_0000_0002_0000_0001;
     reg  [127:0] gr_b0  = 128'h0;
+    /* 右耳的观察量用一组不同的数：这样"读 0x2xx 却读到左耳"立刻暴露。
+     * 2026-10-29 板上就是这么发现 bank 选错位的（写右耳 THR 把左耳改了）。 */
+    reg  [127:0] env_b1 = 128'h0000_0014_0000_0013_0000_0012_0000_0011;
+    reg  [127:0] gr_b1  = 128'h0000_0024_0000_0023_0000_0022_0000_0021;
 
     fir_pl_regs dut (
         .clk(clk), .rst_n(rst_n),
@@ -69,7 +73,7 @@ module tb_fir_pl_regs;
         .ply_ctl(ply_ctl), .ply_len(ply_len), .scope_ctl(scope_ctl),
         .stat0(stat0), .stat1(32'h0), .stat2(32'h0),
         .smp_cnt(32'd0), .frm_cnt(32'd0), .ply_rd(32'd0), .ply_und(32'd0),
-        .env_b0(env_b0), .gr_b0(gr_b0), .env_b1(128'd0), .gr_b1(128'd0),
+        .env_b0(env_b0), .gr_b0(gr_b0), .env_b1(env_b1), .gr_b1(gr_b1),
         .lvl_in_lo(32'd0), .lvl_in_hi(32'd0), .lvl_out_lo(32'd0), .lvl_out_hi(32'd0),
         .peak_in(16'd0), .peak_out(16'd0),
         .mpo_cnt(32'd0), .mpo_peak(16'd0),
@@ -215,6 +219,33 @@ module tb_fir_pl_regs;
         chk("thr_b0 段1", {8'd0, thr_b0[47:24]}, 32'h000A_0002);
         chk("thr_b0 段2", {8'd0, thr_b0[71:48]}, 32'h000A_0003);
         chk("thr_b0 段3", {8'd0, thr_b0[95:72]}, 32'h000A_0004);
+
+        $display("-- ⑥ 两个 bank 必须互不影响 --");
+        /* 这一段是 2026-10-29 板上那个 bug 的判据：bank 选择位原来取 wa[11]，
+         * 而 0x100/0x200 的 bit11 都是 0，于是写 bank1 全落到 bank0 上。
+         * 现象：网页/探针怎么调"右耳"，两只耳朵一起变。
+         * 下面每一种参数都写两组不同的值，然后同时看两个 bank 的输出端口。 */
+        axi_write(12'h100, 32'd273);             // b0 段0
+        axi_write(12'h200, 32'd546);             // b1 段0
+        chk("bank 隔离 gain_b0", {16'd0, gain_b0[15:0]}, 32'd273);
+        chk("bank 隔离 gain_b1", {16'd0, gain_b1[15:0]}, 32'd546);
+        axi_read (12'h104, v); chk("读 0x104 是 b0 段1(512)", v, 32'h0000_0200);
+        axi_read (12'h204, v); chk("读 0x204 是 b1 段1(出厂 256)", v, 32'd256);
+
+        axi_write(12'h210, 32'h0011_2233);       // b1 thr 段0
+        chk("bank 隔离 thr_b1", {8'd0, thr_b1[23:0]}, 32'h0011_2233);
+        chk("bank 隔离 thr_b0 未动", {8'd0, thr_b0[23:0]}, 32'h000A_0001);
+
+        axi_write(12'h270, 32'd9);               // b1 ramp_div 段0
+        chk("bank 隔离 ramp_div_b1", {16'd0, ramp_div_b1}, 32'd9);
+        chk("bank 隔离 ramp_div_b0 未动", {16'd0, ramp_div_b0}, 32'd7);
+
+        /* 观察量：0x15x 读左耳、0x25x 读右耳，两边的常量不一样 */
+        axi_read (12'h150, v); chk("ENV[0] b0 = 1",  v, 32'd1);
+        axi_read (12'h250, v); chk("ENV[0] b1 = 0x11", v, 32'h11);
+        axi_read (12'h25C, v); chk("ENV[3] b1 = 0x14", v, 32'h14);
+        axi_read (12'h160, v); chk("GR[0] b0 = 0",   v, 32'd0);
+        axi_read (12'h260, v); chk("GR[0] b1 = 0x21", v, 32'h21);
 
         $display("");
         if (fail == 0) $display("PASS 寄存器文件全部通过");
