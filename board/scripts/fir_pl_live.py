@@ -448,7 +448,10 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=N
         "i2s_stat1": st1,
         "l": 0,
         "nbuf": 0,
-        "lat_ms": 2.3,               # PL 直连的端到端数字延迟（实测值待补）
+        # 端到端延迟 = 采集 FIFO 积压 + 播放 FIFO 水位 + 核组延迟（0.98 ms）+ 声学（1.23 ms）
+        # 2026-10-29 夜：原来是写死的 2.3，那是**只算核**的数；实测采集 FIFO 常驻
+        # 3960/4096，实际是 80 ms 级。现在按真实水位算，flush 之后应该掉到 3 ms 左右。
+        "lat_ms": round((st1 >> 16) / 48.828 + (st1 & 0xFFFF) / 97.656 + 2.2, 2),
         "io_ms": 0.0,
         "dsp_ms": 0.0,
         "uptime_s": round(now - t0, 2),
@@ -683,7 +686,16 @@ def main():
             run_now = read_run()
             if run_now != run:
                 run = run_now
-                set_ctrl(ctrl_for(last or {}) if run else 0)
+                if run:
+                    # 2026-10-29 夜：采集 FIFO 在上电时就被 ADC 灌满（实测水位
+                    # 3960/4096），不 flush 的话输出的一直是 ~81 ms 之前的样本 ——
+                    # 实测端到端延迟 85 ms 而不是 2.3 ms。这里先打一拍 flush
+                    # （ctrl[2] 自清）把积压清掉，再正常放行。
+                    set_ctrl(ctrl_for(last or {}) | CTRL_FLUSH)
+                    time.sleep(0.02)
+                    set_ctrl(ctrl_for(last or {}))
+                else:
+                    set_ctrl(0)
             tune = read_tune() or {}
             cur, changed = apply_tune(regs, tune, last)
             if changed:

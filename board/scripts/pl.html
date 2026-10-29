@@ -342,7 +342,8 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
 #hear-box>summary .sub{display:none}
 #hear-box>summary:hover{color:#fff;border-color:var(--acc)}
 #hear-box[open]{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-  width:min(560px,92vw);max-height:82vh;overflow:auto;z-index:60;padding:14px 18px;
+  width:min(560px,92vw);min-width:420px;max-height:82vh;overflow:auto;
+  z-index:60;padding:16px 20px;
   background:var(--panel);border:1px solid var(--acc-dim);border-radius:6px;
   box-shadow:0 0 0 100vmax rgba(0,0,0,.62), 0 18px 60px #000c}
 #hear-box[open]>summary{margin-bottom:10px;background:none;border:none;
@@ -493,9 +494,10 @@ main{height:calc(100vh - 46px);overflow:hidden;display:flex;flex-direction:colum
     <details class="hear" id="hear-box">
       <summary>测听 → 配增益<span class="sub">每个频段一个测试音，四段共约 1 分钟</span></summary>
       <div class="hear-body">
-        <p class="hint">测试音从板子的耳机口放出，<b>先把实时停掉</b>。量的是
-          <b>相对听阈</b>：以你听得最好的那一段为 0 dB，不做绝对声压校准
+        <p class="hint">测试音从耳机口放，<b>放的时候麦克风那一路会被顶替</b>，测完自动恢复。
+          量的是<b>相对听阈</b>：以你听得最好的那一段为 0 dB，不做绝对声压校准
           （真实测听的 dB HL 也是相对值）。</p>
+        <p class="hint">四个频段依次测：听到就点<b>听到了</b>，听不到点<b>没听到</b>，会自动升降 5 dB。</p>
         <div id="hear-idle">
           <button class="btn go" id="hear-start">开始测听</button>
         </div>
