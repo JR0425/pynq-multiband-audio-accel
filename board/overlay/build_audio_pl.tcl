@@ -192,8 +192,8 @@ set_property -dict [list \
   CONFIG.Write_Depth_A {16384} \
   CONFIG.Use_Byte_Write_Enable {false} \
   CONFIG.Enable_B {Use_ENB_Pin} \
-  CONFIG.Register_PortA_Enable_of_Memory_Primitives {false} \
-  CONFIG.Register_PortB_Enable_of_Memory_Primitives {false} \
+  CONFIG.Register_PortA_Output_of_Memory_Primitives {false} \
+  CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
 ] $ply_bram
 set ply_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.1 ply_ctrl]
 set_property -dict [list CONFIG.SINGLE_PORT_BRAM {0} CONFIG.DATA_WIDTH {32}] $ply_ctrl
@@ -214,9 +214,17 @@ set_property -dict [list \
   CONFIG.Use_Byte_Write_Enable {false} \
   CONFIG.Enable_A {Always_Enabled} \
   CONFIG.Enable_B {Use_ENB_Pin} \
-  CONFIG.Register_PortA_Enable_of_Memory_Primitives {false} \
-  CONFIG.Register_PortB_Enable_of_Memory_Primitives {false} \
+  CONFIG.Register_PortA_Output_of_Memory_Primitives {false} \
+  CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
 ] $cap_bram
+# 2026-10-30 的两处错参数名已改成 Register_PortX_Output_of_...（原来写成
+# Register_PortX_Enable_of_...，那个参数不存在，BD 只报 CRITICAL WARNING 就跳过）。
+# 但 Write_Depth_A / Use_Byte_Write_Enable / Enable_A 还是被 Vivado 判成
+# disabled parameter 直接忽略（IP_Flow 19-3374），实际生效的是默认值：
+#   深度 2048 字、addra/addrb 是 32 位字节地址、web 是 4 位字节写使能。
+# 2026-10-31 试过显式 CONFIG.Enable_32bit_Address {false}，位上板后写侧整个哑了
+# （4096 个下标读回来全 0），所以那条路走不通。改成顺着默认走：PL 侧
+# fir_pl_direct 的 cap_addr 现在自己左移两位送字节地址。
 # 2026-10-30 夜：**不再挂 axi_bram_ctrl**。
 # 板上实测：0x43C50000（波表）和 0x43C60000（抓取）都是「写能进去、读回来恒 0x8」，
 # 而同一块 AXI 上的 axi_gpio / fir_pl_regs 读得好好的 —— 是 BRAM 控制器这条读通路
@@ -266,6 +274,9 @@ connect_bd_net [get_bd_pins fir_pl_regs_0/mpo_th]    [get_bd_pins fir_pl_direct_
 connect_bd_net [get_bd_pins fir_pl_regs_0/mpo_rel]   [get_bd_pins fir_pl_direct_0/mpo_rel]
 connect_bd_net [get_bd_pins fir_pl_direct_0/mpo_cnt] [get_bd_pins fir_pl_regs_0/mpo_cnt]
 connect_bd_net [get_bd_pins fir_pl_direct_0/mpo_peak] [get_bd_pins fir_pl_regs_0/mpo_peak]
+# 2026-10-31：跳变计数器 0x80 / 0x84
+connect_bd_net [get_bd_pins fir_pl_direct_0/pop_dx]   [get_bd_pins fir_pl_regs_0/pop_dx]
+connect_bd_net [get_bd_pins fir_pl_direct_0/pop_vld]  [get_bd_pins fir_pl_regs_0/pop_vld]
 
 puts "==== fir_pl_regs_0 的 AXI 接口 ===="
 foreach ip [get_bd_intf_pins -quiet fir_pl_regs_0/*] { puts "  intf $ip" }
@@ -293,6 +304,8 @@ connect_bd_net [get_bd_pins gpio_dbg/gpio2_io_i]  [get_bd_pins fir_pl_direct_0/d
 # ---- 运行期参数：增益/斜坡 + DRC 四参数（2026-10-28 批 2）----
 connect_bd_net [get_bd_pins fir_pl_regs_0/gain_b0]     [get_bd_pins fir_pl_direct_0/gain_pack]
 connect_bd_net [get_bd_pins fir_pl_regs_0/ramp_div_b0] [get_bd_pins fir_pl_direct_0/ramp_div]
+# 2026-10-30 任务 C：右耳斜坡自己的分频。原来这根线悬空，u_ramp_b 偷偷用了 bank0 的。
+connect_bd_net [get_bd_pins fir_pl_regs_0/ramp_div_b1] [get_bd_pins fir_pl_direct_0/ramp_div_b1]
 connect_bd_net [get_bd_pins fir_pl_direct_0/ramp_busy] [get_bd_pins fir_pl_regs_0/ramp_busy_b0]
 foreach pk {thr ratio atk rel} {
   connect_bd_net [get_bd_pins fir_pl_regs_0/${pk}_b0] [get_bd_pins fir_pl_direct_0/${pk}_pack]
@@ -320,9 +333,12 @@ connect_bd_net [get_bd_pins fir_pl_direct_0/stat1] [get_bd_pins fir_pl_regs_0/st
 connect_bd_net [get_bd_pins fir_pl_direct_0/stat2] [get_bd_pins fir_pl_regs_0/stat2]
 
 
-foreach pin {smp_cnt frm_cnt ply_rd ply_und lvl_in_lo lvl_in_hi lvl_out_lo lvl_out_hi scope_seq} {
+foreach pin {smp_cnt frm_cnt ply_und lvl_in_lo lvl_in_hi lvl_out_lo lvl_out_hi scope_seq} {
   connect_bd_net [get_bd_pins z32/dout] [get_bd_pins fir_pl_regs_0/$pin]
 }
+
+# 0x1C 读 ptr：以前接常量 0，现在接真正的读指针（2026-10-30）
+connect_bd_net [get_bd_pins fir_pl_direct_0/ply_rd] [get_bd_pins fir_pl_regs_0/ply_rd]
 
 # ---- 时钟 / 复位 ----
 set clk_pins [list \
@@ -484,13 +500,21 @@ if {$s_dsp < 100} {
 # 减法 → 绝对值钳位 → 取负 → 饱和，四级组合逻辑串在一起）。
 # 不动 RTL（加一拍会改整条链的延迟对齐，得重跑全部 tb），先用布局布线的
 # ExtraTimingOpt 把这点余量抠出来。想要复现默认结果就 IMPL_DIRECTIVE=Default。
+# 2026-10-30 连挂 3 轮的真因：ExtraTimingOpt 只有 place_design 认，
+# route_design 的合法值里没有它（Default / Explore / AggressiveExplore /
+# NoTimingRelaxation / MoreGlobalIterations / HigherDelayCost / RuntimeOptimized…），
+# 原来那一行把同一个值塞给 ROUTE_DESIGN，过 BD 必挂 [Common 17-110]。
 if {[info exists ::env(IMPL_DIRECTIVE)] && $::env(IMPL_DIRECTIVE) ne ""} {
   set impl_dir $::env(IMPL_DIRECTIVE)
-  puts "### impl directive = $impl_dir"
+  set route_dir Default
+  if {[info exists ::env(IMPL_ROUTE_DIRECTIVE)] && $::env(IMPL_ROUTE_DIRECTIVE) ne ""} {
+    set route_dir $::env(IMPL_ROUTE_DIRECTIVE)
+  }
+  puts "### impl directive = $impl_dir  route = $route_dir"
   set_property STEPS.PLACE_DESIGN.ARGS.DIRECTIVE $impl_dir [get_runs impl_1]
   set_property STEPS.PHYS_OPT_DESIGN.IS_ENABLED true        [get_runs impl_1]
   set_property STEPS.PHYS_OPT_DESIGN.ARGS.DIRECTIVE Explore [get_runs impl_1]
-  set_property STEPS.ROUTE_DESIGN.ARGS.DIRECTIVE $impl_dir [get_runs impl_1]
+  set_property STEPS.ROUTE_DESIGN.ARGS.DIRECTIVE $route_dir [get_runs impl_1]
 }
 
 launch_runs impl_1 -to_step write_bitstream -jobs 4
