@@ -36,6 +36,8 @@ OFF_MPO_CNT = 0x50
 OFF_MPO_PEAK = 0x54
 OFF_SCOPE_CTL = 0x64
 OFF_SCOPE_WR = 0x6C
+OFF_CAP_IDX = 0x78                 # 写：抓取缓冲读下标
+OFF_CAP_DATA = 0x7C                # 读：该下标的字
 
 OUT_DIR = "/home/xilinx/dma_exp"
 
@@ -49,13 +51,13 @@ def main():
                     help="相对最近典型值的倍数")
     ap.add_argument("--period", type=float, default=0.010)
     ap.add_argument("--cap", type=int, default=0,
-                    help="1 = 出事时把 84 ms 抓取窗口存下来。"
-                         "只有 2026-10-29 夜之后的位流才有抓取缓冲（0x43C60000），"
-                         "老位流上读它是未映射地址，会把总线挂死 —— 默认关。")
+                    help="1 = 出事时把 84 ms 抓取窗口存下来（走 0x78/0x7C 窗口读）。"
+                         "需要 2026-10-30 夜之后的位流（抓取缓冲已接到 fir_pl_regs），"
+                         "老位流上 0x78/0x7C 是空的，读出来全 0 —— 默认关。")
     a = ap.parse_args()
 
     regs = MMIO(REGS_BASE, 0x1000)
-    cap = MMIO(CAP_BASE, 0x4000) if a.cap else None
+    cap = True if a.cap else None      # 只作开关；读数据走 regs 的 0x78/0x7C
     csv_path = os.path.join(OUT_DIR, "pop_hunt.csv")
     f = open(csv_path, "w", buffering=1)
 
@@ -120,15 +122,22 @@ def main():
 
 
 def grab_window(regs, cap):
-    """冻 → 读 4096 字 → 解冻（和 fir_pl_live.read_scope 同一套）。"""
+    """冻 → 逐字读 4096 个 → 解冻。
+
+    2026-10-30 夜：不再从 0x43C60000 整块读。那片 AXI BRAM 的读通路断的
+    （读回恒 0x8），现在 BRAM 的 A 口接在 fir_pl_regs 上：写 0x78 选下标、
+    读 0x7C 取字。冻结期间环形缓冲不变，4096 个点大约读 10 ms。
+    """
     import array
     regs.write(OFF_SCOPE_CTL, 1)
     time.sleep(0.002)
     ptr = regs.read(OFF_SCOPE_WR) & 0xFFF
-    raw = cap.read(0, 4096 * 4)
+    words = []
+    for i in range(4096):
+        regs.write(OFF_CAP_IDX, i)
+        words.append(regs.read(OFF_CAP_DATA))
     regs.write(OFF_SCOPE_CTL, 0)
-    v = array.array("I")
-    v.frombytes(raw)
+    v = array.array("I", words)
     rot = ptr % 4096
     v = v[rot:] + v[:rot]
     return {

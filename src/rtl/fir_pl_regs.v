@@ -88,6 +88,15 @@ module fir_pl_regs #(
     input  wire [15:0]  mpo_peak,
     input  wire [31:0]  scope_seq,
     input  wire [12:0]  scope_wr,
+    /* 抓取缓冲的读取窗口（2026-10-30 夜）。
+     * 原本 PS 直接从 axi_bram_ctrl 读 0x43C60000，板上实测**读回恒为 0x8** ——
+     * 写能进（波形确实抓得到），读通道不通。两片 BRAM（波表 + 抓取）都是这个
+     * 症状，而同一块 AXI 上的 axi_gpio / fir_pl_regs 读得好好的，说明是 BRAM
+     * 控制器这条读通路的问题，不是地址映射。
+     * 绕开的办法：把 BRAM 的 A 口交给本模块——写 0x78 选下标，读 0x7C 取数据。
+     * 抓取已经"冻住"时环形缓冲不再变，4096 个点分 8192 次 MMIO 读完约 10 ms。 */
+    input  wire [31:0]  cap_rdata,
+    output wire [11:0]  cap_raddr,
     input  wire         ramp_busy_b0, ramp_busy_b1
 );
 
@@ -96,6 +105,7 @@ module fir_pl_regs #(
     reg [31:0] ctrl_reg;
     reg [31:0] ear_reg, tone_sel_reg, tone_amp_reg, mpo_th_reg, mpo_rel_reg;
     reg [31:0] win_len_reg, ply_ctl_reg, ply_len_reg, scope_ctl_reg;
+    reg [11:0] cap_idx_r;          // 0x78：抓取缓冲读下标（0x7C 返回该字）
 
     /* 参数:idx[2]=bank(0 左 1 右),[1:0]=段号 */
     reg [31:0] gain_r  [0:7];
@@ -119,6 +129,7 @@ module fir_pl_regs #(
         ply_ctl_reg  = 32'h0;
         ply_len_reg  = 32'h0;
         scope_ctl_reg= 32'h0;
+        cap_idx_r  = 12'h0;
         for (i = 0; i < 8; i = i + 1) begin
             gain_r[i]  = 32'd256;      // 0 dB
             thr_r[i]   = 32'd419456;   // 3277(Q1.15) << 7 = -20 dBFS
@@ -228,6 +239,7 @@ module fir_pl_regs #(
                             7'h60: ear_reg       <= {29'd0, w_data[2:0]};
                             7'h64: scope_ctl_reg <= {30'd0, w_data[1:0]};
                             7'h70: clr_r         <= 1'b1;      // CLR_STAT
+                            7'h78: cap_idx_r     <= w_data[11:0];   // 抓取缓冲读下标
                             default: ;
                         endcase
                     end
@@ -316,6 +328,8 @@ module fir_pl_regs #(
                     7'h64: rd_mux = scope_ctl_reg;
                     7'h68: rd_mux = scope_seq;
                     7'h6C: rd_mux = {19'd0, scope_wr};
+                    7'h78: rd_mux = {20'd0, cap_idx_r};
+                    7'h7C: rd_mux = cap_rdata;
                     default: rd_mux = 32'd0;
                 endcase
             end
@@ -364,5 +378,6 @@ module fir_pl_regs #(
     assign ply_ctl   = ply_ctl_reg;
     assign ply_len   = ply_len_reg;
     assign scope_ctl = scope_ctl_reg;
+    assign cap_raddr = cap_idx_r;
 
 endmodule

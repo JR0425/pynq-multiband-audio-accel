@@ -110,7 +110,7 @@ set_property -dict [list \
 
 # ---- 寄存器总线 ----
 set axi_ic [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_ic]
-set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {7}] $axi_ic
+set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {6}] $axi_ic
 
 set gpio_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 gpio_ctrl]
 set_property -dict [list \
@@ -204,7 +204,7 @@ connect_bd_net [get_bd_pins fir_pl_direct_0/ply_addr]  [get_bd_pins ply_bram/add
 connect_bd_net [get_bd_pins ply_bram/doutb]            [get_bd_pins fir_pl_direct_0/ply_rdata]
 
 # ---- 抓取缓冲（C3，2026-10-29）：4096×32，低 16 位进核 / 高 16 位出核 ----
-# A 口给 axi_bram_ctrl（PS 读），B 口给 fir_pl_direct 的写口。
+# A 口给 PS 读（经 fir_pl_regs 的 0x78/0x7C 窗口），B 口给 fir_pl_direct 的写口。
 # 4096 点 @ 48.8 kHz ≈ 84 ms 历史，够画时域波形和做 4096 点 FFT。
 set cap_bram [create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 cap_bram]
 set_property -dict [list \
@@ -212,13 +212,26 @@ set_property -dict [list \
   CONFIG.Write_Width_A {32} \
   CONFIG.Write_Depth_A {4096} \
   CONFIG.Use_Byte_Write_Enable {false} \
+  CONFIG.Enable_A {Always_Enabled} \
   CONFIG.Enable_B {Use_ENB_Pin} \
   CONFIG.Register_PortA_Enable_of_Memory_Primitives {false} \
   CONFIG.Register_PortB_Enable_of_Memory_Primitives {false} \
 ] $cap_bram
-set cap_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.1 cap_ctrl]
-set_property -dict [list CONFIG.SINGLE_PORT_BRAM {0} CONFIG.DATA_WIDTH {32}] $cap_ctrl
-connect_bd_intf_net [get_bd_intf_pins cap_ctrl/BRAM_PORTA] [get_bd_intf_pins cap_bram/BRAM_PORTA]
+# 2026-10-30 夜：**不再挂 axi_bram_ctrl**。
+# 板上实测：0x43C50000（波表）和 0x43C60000（抓取）都是「写能进去、读回来恒 0x8」，
+# 而同一块 AXI 上的 axi_gpio / fir_pl_regs 读得好好的 —— 是 BRAM 控制器这条读通路
+# 不通，不是地址映射。与其赌再编一版还是不通，改成把 A 口直接交给 fir_pl_regs：
+#   写 0x78 选下标 → 读 0x7C 取该字（寄存器窗口的读是验过的）
+# 抓取一冻结环形缓冲就不再变，4096 点分 8192 次 MMIO 读完约 10 ms。
+connect_bd_net [get_bd_pins ps7_0/FCLK_CLK0]         [get_bd_pins cap_bram/clka]
+connect_bd_net [get_bd_pins fir_pl_regs_0/cap_raddr] [get_bd_pins cap_bram/addra]
+connect_bd_net [get_bd_pins cap_bram/douta]          [get_bd_pins fir_pl_regs_0/cap_rdata]
+set const0 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant const0]
+set_property -dict [list CONFIG.CONST_WIDTH {32} CONFIG.CONST_VAL {0}] $const0
+connect_bd_net [get_bd_pins const0/dout]             [get_bd_pins cap_bram/dina]
+set const1 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant const1]
+set_property -dict [list CONFIG.CONST_WIDTH {1} CONFIG.CONST_VAL {0}] $const1
+connect_bd_net [get_bd_pins const1/dout]             [get_bd_pins cap_bram/wea]
 connect_bd_net [get_bd_pins ps7_0/FCLK_CLK0]          [get_bd_pins cap_bram/clkb]
 connect_bd_net [get_bd_pins fir_pl_direct_0/cap_we]   [get_bd_pins cap_bram/web]
 connect_bd_net [get_bd_pins fir_pl_direct_0/cap_addr] [get_bd_pins cap_bram/addrb]
@@ -254,7 +267,6 @@ if {[catch {
 
 if {[catch {
   connect_bd_intf_net -intf_net axi_ic_m05 [get_bd_intf_pins axi_ic/M05_AXI]                       [get_bd_intf_pins ply_ctrl/S_AXI]
-connect_bd_intf_net -intf_net axi_ic_m06 [get_bd_intf_pins axi_ic/M06_AXI]                       [get_bd_intf_pins cap_ctrl/S_AXI]
 } _e]} {
   puts "### M05 连接失败: $_e"
   error $_e
@@ -322,8 +334,6 @@ set clk_pins [list \
                [get_bd_pins gpio_stat2/s_axi_aclk] \
                [get_bd_pins gpio_dbg/s_axi_aclk] \
                               [get_bd_pins ply_ctrl/s_axi_aclk] \
-                              [get_bd_pins cap_ctrl/s_axi_aclk] \
-                              [get_bd_pins axi_ic/M06_ACLK] \
                [get_bd_pins fir_pl_direct_0/clk] ]
 
 set rst_pins [list \
@@ -341,8 +351,6 @@ set rst_pins [list \
                [get_bd_pins gpio_stat/s_axi_aresetn] \
                [get_bd_pins gpio_stat2/s_axi_aresetn] \
                [get_bd_pins gpio_dbg/s_axi_aresetn]                               [get_bd_pins ply_ctrl/s_axi_aresetn] \
-                              [get_bd_pins cap_ctrl/s_axi_aresetn] \
-                              [get_bd_pins axi_ic/M06_ARESETN] \
                [get_bd_pins fir_pl_direct_0/rst_n] ]
 
 connect_bd_net {*}$clk_pins
@@ -399,9 +407,7 @@ assign_bd_address -offset 0x43C40000 -range 0x00001000 \
 assign_bd_address -offset 0x43C50000 -range 0x00010000 \
   -target_address_space [get_bd_addr_spaces ps7_0/Data] [seg_of_pin ply_ctrl/S_AXI] -force
 
-# 抓取缓冲：4096 字 × 4 B = 16 KB（C3，2026-10-30）
-assign_bd_address -offset 0x43C60000 -range 0x00010000 \
-  -target_address_space [get_bd_addr_spaces ps7_0/Data] [seg_of_pin cap_ctrl/S_AXI] -force
+# 抓取缓冲不再占 AXI 地址：改由 fir_pl_regs 的 0x78/0x7C 窗口读（见上）
 
 puts "==== ADDR MAP ===="
 foreach s [get_bd_addr_segs -of_objects [get_bd_addr_spaces ps7_0/Data]] {
@@ -419,9 +425,10 @@ foreach w $want {
     error "ADDR MAP 缺 $w,现有:$have"
   }
 }
-# 批 1 加的波表 BRAM 从机（段名带 mem0 后缀,提前写死容易错,按"至少 7 个从机"判）
-if {[llength $have] < 7} {
-  error "ADDR MAP 只有 [llength $have] 个从机,少了 ply_ctrl/cap_ctrl 的段。现有:$have"
+# 波表 BRAM 从机也在里面（段名带 mem0 后缀,提前写死容易错,按"至少 6 个从机"判）。
+# 2026-10-30 夜撤掉 cap_ctrl 后从 7 个降到 6 个：4 个 gpio + regs + 波表。
+if {[llength $have] < 6} {
+  error "ADDR MAP 只有 [llength $have] 个从机,少了 ply_ctrl 的段。现有:$have"
 }
 puts "### ADDR MAP OK ($have)"
 

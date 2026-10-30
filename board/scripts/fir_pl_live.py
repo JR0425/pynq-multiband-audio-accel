@@ -97,13 +97,17 @@ FS         = 48000
 RUN_PATH = os.environ.get("FIR_PL_RUN", "/dev/shm/fir_pl_run.txt")
 
 # ---- C3 抓取缓冲（2026-10-30）----
-# 0x43C60000 一块 4096×32 BRAM：低 16 位进核、高 16 位出核（限幅后左耳）。
+# 4096×32 BRAM：低 16 位进核、高 16 位出核（限幅后左耳）。
 # 0x64 的 bit0 是 snap（1 = 冻结写指针），0x6C 读回写指针。
+# 读数据**不走 0x43C60000**：那片 AXI BRAM 的读通路是断的（读回恒 0x8，见
+# read_scope 的注释）。A 口接在 fir_pl_regs 上，写 0x78 选下标、读 0x7C 取字。
 # 读完写 /dev/shm/fir_scope.json，网页从 /api/scope 取。
 SCOPE_PATH = os.environ.get("FIR_PL_SCOPE", "/dev/shm/fir_scope.json")
-CAP_BASE_DEFAULT = 0x43C60000
+CAP_BASE_DEFAULT = 0x43C60000        # 仅作日志/兼容，不再用于读数
 OFF_SCOPE_CTL = 0x64
 OFF_SCOPE_WR = 0x6C
+OFF_CAP_IDX = 0x78                  # 写：抓取缓冲读下标 0..4095
+OFF_CAP_DATA = 0x7C                 # 读：该下标的字（低 16 进核 / 高 16 出核）
 
 # ---- 循环播放固定音频（2026-10-30）----
 # 波表 BRAM 0x43C50000，16384 字环形；样本放 [31:16]。RTL 按采样节拍读，
@@ -238,22 +242,29 @@ def write_run(on):
 
 # ---------------------------------------------------------------- 抓取缓冲
 def read_scope(regs, cap, path=None):
-    """冻指针 → 读 4096 字 → 解锁 → 写 scope json。返回样本数，0 = 失败。
+    """冻指针 → 逐字读 4096 个 → 解锁 → 写 scope json。返回样本数，0 = 失败。
 
-    必须先冻再读：读 16 KB 要几毫秒，不冻的话新样本会盖掉环形缓冲的一截，
+    必须先冻再读：读 4096 个字要几毫秒，不冻的话新样本会盖掉环形缓冲的一截，
     画出来是断的。冻结只停抓取，音频通路照跑。
+
+    **读法（2026-10-30 夜改）**：不再直接从 0x43C60000 读。
+    板上实测那片 AXI BRAM 的读通路是断的 —— 写能进去（波形确实抓得到），
+    读回来恒等于 0x8，波表那片也一样，而同一块 AXI 上的寄存器读得好好的。
+    现在 BRAM 的 A 口接在 fir_pl_regs 上：
+        写 0x78 = 下标  →  读 0x7C = 该字
+    冻结之后环形缓冲不再变，4096 点分 8192 次 MMIO 大约 10 ms，够 1 Hz 刷新。
     """
     path = path or SCOPE_PATH
     import array
     regs.wr(OFF_SCOPE_CTL, 1)
     time.sleep(0.002)
     ptr = regs.rd(OFF_SCOPE_WR) & 0xFFF
-    raw = cap.read(0, 4096 * 4)
+    words = [0] * 4096
+    for i in range(4096):
+        regs.wr(OFF_CAP_IDX, i)
+        words[i] = regs.rd(OFF_CAP_DATA)
     regs.wr(OFF_SCOPE_CTL, 0)
-    if len(raw) != 4096 * 4:
-        return 0
-    v = array.array("I")
-    v.frombytes(raw)
+    v = array.array("I", words)
     rot = ptr % 4096                # cap_wr 是下一个要写的地址，从它开始 = 最旧在前
     v = v[rot:] + v[:rot]
     ins = [((x & 0xFFFF) ^ 0x8000) - 0x8000 for x in v]
@@ -829,7 +840,15 @@ def main():
     src_on = False
     scope_tick = 0.0
 
-    # 先把 run + drc 打开，再让 tune 决定具体参数
+    # 先把通路关一下再开，并且开的时候带一拍 flush。
+    # 2026-10-30 修：原来这里直接 set_ctrl(run)，而 run 一直是 1，循环里那个
+    # "run 0→1 才 flush" 的分支永远不会走到 —— 采集 FIFO 从上电就带着 ~81 ms
+    # 积压，lat_ms 一直显示 85 ms。（上一版只测了"先停后开"的路径，没测重启
+    # live 进程这条，所以漏了。）现在启动就是 ctrl=0 → flush → run。
+    set_ctrl(0)
+    time.sleep(0.05)
+    set_ctrl(ctrl_for({}) | CTRL_FLUSH)
+    time.sleep(0.03)
     set_ctrl(ctrl_for({}))
     time.sleep(0.05)
 
