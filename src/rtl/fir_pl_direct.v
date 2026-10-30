@@ -66,7 +66,11 @@ module fir_pl_direct #(
     input  wire [95:0] ratio_pack_b1,
     input  wire [95:0] atk_pack_b1,
     input  wire [95:0] rel_pack_b1,
-    input  wire [15:0] ramp_div,          // 斜坡移位量，6 ≈ 1.3 ms 收敛
+    input  wire [15:0] ramp_div,          // 斜坡移位量，6 ≈ 1.3 ms 收敛（左耳 bank0）
+    /* 2026-10-30 任务 C：右耳自己的斜坡分频。原来 u_ramp_b 的 .div 接的是
+     * bank0 的 ramp_div，而 fir_pl_regs 吐出来的 ramp_div_b1 在 BD 里是根
+     * 悬空的死线 —— 两个 bank 参数一样时看不出来，等左右独立增益就会错。 */
+    input  wire [15:0] ramp_div_b1,
     output wire        ramp_busy,         // 还有段没爬到目标（1 = 正在爬）
     output wire        ramp_busy_b1,
     output wire [31:0] stat0,            // i2s_duplex：ovf / und 计数
@@ -94,22 +98,34 @@ module fir_pl_direct #(
     output wire [127:0] gr_b1,
     output wire [15:0]  peak_in,
     output wire [15:0]  peak_out,
-    output wire [13:0]  ply_addr,
+    output wire [15:0]  ply_addr,
     output wire         ply_en,
     input  wire [31:0]  ply_rdata,
     input  wire [31:0]  ply_ctl,
     input  wire [31:0]  ply_len,
+
+    /* 2026-10-30：读指针回读（0x1C）。BD 里这根线原来接常量 0，PS 看不见
+     * 读位置，只能拿墙钟猜 —— 播放环和写指针套圈的根就在这里。*/
+    output wire [31:0]  ply_rd,
 
     /* ---- 2026-10-30：C3 抓取缓冲（波形/频谱）----
      * BD 里一块 4096×32 的 BRAM 挂在 axi_bram_ctrl 上（0x43C60000），
      * 这里只出写口：低 16 位 = 进核样本，高 16 位 = 限幅后左耳。
      * scope_snap=1 时停止采集（只停抓取，不影响音频），写指针经 0x6C 读回。
      * PS 侧从 ptr 往回读 4096 字就是快照前约 84 ms 的连续历史。 */
-    output wire [11:0]  cap_addr,
+    output wire [12:0]  cap_addr,
     output wire [31:0]  cap_din,
     output wire         cap_we,
     input  wire         scope_snap,
     output wire [12:0]  scope_wr,
+
+    /* ---- 2026-10-31：跳变计数器（0x80 POP_CNT / 0x84 POP_MAX）----
+     * 0x78/0x7C 那个读窗口太慢（40 µs/字，1024 点要 41 ms > 21 ms 可读窗口），
+     * 抓出来的"台阶"分不清是链路跳的还是读窗口自己造的（§0.0.12 C）。
+     * 这里只出原始值：进核前相邻采样之差的绝对值 + 一个脉冲；
+     * 判阈值、计数、清零都在 fir_pl_regs 里做，比较的是增益之前的数据。 */
+    output wire [15:0]  pop_dx,
+    output wire         pop_vld,
 
     /* ---- 2026-10-29 夜：测试音（B4 听力图闭环）+ MPO 限幅（B6） ----
      * tone_sel 选四段中心频率（0=250 1=750 2=1500 3=3000 Hz），tone_amp 是
@@ -209,7 +225,7 @@ module fir_pl_direct #(
     assign fe_din = ply_sel ? ply_sample : mic_sample;
 
     /* ---- WAV 播放引擎：16384 字**环形缓冲**（寄存器表口径），PS 持续填充 ----
-     * 地址 14 位自然环回（16384 = 2^14），不用 ply_len——PS 侧追着写，
+     * 计数 14 位自然环回（16384 = 2^14），不用 ply_len——PS 侧追着写，
      * RTL 只管按采样节拍读。BRAM 读 1 拍延迟，但地址每 3 拍才变一次，
      * 读数稳定对应当前地址。!en / flush / !rst_n 时地址归零。
      * 曲子有多长取决于 PS 填得多快（Python bulk 写 32 KB/0.3 s，余量足）。 */
@@ -222,7 +238,12 @@ module fir_pl_direct #(
             ply_cnt <= ply_cnt + 14'd1;    /* 2^14 自然环回 */
     end
     assign ply_en   = ply_sel;
-    assign ply_addr = ply_cnt;
+    /* ply_bram 是 blk_mem_gen 且开了 Enable_32bit_Address，读口按**字节地址**解释。
+     * 只送 ply_cnt 的话实际读到 word[ply_cnt>>2] —— 慢 4 倍、而且只够得到环的前
+     * 1/4（peak_in 顶到 4094、POP_CNT 恒 0 就是这么来的）。这里补上低两位。
+     * 写侧走 axi_bram_ctrl，本来就是字节地址，所以写一直是对的。 */
+    assign ply_addr = {ply_cnt, 2'b00};
+    assign ply_rd   = {18'd0, ply_cnt};
 
     /* ================= 每帧只喂一个采样（2026-10-27 修） =================
      *
@@ -328,7 +349,7 @@ module fir_pl_direct #(
         .tgt1   (gain_pack_b1[31:16]),
         .tgt2   (gain_pack_b1[47:32]),
         .tgt3   (gain_pack_b1[63:48]),
-        .div    (ramp_div),
+        .div    (ramp_div_b1),
         .cur0   (h0_cur),
         .cur1   (h1_cur),
         .cur2   (h2_cur),
@@ -684,8 +705,8 @@ module fir_pl_direct #(
     reg signed [15:0] fe_din_q;
     reg [31:0] cap_q;
     reg        cap_qv;
-    reg [11:0] cap_wr;
-    reg [11:0] cap_ptr;
+    reg [10:0] cap_wr;
+    reg [10:0] cap_ptr;
 
     always @(posedge clk) begin
         if (fe_din_vld) fe_din_q <= fe_din;
@@ -695,14 +716,14 @@ module fir_pl_direct #(
         if (!rst_n || flush) begin
             cap_q   <= 32'd0;
             cap_qv  <= 1'b0;
-            cap_wr  <= 12'd0;
-            cap_ptr <= 12'd0;
+            cap_wr  <= 11'd0;
+            cap_ptr <= 11'd0;
         end else begin
             cap_qv <= 1'b0;
             if (vld2_q && !scope_snap) begin
                 cap_q   <= {mpo_l, fe_din_q};
                 cap_qv  <= 1'b1;
-                cap_wr  <= cap_wr + 12'd1;
+                cap_wr  <= cap_wr + 11'd1;
             end
             if (scope_snap) cap_ptr <= cap_wr;
         end
@@ -710,8 +731,44 @@ module fir_pl_direct #(
 
     assign cap_we   = cap_qv;
     assign cap_din  = cap_q;
-    assign cap_addr = cap_wr;
-    assign scope_wr = {1'b0, cap_ptr};
+    /* cap_bram 的 Enable_32bit_Address 关不掉（BD 里那是 disabled 参数，硬关
+     * 会把写侧整个弄哑 —— 2026-10-31 实测 4096 个下标读回来全 0）。所以地址口
+     * 就按字节地址用：字计数左移两位再送。深度 2048 字 = 8192 字节 = 2^13。 */
+    assign cap_addr = {cap_wr, 2'b00};
+    assign scope_wr = {2'b0, cap_ptr};
+
+    /* ================= 跳变计数器（2026-10-31） ================= */
+    /* |fe_din[n] - fe_din[n-1]|，进核前、增益之前。
+     * 差值是 17 位，但最大只能到 65535（-32768 → +32767），16 位无符号装得下。
+     * flush 后第一拍不比较（pop_have=0），否则 pop_d0 还是 0，会把起播第一个
+     * 采样当成一次跳变。 */
+    reg signed [15:0] pop_d0;
+    reg               pop_have;
+    reg        [15:0] pop_dx_r;
+    reg               pop_vld_r;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n || flush) begin
+            pop_d0    <= 16'sd0;
+            pop_have  <= 1'b0;
+            pop_dx_r  <= 16'd0;
+            pop_vld_r <= 1'b0;
+        end else begin
+            pop_vld_r <= 1'b0;
+            if (fe_din_vld) begin
+                pop_d0 <= fe_din;
+                if (pop_have) begin
+                    pop_dx_r  <= (fe_din >= pop_d0) ? (fe_din - pop_d0)
+                                                    : (pop_d0 - fe_din);
+                    pop_vld_r <= 1'b1;
+                end
+                pop_have <= 1'b1;
+            end
+        end
+    end
+
+    assign pop_dx  = pop_dx_r;
+    assign pop_vld = pop_vld_r;
 
     /* ================= 输出 FIFO ================= */
     /* 前端输出没有 ready，而 i2s_duplex 的播放入口可能有一拍不 ready

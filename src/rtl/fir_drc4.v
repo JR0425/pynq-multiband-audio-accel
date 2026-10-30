@@ -412,17 +412,49 @@ module fir_drc4 #(
     output wire [DW*4-1:0]       gr_o
 );
 
-    function automatic signed [15:0] sat16;
-        input signed [BW-1:0] v;
-        reg   signed [BW-1:0] s;
-        begin
-            s = v >>> OUT_SHIFT;
-            if (s[BW-1:15] == {(BW-15){1'b0}})      sat16 = s[15:0];
-            else if (s[BW-1:15] == {(BW-15){1'b1}}) sat16 = s[15:0];
-            else if (s[BW-1])                       sat16 = 16'sh8000;
-            else                                    sat16 = 16'sh7FFF;
-        end
-    endfunction
+    /* ================= 软膝限幅（2026-10-30 替换硬饱和）=================
+     *
+     * 原来是 sat16：四段相加立刻硬饱和到 ±32767。四段增益默认 19/21/22.5/21 dB
+     * 叠起来远超 0 dBFS，于是顶到满量程的样点被削成方波边 —— 板上实测输入
+     * peak −8.3 dBFS 的音乐，16% 的 16 ms 窗顶满。下游 MPO 在 fir_pl_direct
+     * 里、在这个饱和**之后**，挡不住（信息已经丢了）。
+     *
+     * 现在换成六段折线：
+     *
+     *   |u| <= T (0.70 FS)         y = |u|                    ← 逐位透明
+     *   T .. 0.9FS  斜率 1/2        e>>1
+     *   0.9..1.0FS  斜率 1/4        3277 + (e-6554)>>2
+     *   1.0..1.5FS  斜率 1/16       4096 + (e-9831)>>4
+     *   1.5..3.0FS  斜率 1/64       5120 + (e-26215)>>6
+     *   3.0..15FS   斜率 1/256      5888 + (e-75311)>>8
+     *   > 15FS      斜率 1/4096     7416 + (e-466615)>>12
+     *
+     *   e = |u| − T。每段起点值等于上一段终点的值，所以曲线连续、单调不减；
+     *   斜率全部为正、逐段递减到 1/4096，输出**永远追不到** 32767：
+     *   输入给到 24 位能表示的最大幅度（128 FS）时 y = 31257。
+     *
+     * 关键数（单位：16 位样点，FS = 32768）：
+     *
+     *   |输入|      1.0 FS  1.5 FS  3 FS   4.85 FS  8 FS   128 FS
+     *   输出        27033   28057   28825  29062    29465  31257
+     *
+     * 为什么会压得这么狠：要不削顶，只能把 4~8 倍的过载压回 1 FS 以内，
+     * 平均斜率就只有 0.03 量级。这本质上是一个 0.7 FS 起控的限幅器，
+     * 不是"轻微染色"。语音在 0.76 FS 附近只掉 0.35 dB（22937 起点之上
+     * 只有 0.06 FS 的量），所以 demo_voice 听不出变化。
+     *
+     * 实现：只有比较、减法、移位、加法 —— 0 个 DSP48（全机只剩 7 个）。
+     * 幅度域先打一拍（u_r），折线运算再打一拍（y），所以 y 比原来晚 1 拍，
+     * y_vld 同步多延迟一级 —— 语义仍是"与数据无关的流水有效位"。
+     */
+    localparam [23:0] LIM_T   = 24'd22937;   // 0.70 × 32768，按样点取整
+    localparam [23:0] LIM_E1  = 24'd6554;    // 到 0.90 FS
+    localparam [23:0] LIM_E2  = 24'd9831;    // 到 1.00 FS
+    localparam [23:0] LIM_E3  = 24'd26215;   // 到 1.50 FS
+    localparam [23:0] LIM_E4  = 24'd75311;   // 到 3.00 FS
+    localparam [23:0] LIM_E5  = 24'd466615;  // 到 15.0 FS
+    /* 具体逻辑在 asum 之后（这里引用不到 asum / v0..v3），见文件末尾。 */
+
 
     wire signed [DW-1:0] yv0, yv1, yv2, yv3;
     wire                 v0,  v1,  v2,  v3;
@@ -462,13 +494,81 @@ module fir_drc4 #(
     wire signed [BW-1:0] asum = (yvx0 <<< SH) + (yvx1 <<< SH)
                               + (yvx2 <<< SH) + (yvx3 <<< SH);
 
+    /* ================= 软膝限幅（逻辑，参数见文件上方）=================
+     * 三级流水（2026-10-30 二次修改）：
+     *   ① 幅度域 + 符号 + vld      —— asum → |u|
+     *   ② |u| 与超出的量 e         —— 24 位取负 + 24 位减法
+     *   ③ 六段折线 + 恢复符号      —— 移位、小加法、选择
+     *
+     * 第一版只切了两级，布线后 WNS = **−3.973 ns**（2238 个失败端点，
+     * 最差路径 lim_ur→y 13.829 ns / 15 个 CARRY4）。原因是 24 位取负、
+     * 24 位减法、六路「减常数再移位再加」和 24 位选择全挤在一拍里。
+     * 现在把取负/减法挪到第 ② 拍，第 ③ 拍只做窄加法。
+     *
+     * 第 ③ 拍还做了两次**恒等改写**，都不改变任何输出位：
+     *   (e − K) >> s ≡ (e >> s) − q − b ，其中 K = q·2^s + r，b = ((e & (2^s−1)) < r)
+     * 于是 3277 + ((e−6554)>>2) 变成 1639 − b2 + (e>>2)，省掉一条 24 位进位链。
+     * 再把外壳那个 +22937 并进每段常数（1639→24576 等），末级只剩一次选值，
+     * 关键路径上不再多一条 16 位加法。
+     */
+    wire signed [23:0] lim_u = asum >>> OUT_SHIFT;   // ±2^22，24 位够
+    reg  signed [23:0] lim_ur, lim_ar, lim_er;
+    reg                lim_neg1, lim_neg2;
+    reg                lim_vld1, lim_vld2;
+
+    /* 第 ① 拍之后的组合量：|u| 与 e */
+    wire [23:0] lim_a_c = lim_neg1 ? (24'd0 - lim_ur) : lim_ur;
+    wire [23:0] lim_e_c = (lim_a_c > LIM_T) ? (lim_a_c - LIM_T) : 24'd0;
+
+    always @(posedge clk) begin
+        if (rst) begin
+            lim_ur   <= 24'sd0;
+            lim_ar   <= 24'sd0;
+            lim_er   <= 24'sd0;
+            lim_neg1 <= 1'b0;  lim_neg2 <= 1'b0;
+            lim_vld1 <= 1'b0;  lim_vld2 <= 1'b0;
+        end else begin
+            /* ① */
+            lim_ur   <= lim_u;
+            lim_neg1 <= asum[BW-1];
+            lim_vld1 <= v0 & v1 & v2 & v3;
+            /* ② */
+            lim_ar   <= lim_a_c;
+            lim_er   <= lim_e_c;
+            lim_neg2 <= lim_neg1;
+            lim_vld2 <= lim_vld1;
+            /* ③ 直接用 lim_neg2/lim_vld2：y 在下一拍寄存器取值，
+               正好和 ② 拍存下来的符号/有效位对齐 */
+        end
+    end
+
+    wire [23:0] lim_e = lim_er;
+
+    /* 常数已是「22937 + 该段起点」，所以下面选出来的 lim_c 就是最终幅度值。*/
+    wire [23:0] lim_c1 = 24'd22937 + (lim_e >> 1);
+    wire [23:0] lim_c2 = 24'd24576 + (lim_e >> 2)  - {23'd0, (lim_e[1:0]   < 2'd2)};
+    wire [23:0] lim_c3 = 24'd26419 + (lim_e >> 4)  - {23'd0, (lim_e[3:0]   < 4'd7)};
+    wire [23:0] lim_c4 = 24'd27648 + (lim_e >> 6)  - {23'd0, (lim_e[5:0]   < 6'd39)};
+    wire [23:0] lim_c5 = 24'd28531 + (lim_e >> 8)  - {23'd0, (lim_e[7:0]   < 8'd47)};
+    wire [23:0] lim_c6 = 24'd30240 + (lim_e >> 12) - {23'd0, (lim_e[11:0]  < 12'd3767)};
+
+    /* 六选一用**平衡树**而不是优先级链：链深 5 级、树深 3 级，取值逐位相同。*/
+    wire [23:0] lim_m01   = (lim_e < LIM_E1) ? lim_c1 : lim_c2;
+    wire [23:0] lim_m23   = (lim_e < LIM_E3) ? lim_c3 : lim_c4;
+    wire [23:0] lim_m45   = (lim_e < LIM_E5) ? lim_c5 : lim_c6;
+    wire [23:0] lim_m0123 = (lim_e < LIM_E2) ? lim_m01 : lim_m23;
+    wire [23:0] lim_c     = (lim_e < LIM_E4) ? lim_m0123 : lim_m45;
+
+    /* 透明区直接用输入值，不是"T + 0" —— 否则 0.7 FS 以下会被整体抬 0.7 FS */
+    wire signed [15:0] lim_y = (lim_ar <= LIM_T) ? lim_ar[15:0] : lim_c[15:0];
+
     always @(posedge clk) begin
         if (rst) begin
             y     <= 16'sd0;
             y_vld <= 1'b0;
         end else begin
-            y     <= sat16(asum);
-            y_vld <= v0 & v1 & v2 & v3;   // 四段同步，用一个就够，四个一起与更保险
+            y     <= lim_neg2 ? -lim_y : lim_y;   // 恢复符号（幅度 ≤ 31257，不会溢出）
+            y_vld <= lim_vld2;
         end
     end
 

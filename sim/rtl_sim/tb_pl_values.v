@@ -50,7 +50,7 @@ module tb_pl_values;
         .atk_pack(atk_pack), .rel_pack(rel_pack),
         .gain_pack_b1(gain_pack), .thr_pack_b1(thr_pack),
         .ratio_pack_b1(ratio_pack), .atk_pack_b1(atk_pack), .rel_pack_b1(rel_pack),
-        .ramp_div(16'd6),
+        .ramp_div(16'd6), .ramp_div_b1(16'd6),
         .ply_rdata(32'd0), .ply_ctl(32'd0), .ply_len(32'd0)
     );
 

@@ -47,6 +47,9 @@ module tb_drc_gain;
     always #5 clk = ~clk;
 
     integer errs = 0, nout = 0, i, cyc;
+    reg     chk_sign = 1'b0;    // 过载段：正输入，输出不许变负
+    integer n_hi = 0, n_lo = 0;
+    integer n_lim = 0;          // 参考模块顶满量程、被新模块软压的点数（预期差异）
     reg cmp_en = 1'b1;
     reg meas   = 1'b1;     // 只在稳定段统计幅度，避开复位后的流水尾巴
     integer maxabs = 0;
@@ -67,14 +70,20 @@ module tb_drc_gain;
         end
     endtask
 
-    /* 新模块 2026-10-28 批 2 多了一级流水（差分与步进单独打一拍，见 fir_drc4.v
-     * 级 3 的注释），所以它的输出比参考模块晚一拍。这里把**参考模块**的输出
-     * 再延一拍去追新模块，判据仍然是逐位。 */
-    reg signed [15:0] y_ref_d;
-    reg               v_ref_d;
+    /* 新模块比参考模块晚**三**拍：
+     *   ① 2026-10-28 批 2：差分与步进单独打一拍（见 fir_drc4.v 级 3 注释）
+     *   ② 2026-10-30 任务 A：末级 sat16 换成软膝限幅，三级流水（幅度域 /
+     *      |u| 与 e / 折线），合计 +2 拍
+     * 这里把参考模块的输出延三拍去追新模块。 */
+    reg signed [15:0] y_ref_d, y_ref_d2, y_ref_d3;
+    reg               v_ref_d, v_ref_d2, v_ref_d3;
     always @(posedge clk) begin
-        y_ref_d <= y_ref;
-        v_ref_d <= v_ref;
+        y_ref_d  <= y_ref;
+        v_ref_d  <= v_ref;
+        y_ref_d2 <= y_ref_d;
+        v_ref_d2 <= v_ref_d;
+        y_ref_d3 <= y_ref_d2;
+        v_ref_d3 <= v_ref_d2;
     end
 
     /* 每拍比一次：ref 与「延一拍后的 new」是同拍输出。
@@ -82,14 +91,21 @@ module tb_drc_gain;
     always @(negedge clk) begin
         if (!rst) begin
             if (cmp_en) begin
-                if (v_ref_d !== v_new) begin
+                if (v_ref_d3 !== v_new) begin
                     errs = errs + 1;
-                    if (errs <= 5) $display("  失配 vld: ref=%b new=%b", v_ref_d, v_new);
+                    if (errs <= 5) $display("  失配 vld: ref=%b new=%b", v_ref_d3, v_new);
                 end
-                if (v_ref_d && (y_ref_d !== y_new)) begin
-                    errs = errs + 1;
-                    if (errs <= 5)
-                        $display("  失配 y: ref=%0d new=%0d", $signed(y_ref_d), $signed(y_new));
+                if (v_ref_d3 && (y_ref_d3 !== y_new)) begin
+                    /* 2026-10-30：参考模块是硬饱和，新模块是软膝。凡是参考模块
+                     * 顶到 ±满量程的点，**本来就该不一样**，单独计数；
+                     * 其余点必须逐位相等（透明区）。 */
+                    if (y_ref_d3 == 16'sd32767 || y_ref_d3 == -16'sd32768)
+                        n_lim = n_lim + 1;
+                    else begin
+                        errs = errs + 1;
+                        if (errs <= 5)
+                            $display("  失配 y: ref=%0d new=%0d", $signed(y_ref_d3), $signed(y_new));
+                    end
                 end
             end
             if (v_new && meas) begin
@@ -97,10 +113,10 @@ module tb_drc_gain;
                 if (y_new[15] ? (-$signed(y_new) > maxabs) : ($signed(y_new) > maxabs))
                     maxabs = y_new[15] ? -$signed(y_new) : $signed(y_new);
             end
+            if (v_new && chk_sign && y_new[15]) n_hi = n_hi + 1;
         end
     end
 
-    integer n_hi = 0, n_lo = 0;
     integer ymax_db0 = 0, ymax_db18 = 0;
 
     initial begin
@@ -126,7 +142,8 @@ module tb_drc_gain;
         end
         repeat (16) @(posedge clk);
         if (errs == 0 && nout > 2900)
-            $display("  PASS  输出 %0d 个采样，逐位 0 失配，max|y|=%0d", nout, maxabs);
+            $display("  PASS  输出 %0d 个采样，未限幅部分逐位 0 失配（%0d 点走软膝，max|y|=%0d）",
+                     nout, n_lim, maxabs);
         else
             $display("  FAIL  输出 %0d 个采样，%0d 处失配，max|y|=%0d", nout, errs, maxabs);
 
@@ -168,10 +185,14 @@ module tb_drc_gain;
             $display("  FAIL  0 dB max=%0d → +18 dB max=%0d（比值 %.2f，期望 8）",
                      ymax_db0, ymax_db18, ymax_db0 ? ymax_db18 / (ymax_db0 * 1.0) : 0.0);
 
-        /* 大信号 + 大增益：必须停在 32767，不能翻到负 */
+        /* 大信号 + 大增益：2026-10-30 起末级是软膝限幅，**不再停在 32767**，
+         * 而是压在 ~29500（四段全饱和 = 8 FS 时的理论上限 29465）。
+         * 这里查两件事：不超过 32000（验收口径）、不翻符号。 */
         rst = 1; repeat (2) @(posedge clk); rst = 0;
         g0 = 16'sd4063; g1 = 16'sd4063; g2 = 16'sd4063; g3 = 16'sd4063;   /* +24 dB */
         meas = 1'b0;
+        n_hi = 0;
+        chk_sign = 1'b1;
         for (i = 0; i < 40; i = i + 1) begin
             if (i == 10) begin maxabs = 0; meas = 1'b1; end
             b0 = 40'sh7000_0000; b1 = 40'sh7000_0000;
@@ -179,10 +200,11 @@ module tb_drc_gain;
             in_vld = 1; @(posedge clk); in_vld = 0; repeat (4) @(posedge clk);
         end
         repeat (16) @(posedge clk);
-        if (maxabs == 32767)
-            $display("  PASS  大信号 +24 dB 饱和在 %0d，没有翻转", maxabs);
+        if (maxabs <= 32000 && maxabs >= 28000 && n_hi == 0)
+            $display("  PASS  大信号 +24 dB 限在 %0d（<=32000，0 次反号）", maxabs);
         else
-            $display("  FAIL  大信号 +24 dB 的 max|y|=%0d（应为 32767）", maxabs);
+            $display("  FAIL  大信号 +24 dB 的 max|y|=%0d，反号 %0d 次（应在 28000..32000 且 0 次）",
+                     maxabs, n_hi);
 
         if (errs == 0) $display("=== 全部通过 ===");
         else           $display("=== 有失配 %0d 处 ===", errs);

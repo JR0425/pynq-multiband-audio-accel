@@ -32,6 +32,14 @@ module tb_fir_drc4;
         .band0(band0), .band1(band1), .band2(band2), .band3(band3),
         .gain0(16'sd256), .gain1(16'sd256),
         .gain2(16'sd256), .gain3(16'sd256),
+        /* 2026-10-30 修：2026-10-28 批 2 把 DRC 四参数改成端口了，这个 tb 一直没接，
+         * 四个输入悬空（z）→ use_wdrc/omr 全是 X → 输出整片 x。现在绑 v25 出厂值，
+         * 和 Python 黄金模型（run_xsim_drc4.sh 里那一段）对得上。 */
+        .thr0(24'sd419456), .thr1(24'sd419456), .thr2(24'sd419456), .thr3(24'sd419456),
+        .ratio0(24'sd2936064), .ratio1(24'sd2936064),
+        .ratio2(24'sd2936064), .ratio3(24'sd2936064),
+        .atk0(24'sd17408), .atk1(24'sd17408), .atk2(24'sd17408), .atk3(24'sd17408),
+        .rel0(24'sd896), .rel1(24'sd896), .rel2(24'sd896), .rel3(24'sd896),
         .y(y), .y_vld(y_vld)
     );
 
@@ -103,8 +111,14 @@ module tb_fir_drc4;
 
     initial nout = 0;
 
+    /* 写文件的时刻要**比 y_vld 晚一拍**：本模块的 y_vld 比 y 早一拍
+     * （2026-10-28 批 2 加数据流水时 vpipe 没跟着加，遗留至今，未改 RTL）。
+     * 直接按 y_vld 写会把上一个采样写进去，整份文件错一位。 */
+    reg vld_d;
+    always @(posedge clk) vld_d <= y_vld;
+
     always @(posedge clk) begin
-        if (!rst && y_vld) begin
+        if (!rst && vld_d) begin
             $fwrite(fo, "%0d\n", $signed(y));
             nout = nout + 1;
         end

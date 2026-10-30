@@ -75,6 +75,31 @@ def sat16(v):
     return 32767 if v > 32767 else (-32768 if v < -32768 else v)
 
 
+# 2026-10-30 任务 A：末级从"硬饱和"改成六段折线软膝限幅（见 fir_drc4.v）。
+# 黄金模型必须同步 —— 不然凡是过载的采样都会报不一致，而那正是**有意**改的地方。
+LIM_T = 22937
+
+
+def lim16(u):
+    if -LIM_T <= u <= LIM_T:
+        return u
+    e = abs(u) - LIM_T
+    if e < 6554:
+        c = e >> 1
+    elif e < 9831:
+        c = 3277 + ((e - 6554) >> 2)
+    elif e < 26215:
+        c = 4096 + ((e - 9831) >> 4)
+    elif e < 75311:
+        c = 5120 + ((e - 26215) >> 6)
+    elif e < 466615:
+        c = 5888 + ((e - 75311) >> 8)
+    else:
+        c = 7416 + ((e - 466615) >> 12)
+    y = LIM_T + c
+    return -y if u < 0 else y
+
+
 def s40(h):
     v = int(h.strip(), 16)
     return v - (1 << 40) if v >= (1 << 39) else v
@@ -107,7 +132,7 @@ for i in range(L):
             a2 = 0
         yv = -a2 if gb < 0 else a2
         acc += yv << 10
-    golden.append(sat16(acc >> 17))
+    golden.append(lim16(acc >> 17))
 
 got = [int(s) for s in open(out_path) if s.strip()]
 if len(got) != len(golden):

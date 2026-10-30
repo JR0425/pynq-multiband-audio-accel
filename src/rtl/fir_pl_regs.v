@@ -86,6 +86,11 @@ module fir_pl_regs #(
     input  wire [15:0]  peak_in, peak_out,
     input  wire [31:0]  mpo_cnt,
     input  wire [15:0]  mpo_peak,
+    /* 2026-10-31：PL 里量的相邻采样跳变（fir_pl_direct 出）。
+     * 0x78/0x7C 那个读窗口 40 µs/字，1024 点要 41 ms，比 21 ms 的可读窗口还长，
+     * 当测量仪器不成立（§0.0.12 C 三条全被自己的伪影骗过），所以把判据下到 PL。 */
+    input  wire [15:0]  pop_dx,
+    input  wire         pop_vld,
     input  wire [31:0]  scope_seq,
     input  wire [12:0]  scope_wr,
     /* 抓取缓冲的读取窗口（2026-10-30 夜）。
@@ -96,7 +101,7 @@ module fir_pl_regs #(
      * 绕开的办法：把 BRAM 的 A 口交给本模块——写 0x78 选下标，读 0x7C 取数据。
      * 抓取已经"冻住"时环形缓冲不再变，4096 个点分 8192 次 MMIO 读完约 10 ms。 */
     input  wire [31:0]  cap_rdata,
-    output wire [11:0]  cap_raddr,
+    output wire [12:0]  cap_raddr,
     input  wire         ramp_busy_b0, ramp_busy_b1
 );
 
@@ -105,7 +110,7 @@ module fir_pl_regs #(
     reg [31:0] ctrl_reg;
     reg [31:0] ear_reg, tone_sel_reg, tone_amp_reg, mpo_th_reg, mpo_rel_reg;
     reg [31:0] win_len_reg, ply_ctl_reg, ply_len_reg, scope_ctl_reg;
-    reg [11:0] cap_idx_r;          // 0x78：抓取缓冲读下标（0x7C 返回该字）
+    reg [12:0] cap_idx_r;          // 0x78：抓取缓冲读下标（0x7C 返回该字）
 
     /* 参数:idx[2]=bank(0 左 1 右),[1:0]=段号 */
     reg [31:0] gain_r  [0:7];
@@ -129,7 +134,7 @@ module fir_pl_regs #(
         ply_ctl_reg  = 32'h0;
         ply_len_reg  = 32'h0;
         scope_ctl_reg= 32'h0;
-        cap_idx_r  = 12'h0;
+        cap_idx_r  = 13'h0;
         for (i = 0; i < 8; i = i + 1) begin
             gain_r[i]  = 32'd256;      // 0 dB
             thr_r[i]   = 32'd419456;   // 3277(Q1.15) << 7 = -20 dBFS
@@ -174,6 +179,23 @@ module fir_pl_regs #(
     /* 单拍清零脉冲:写 0x070 或 CTRL[8] */
     reg        clr_r;
     assign clr_pulse = clr_r;
+
+    /* ================= 跳变计数（0x80 / 0x84，2026-10-31） ================= */
+    /* 判据（§0.0.12 C）：安静 60 s POP_CNT 不涨 = 链路干净；涨而 POP_MAX 只有
+     * 几百 = 是噪声；POP_MAX 上万 = 真的丢样点/重样点。
+     * 8192 = 满量程的 1/4，比任何语音/音乐的单采样变化都大得多。 */
+    reg [31:0] pop_cnt_r;
+    reg [15:0] pop_max_r;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n || clr_pulse) begin
+            pop_cnt_r <= 32'd0;
+            pop_max_r <= 16'd0;
+        end else if (pop_vld) begin
+            if (pop_dx > 16'd8192)  pop_cnt_r <= pop_cnt_r + 32'd1;
+            if (pop_dx > pop_max_r) pop_max_r <= pop_dx;
+        end
+    end
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -239,7 +261,7 @@ module fir_pl_regs #(
                             7'h60: ear_reg       <= {29'd0, w_data[2:0]};
                             7'h64: scope_ctl_reg <= {30'd0, w_data[1:0]};
                             7'h70: clr_r         <= 1'b1;      // CLR_STAT
-                            7'h78: cap_idx_r     <= w_data[11:0];   // 抓取缓冲读下标
+                            7'h78: cap_idx_r     <= w_data[12:0];   // 抓取缓冲读下标
                             default: ;
                         endcase
                     end
@@ -299,37 +321,42 @@ module fir_pl_regs #(
                     rd_mux = bank_rd(a, a[6:4]);
                 end
             end else begin
-                case (a[6:0])
-                    7'h00: rd_mux = ID_VALUE;
-                    7'h04: rd_mux = ctrl_reg;
-                    7'h08: rd_mux = stat0;
-                    7'h0C: rd_mux = stat1;
-                    7'h10: rd_mux = stat2;
-                    7'h14: rd_mux = smp_cnt;
-                    7'h18: rd_mux = frm_cnt;
-                    7'h1C: rd_mux = ply_rd;
-                    7'h20: rd_mux = ply_und;
-                    7'h24: rd_mux = ply_ctl_reg;
-                    7'h28: rd_mux = ply_len_reg;
-                    7'h2C: rd_mux = lvl_in_lo;
-                    7'h30: rd_mux = lvl_in_hi;
-                    7'h34: rd_mux = lvl_out_lo;
-                    7'h38: rd_mux = lvl_out_hi;
-                    7'h3C: rd_mux = win_len_reg;
-                    7'h40: rd_mux = {16'd0, peak_in};
-                    7'h44: rd_mux = {16'd0, peak_out};
-                    7'h48: rd_mux = mpo_th_reg;
-                    7'h4C: rd_mux = mpo_rel_reg;
-                    7'h50: rd_mux = mpo_cnt;
-                    7'h54: rd_mux = {16'd0, mpo_peak};
-                    7'h58: rd_mux = tone_sel_reg;
-                    7'h5C: rd_mux = tone_amp_reg;
-                    7'h60: rd_mux = ear_reg;
-                    7'h64: rd_mux = scope_ctl_reg;
-                    7'h68: rd_mux = scope_seq;
-                    7'h6C: rd_mux = {19'd0, scope_wr};
-                    7'h78: rd_mux = {20'd0, cap_idx_r};
-                    7'h7C: rd_mux = cap_rdata;
+                // 2026-10-30: 原来按 a[6:0] 索引，7'h80 被截成 7'h00，
+                // 读 0x80 拿到的是 ID_VALUE(0x504C0002)、0x84 落回 ctrl_reg。
+                // 扩到 a[7:0]，0x80/0x84 才真的读得到跳变计数器。
+                case (a[7:0])
+                    8'h00: rd_mux = ID_VALUE;
+                    8'h04: rd_mux = ctrl_reg;
+                    8'h08: rd_mux = stat0;
+                    8'h0C: rd_mux = stat1;
+                    8'h10: rd_mux = stat2;
+                    8'h14: rd_mux = smp_cnt;
+                    8'h18: rd_mux = frm_cnt;
+                    8'h1C: rd_mux = ply_rd;
+                    8'h20: rd_mux = ply_und;
+                    8'h24: rd_mux = ply_ctl_reg;
+                    8'h28: rd_mux = ply_len_reg;
+                    8'h2C: rd_mux = lvl_in_lo;
+                    8'h30: rd_mux = lvl_in_hi;
+                    8'h34: rd_mux = lvl_out_lo;
+                    8'h38: rd_mux = lvl_out_hi;
+                    8'h3C: rd_mux = win_len_reg;
+                    8'h40: rd_mux = {16'd0, peak_in};
+                    8'h44: rd_mux = {16'd0, peak_out};
+                    8'h48: rd_mux = mpo_th_reg;
+                    8'h4C: rd_mux = mpo_rel_reg;
+                    8'h50: rd_mux = mpo_cnt;
+                    8'h54: rd_mux = {16'd0, mpo_peak};
+                    8'h58: rd_mux = tone_sel_reg;
+                    8'h5C: rd_mux = tone_amp_reg;
+                    8'h60: rd_mux = ear_reg;
+                    8'h64: rd_mux = scope_ctl_reg;
+                    8'h68: rd_mux = scope_seq;
+                    8'h6C: rd_mux = {19'd0, scope_wr};
+                    8'h78: rd_mux = {19'd0, cap_idx_r};
+                    8'h7C: rd_mux = cap_rdata;
+                    8'h80: rd_mux = pop_cnt_r;
+                    8'h84: rd_mux = {16'd0, pop_max_r};
                     default: rd_mux = 32'd0;
                 endcase
             end
