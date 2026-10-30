@@ -103,6 +103,8 @@ RUN_PATH = os.environ.get("FIR_PL_RUN", "/dev/shm/fir_pl_run.txt")
 # read_scope 的注释）。A 口接在 fir_pl_regs 上，写 0x78 选下标、读 0x7C 取字。
 # 读完写 /dev/shm/fir_scope.json，网页从 /api/scope 取。
 SCOPE_PATH = os.environ.get("FIR_PL_SCOPE", "/dev/shm/fir_scope.json")
+# 抓取刷新周期（秒）。见主循环里的注释：读一遍 165 ms，别设得比 1 s 小。
+SCOPE_EVERY = float(os.environ.get("FIR_PL_SCOPE_EVERY", "3.0"))
 CAP_BASE_DEFAULT = 0x43C60000        # 仅作日志/兼容，不再用于读数
 OFF_SCOPE_CTL = 0x64
 OFF_SCOPE_WR = 0x6C
@@ -911,8 +913,11 @@ def main():
                     set_ctrl(ctrl_for(cur, src_on))
             busy = read_busy(regs)
 
-            # ---- C3 抓取缓冲：1 Hz 刷一次，页面画波形/频谱 ----
-            if time.time() - scope_tick >= 1.0:
+            # ---- C3 抓取缓冲：默认 3 s 刷一次 ----
+            # 2026-10-30 板上实测：读一遍 4096 点要 165 ms（每次 MMIO 事务在 AXI 上
+            # 有固定开销，不是设计时估的 10 ms）。1 Hz 抓的话控制环有 16% 的时间
+            # 卡在读窗口上，参数拖动会一顿一顿；3 s 一次既看不出延迟，又留足余量。
+            if time.time() - scope_tick >= SCOPE_EVERY:
                 scope_tick = time.time()
                 read_scope(regs, cap)
 

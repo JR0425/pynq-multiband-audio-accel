@@ -226,14 +226,25 @@ set_property -dict [list \
 connect_bd_net [get_bd_pins ps7_0/FCLK_CLK0]         [get_bd_pins cap_bram/clka]
 connect_bd_net [get_bd_pins fir_pl_regs_0/cap_raddr] [get_bd_pins cap_bram/addra]
 connect_bd_net [get_bd_pins cap_bram/douta]          [get_bd_pins fir_pl_regs_0/cap_rdata]
+# 端口 A 只读：ena 必须常 1（这版 blk_mem_gen 的 Enable_A 参数是禁用的，
+# 改不了成 Always_Enabled —— 之前漏接 ena，douta 永远不更新，读回来全 0，
+# 2026-10-30 首版就是这样，白编了一版）。wea 是 4 位字节写使能（Use_Byte_Write_Enable
+# 同样被禁用），接 4 位常量 0；dina 接 32 位常量 0。
 set const0 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant const0]
 set_property -dict [list CONFIG.CONST_WIDTH {32} CONFIG.CONST_VAL {0}] $const0
 connect_bd_net [get_bd_pins const0/dout]             [get_bd_pins cap_bram/dina]
 set const1 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant const1]
 set_property -dict [list CONFIG.CONST_WIDTH {1} CONFIG.CONST_VAL {0}] $const1
-connect_bd_net [get_bd_pins const1/dout]             [get_bd_pins cap_bram/wea]
+set const2 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant const2]
+set_property -dict [list CONFIG.CONST_WIDTH {4} CONFIG.CONST_VAL {0}] $const2
+connect_bd_net [get_bd_pins const2/dout]             [get_bd_pins cap_bram/wea]
+set const3 [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant const3]
+set_property -dict [list CONFIG.CONST_WIDTH {1} CONFIG.CONST_VAL {1}] $const3
+connect_bd_net [get_bd_pins const3/dout]             [get_bd_pins cap_bram/ena]
 connect_bd_net [get_bd_pins ps7_0/FCLK_CLK0]          [get_bd_pins cap_bram/clkb]
 connect_bd_net [get_bd_pins fir_pl_direct_0/cap_we]   [get_bd_pins cap_bram/web]
+# enb 漏接 = 永远不使能 = 一个采样都没写进去（首版就是这个坑：读回来全 0）
+connect_bd_net [get_bd_pins fir_pl_direct_0/cap_we]   [get_bd_pins cap_bram/enb]
 connect_bd_net [get_bd_pins fir_pl_direct_0/cap_addr] [get_bd_pins cap_bram/addrb]
 connect_bd_net [get_bd_pins fir_pl_direct_0/cap_din]  [get_bd_pins cap_bram/dinb]
 
@@ -467,6 +478,19 @@ set s_bram [llength [get_cells -hier -filter {REF_NAME =~ RAMB*}]]
 puts "### post-synth DSP48 = $s_dsp   RAMB = $s_bram"
 if {$s_dsp < 100} {
   error "post-synth DSP48 = $s_dsp only: FIR got constant-folded (coefficient .mem missing)"
+}
+
+# 2026-10-30：默认策略下最后只剩 1 个端点差 21 ps（DRC 里 p_gr → yv 那条：
+# 减法 → 绝对值钳位 → 取负 → 饱和，四级组合逻辑串在一起）。
+# 不动 RTL（加一拍会改整条链的延迟对齐，得重跑全部 tb），先用布局布线的
+# ExtraTimingOpt 把这点余量抠出来。想要复现默认结果就 IMPL_DIRECTIVE=Default。
+if {[info exists ::env(IMPL_DIRECTIVE)] && $::env(IMPL_DIRECTIVE) ne ""} {
+  set impl_dir $::env(IMPL_DIRECTIVE)
+  puts "### impl directive = $impl_dir"
+  set_property STEPS.PLACE_DESIGN.ARGS.DIRECTIVE $impl_dir [get_runs impl_1]
+  set_property STEPS.PHYS_OPT_DESIGN.IS_ENABLED true        [get_runs impl_1]
+  set_property STEPS.PHYS_OPT_DESIGN.ARGS.DIRECTIVE Explore [get_runs impl_1]
+  set_property STEPS.ROUTE_DESIGN.ARGS.DIRECTIVE $impl_dir [get_runs impl_1]
 }
 
 launch_runs impl_1 -to_step write_bitstream -jobs 4

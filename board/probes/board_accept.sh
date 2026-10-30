@@ -4,6 +4,7 @@
 #   bash board/probes/board_accept.sh            # 全跑（会从耳机放出 440 Hz 正弦）
 #   bash board/probes/board_accept.sh --quiet    # 只跑寄存器那一条，不出声
 #   bash board/probes/board_accept.sh --skip-push  # 位流已经是这版，跳过推送
+#   bash board/probes/board_accept.sh --keep-down  # 验完不停服务（想自己接手动）
 #
 # 前提：板子开机、能 SSH（192.168.2.99，xilinx/xilinx）、耳机插在板上。
 # 输出是全 ASCII 的 PASS/FAIL 表；中文只出现在本脚本的提示里。
@@ -16,11 +17,12 @@ PY="${PYTHON:-python}"
 REMOTE=/home/xilinx/dma_exp
 RUN="cd $REMOTE && XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u"
 
-QUIET=0; SKIP_PUSH=0
+QUIET=0; SKIP_PUSH=0; KEEP_DOWN=0
 for a in "$@"; do
   case "$a" in
     --quiet)     QUIET=1 ;;
     --skip-push) SKIP_PUSH=1 ;;
+    --keep-down) KEEP_DOWN=1 ;;
     *) echo "未知参数 $a"; exit 2 ;;
   esac
 done
@@ -31,7 +33,7 @@ export MSYS_NO_PATHCONV=1
 say () { printf '\n=== %s\n' "$1"; }
 ssh_ () { "$PY" board_ssh.py "$@"; }
 
-say "0/4 板子在不在"
+say "0/5 板子在不在"
 if ! ssh_ "echo ALIVE; uptime" 2>&1 | grep -q ALIVE; then
     echo "板子没响应。检查：网线、电源、IP 是不是 192.168.2.99"
     exit 1
@@ -39,33 +41,45 @@ fi
 echo "在线"
 
 if [ "$SKIP_PUSH" = "0" ]; then
-    say "1/4 推位流（bit 和 hwh 必须同一次构建）"
+    say "1/5 推位流（bit 和 hwh 必须同一次构建）"
     ssh_ --put "$ROOT/board/overlay/fir_pl.bit"  "$REMOTE/fir_pl.bit"  || exit 1
     ssh_ --put "$ROOT/board/overlay/fir_pl.hwh"  "$REMOTE/fir_pl.hwh"  || exit 1
     ssh_ --putb64 pl_regs_check.py   "$REMOTE/pl_regs_check.py"   || exit 1
     ssh_ --putb64 pl_drc_ply_probe.py "$REMOTE/pl_drc_ply_probe.py" || exit 1
     ssh_ --putb64 pl_dual_probe.py   "$REMOTE/pl_dual_probe.py"   || exit 1
+    ssh_ --putb64 cap_window_check.py "$REMOTE/cap_window_check.py" || exit 1
 else
-    say "1/4 跳过推送（--skip-push）"
+    say "1/5 跳过推送（--skip-push）"
 fi
 
-res_regs=NA; res_drc=NA; res_dual=NA
+# 2026-10-30：**必须先停常驻服务**。
+# 每个探针里都会 Overlay() 重配一次 PL，而 fir_pl_live 同时在 100 Hz 地读写 PL 寄存器。
+# 重配的那几毫秒里 AXI 从机是消失的，live 的访问拿不到响应 → AXI 挂死 → PS 卡死
+# （实测：跑到 3/5 时整块板失联，只能断电）。验收脚本自己负责停/起。
+say "1.5/5 停掉常驻服务（探针要重载位流，和 live 抢 AXI 会把板子卡死）"
+ssh_ --sudo "pkill -f fir_pl_live || true; pkill -f fir_pl_webui || true; sleep 1; echo STOPPED" 2>&1 | tail -2
+
+res_regs=NA; res_drc=NA; res_dual=NA; res_cap=NA
 LOG="$ROOT/build/tmp/probes"; mkdir -p "$LOG"
 
-say "2/4 寄存器窗口（ID / 出厂值 / 四段写读 / 斜坡）"
+say "2/5 寄存器窗口（ID / 出厂值 / 四段写读 / 斜坡）"
 ssh_ --sudo "$RUN pl_regs_check.py" 2>&1 | tee "$LOG/acc_regs.log" | tail -20
 grep -q "REGS PASS" "$LOG/acc_regs.log" && res_regs=PASS || res_regs=FAIL
 
 if [ "$QUIET" = "0" ]; then
-    say "3/4 压缩器随参数动（会从耳机放 440 Hz，约 3 秒）"
+    say "3/5 压缩器随参数动（会从耳机放测试音，约 3 秒）"
     ssh_ --sudo "$RUN pl_drc_ply_probe.py" 2>&1 | tee "$LOG/acc_drc.log" | tail -24
     grep -q "DRC PLY PROBE PASS" "$LOG/acc_drc.log" && res_drc=PASS || res_drc=FAIL
 
-    say "4/4 双耳两套处方（同样会出声）"
+    say "4/5 双耳两套处方（同样会出声）"
     ssh_ --sudo "$RUN pl_dual_probe.py" 2>&1 | tee "$LOG/acc_dual.log" | tail -24
     grep -q "DUAL PROBE PASS" "$LOG/acc_dual.log" && res_dual=PASS || res_dual=FAIL
+
+    say "5/5 抓取窗口 0x78/0x7C（会出声，约 3 秒）"
+    ssh_ --sudo "$RUN cap_window_check.py" 2>&1 | tee "$LOG/acc_cap.log" | tail -18
+    grep -q "CAP WINDOW PASS" "$LOG/acc_cap.log" && res_cap=PASS || res_cap=FAIL
 else
-    say "3/4、4/4 跳过（--quiet：这两条要出声）"
+    say "3/5、4/5、5/5 跳过（--quiet：这几条要出声）"
 fi
 
 say "汇总"
@@ -76,7 +90,13 @@ echo
 echo "  日志：$LOG/acc_*.log"
 echo "  听音还剩三件事（要人）：+30 dB 说话听得清 / 拖增益不咔 / 左右处方不同能听出差别"
 
+if [ "$KEEP_DOWN" = "0" ]; then
+    say "恢复常驻服务（live + 网页）"
+    ssh_ --sudo "cd $REMOTE && sh pl_webui_up.sh" 2>&1 | tail -3
+fi
+
 [ "$res_regs" = "FAIL" ] && exit 1
 [ "$res_drc"  = "FAIL" ] && exit 1
 [ "$res_dual" = "FAIL" ] && exit 1
+[ "$res_cap"  = "FAIL" ] && exit 1
 exit 0

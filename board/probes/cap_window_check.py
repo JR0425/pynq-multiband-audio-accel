@@ -10,7 +10,7 @@
 
 本脚本验证四件事：
 
-  [1] 窗口能读：4096 个字读一遍，不是全 0 / 不是全相同（同一秒内音频是变的）
+  [1] 窗口能读：4096 个字读一遍，不是全 0、确实有幅度（测试音是方波，只有 ±两个值）
   [2] 快照稳定：同一秒内连读两次，指针不动时数值应当一致
   [3] 位置对应：tone 打开（1500 Hz）时，出核那一路的零穿越频率要对得上
   [4] 不动音频：读窗口期间 STAT0 的 ovf/und 不涨
@@ -112,7 +112,8 @@ def main():
     uniq = len(set(outs))
     say("   耗时 %.1f ms  ptr=%d  out 不同取值 %d 个  out 峰值 %d  in 峰值 %d"
         % (dt, ptr, uniq, max(abs(v) for v in outs), max(abs(v) for v in ins)))
-    ok = uniq > 8 and max(abs(v) for v in outs) > 300
+    # 测试音是方波，只有 ±两个取值 —— 不能用"不同取值个数"当判据
+    ok = uniq >= 2 and max(abs(v) for v in outs) > 300
     bad += 0 if ok else 1
     say("   [1] 窗口有数据（不是全 0 / 不是定值）  %s" % ("OK" if ok else "FAIL"))
 
