@@ -48,11 +48,13 @@ def _write_json(path, obj):
 class FakeBoard(threading.Thread):
     """每 200 ms 刷一次 status，数值像真人对着话筒说话。"""
 
-    def __init__(self, status_path, tune_path, run_path, t0=None):
+    def __init__(self, status_path, tune_path, run_path, scope_path=None, t0=None):
         super().__init__(daemon=True)
         self.status_path = status_path
         self.tune_path = tune_path
         self.run_path = run_path
+        self.scope_path = scope_path
+        self._scope_n = 0
         self.t0 = t0 or time.time()
         self.stop_flag = threading.Event()
         self.err = None
@@ -66,6 +68,33 @@ class FakeBoard(threading.Thread):
                 self.err = "%s: %s" % (type(ex).__name__, ex)
             self.stop_flag.wait(0.2)
 
+    def _write_scope(self, run, gain_db):
+        """假抓取缓冲：4096 点 @ 48.8 kHz，三根正弦 + 一点噪声。
+
+        为什么要喂这个：页面的波形/频谱是独立于电平条的另一套绘制代码，
+        没有数据时那两块永远是占位文字，改坏了也看不出来。
+        真板上对应 fir_pl_live.read_scope() 写出来的同一份 json。
+        """
+        if not self.scope_path:
+            return
+        fs = 48828.0
+        n = 4096
+        g = 10 ** ((sum(gain_db) / 4.0) / 20.0)
+        ins, outs = [], []
+        for i in range(n):
+            x = 0.0
+            if run:
+                for f, amp in ((250.0, 0.10), (750.0, 0.08), (1500.0, 0.06)):
+                    x += amp * math.sin(2 * math.pi * f * i / fs)
+                x += 0.004 * (random.random() - 0.5)
+            v = int(max(-1.0, min(1.0, x)) * 32767)
+            ins.append(v)
+            outs.append(int(max(-32768, min(32767, v * g))))
+        _write_json(self.scope_path, {
+            "ok": True, "t": time.time(), "fs": fs, "n": n,
+            "in": ins, "out": outs,
+        })
+
     def _run_on(self):
         try:
             with open(self.run_path) as f:
@@ -78,7 +107,7 @@ class FakeBoard(threading.Thread):
             with open(self.tune_path) as f:
                 return json.load(f)
         except Exception:
-            return {"gain_db": [30.0] * 4, "bypass": False}
+            return {"gain_db": [6.0] * 4, "bypass": False}
 
     def _tick(self):
         now = time.time()
@@ -130,6 +159,10 @@ class FakeBoard(threading.Thread):
             "uptime_s": round(t, 2), "error": None,
         })
 
+        self._scope_n += 1
+        if self._scope_n % 5 == 0:                 # 200 ms × 5 = 1 Hz，和板上一致
+            self._write_scope(run, gains)
+
 
 def start(port=8090, keep=False):
     """起后端 + 假数据，返回 (base_url, stop_fn, tmpdir)。"""
@@ -137,24 +170,25 @@ def start(port=8090, keep=False):
     tune = os.path.join(tmpdir, "fir_tune.json")
     status = os.path.join(tmpdir, "fir_status.json")
     run = os.path.join(tmpdir, "fir_pl_run.txt")
+    scope = os.path.join(tmpdir, "fir_scope.json")
     bit = os.path.join(tmpdir, "fir_pl.bit")
 
     with open(bit, "wb") as f:                    # 假的位流文件，只为 health 报告 exists
         f.write(b"\x00" * 4096)
     with open(run, "w") as f:
         f.write("1")                              # 默认通路开着，不然页面一片空
-    _write_json(tune, {"gain_db": [30.0] * 4, "thr_db": [-20.0] * 4,
+    _write_json(tune, {"gain_db": [6.0] * 4, "thr_db": [-20.0] * 4,
                        "ratio": [0.7] * 4, "attack_ms": [5.0] * 4,
                        "release_ms": [100.0] * 4, "bypass": False})
 
     env = dict(os.environ,
                FIR_TUNE=tune, FIR_STATUS=status,
-               FIR_PL_RUN=run, FIR_PL_BIT=bit,
+               FIR_PL_RUN=run, FIR_PL_BIT=bit, FIR_PL_SCOPE=scope,
                PYTHONIOENCODING="utf-8")
     proc = subprocess.Popen([sys.executable, WEBUI, "--port", str(port)],
                             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-    fake = FakeBoard(status, tune, run)
+    fake = FakeBoard(status, tune, run, scope)
     fake.start()
     time.sleep(1.2)                               # 等 http 起来
 
