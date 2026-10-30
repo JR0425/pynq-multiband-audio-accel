@@ -69,7 +69,7 @@ class FakeBoard(threading.Thread):
             self.stop_flag.wait(0.2)
 
     def _write_scope(self, run, gain_db):
-        """假抓取缓冲：4096 点 @ 48.8 kHz，三根正弦 + 一点噪声。
+        """假抓取缓冲：1024 点 @ 48.8 kHz，三根正弦 + 一点噪声。
 
         为什么要喂这个：页面的波形/频谱是独立于电平条的另一套绘制代码，
         没有数据时那两块永远是占位文字，改坏了也看不出来。
@@ -78,7 +78,7 @@ class FakeBoard(threading.Thread):
         if not self.scope_path:
             return
         fs = 48828.0
-        n = 4096
+        n = 1024          # 跟真板对齐：2026-10-31 起 read_scope 一窗读 1024 点
         g = 10 ** ((sum(gain_db) / 4.0) / 20.0)
         ins, outs = [], []
         for i in range(n):

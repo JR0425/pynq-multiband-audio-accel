@@ -90,7 +90,12 @@ CTRL_CLR   = 1 << 8
 
 GAIN_UNITY = 256               # Q7.8，1.0 = 256
 Q22_ONE    = 1 << 22           # Q2.22 的 1.0
-FS         = 48000
+# PL 真实帧率：i2s_duplex 每 2048 拍（100 MHz）出一个立体声帧 ⇒ 48828.125 Hz。
+# 这里原来写 48000，于是 PS 每秒只往环里填 48000 字、PL 每秒取走 48828 字。
+# 环深 16384 字，读指针每秒追上写指针 828 字 ⇒ 起跑后约 4.9 s 第一次追上，
+# 之后每 19.8 s 一次；每次追上都等于把播放位置硬跳一整个环，听感就是"咔"一声。
+# （这也解释了为什么 48 kHz 的 WAV 播出来偏高 1.7%。）
+FS         = 100e6 / 2048.0
 
 # 网页第三档用它开关通路：内容 "1" / "0"。PL 直连没有"启动音频流"的概念，
 # 只有 run 位；写文件比让网页进程去碰 MMIO 安全（overlay 只能在一个进程里）。
@@ -121,6 +126,9 @@ OFF_PLY_LEN = 0x28
 CTRL_SRC = 1 << 5
 PLAY_RING = 16384
 PLAY_CHUNK = 1024
+# 写头领先读头几块。一块 = 20.97 ms，5 块 ≈ 105 ms：上位机或网络卡顿不超过
+# 105 ms 就不会写到还没播的区域，也就不会出「啪」。
+PLAY_LEAD_CHUNKS = 5
 
 BIT_DEFAULT = "/home/xilinx/dma_exp/fir_pl.bit"
 CTRL_BASE_DEFAULT = 0x43C00000  # gpio_ctrl，ctrl 位仍走这里
@@ -244,7 +252,7 @@ def write_run(on):
 
 # ---------------------------------------------------------------- 抓取缓冲
 def read_scope(regs, cap, path=None):
-    """冻指针 → 按下标步进 4 读 1024 点 → 解锁 → 写 scope json。返回样本数，0 = 失败。
+    """冻指针 → 从写指针 +1 起连读 1024 点 → 解锁 → 写 scope json。返回样本数，0 = 失败。
 
     必须先冻再读：读 1024 个字要几毫秒，不冻的话新样本会盖掉环形缓冲的一截，
     画出来是断的。冻结只停抓取，音频通路照跑。
@@ -253,38 +261,33 @@ def read_scope(regs, cap, path=None):
     板上实测那片 AXI BRAM 的读通路是断的 —— 写能进去（波形确实抓得到），
     读回来恒等于 0x8，波表那片也一样，而同一块 AXI 上的寄存器读得好好的。
     现在 BRAM 的 A 口接在 fir_pl_regs 上：
-        写 0x78 = 下标  →  读 0x7C = 该字
+        写 0x78 = 字节地址  →  读 0x7C = 该字
 
-    **步进 4（2026-10-30 深夜）**：这块 BRAM 的 A 口被当成字节地址解释，
-    读下标 i 拿回的是第 i>>2 个字。写侧是字地址（回放 1 倍速已实测），
-    所以只有读侧折了 4 倍：抓 4096 个下标每个字重复 4 次，时间轴和图上的
-    频率都只有真值的 1/4。板上三组实测：空闲话筒连续 4 个下标完全相同；
-    250 Hz 的 WAV 按 4096 点读 DFT 峰在 60 Hz（真值 62.5 = 250/4）；
-    同一次数据步进 4 读 1024 点，DFT 峰在 223 Hz（≈250）。
-    所以下标乘 4 读，拿到的才是连续样点。窗口是 1024 点 = 21 ms（不是 84 ms）。
+    **字节地址（2026-10-31）**：cap_bram 这块 IP 的 Enable_32bit_Address 是
+    disabled 参数，关不掉（真去关，写侧会整个哑掉 —— 4096 个下标读回来全 0）。
+    所以两头都得按字节地址走：PL 写 {cap_wr, 2'b00}，PS 读 i*4。
+    深度 2048 字 = 8192 字节。
 
-    环形缓冲 2048 字深，读口只够到第 0~1023 字，所以窗口取这一段。
-    但回绕点会落在这段中间：每窗口恰好有一处大跳变，位置随写指针漂。
-    板上量了 6 次，缝的下标每次都精确等于 ((cap_wr>>2) & 0x3FF) + 1，
-    所以按这个位置转一下，接缝就落到窗口两端。配合页面上的 Hann 窗
-    （两端衰减到 0）不会往频谱里扔一条宽带。
+    **从写指针 +1 开始读、让 BRAM 自己回绕**（同一天改）：缓冲是环形，跨回绕点
+    连续读出来的就是时间上连续的 1024 个样点，最老的在最前。这样不用再按指针
+    转窗口，也就不存在"接缝落在窗口中间"的问题。
     """
     path = path or SCOPE_PATH
     import array
     N = 1024
+    DEPTH = 2048
     regs.wr(OFF_SCOPE_CTL, 1)
     time.sleep(0.002)
-    ptr = regs.rd(OFF_SCOPE_WR)
+    ptr = regs.rd(OFF_SCOPE_WR) & (DEPTH - 1)
+    start = (ptr + 1) & (DEPTH - 1)
     words = [0] * N
     for i in range(N):
-        regs.wr(OFF_CAP_IDX, (i * 4) & 0xFFF)
+        regs.wr(OFF_CAP_IDX, ((start + i) & (DEPTH - 1)) * 4)
         words[i] = regs.rd(OFF_CAP_DATA)
     regs.wr(OFF_SCOPE_CTL, 0)
     v = array.array("I", words)
     ins = [((x & 0xFFFF) ^ 0x8000) - 0x8000 for x in v]
     outs = [(((x >> 16) & 0xFFFF) ^ 0x8000) - 0x8000 for x in v]
-    k = (((ptr >> 2) & 0x3FF) + 1) & 0x3FF
-    ins, outs = ins[k:] + ins[:k], outs[k:] + outs[:k]
     obj = {"ok": True, "t": time.time(), "fs": 48828.0, "n": len(ins),
            "in": ins, "out": outs}
     try:
@@ -349,14 +352,18 @@ class Player(threading.Thread):
         self.err = None
 
     def run(self):
-        # 先到点再写：写头永远走在读头前面（落后 4 块 = 85 ms 起跑），不会改到正在播的字
+        # 先到点再写：写头永远走在读头前面（落后 PLAY_LEAD_CHUNKS 块 = ~105 ms 起跑），
+        # 不会改到正在播的字
         try:
             pos = PLAY_RING
-            nxt = time.monotonic() + (PLAY_RING - 4 * PLAY_CHUNK) / float(FS)
+            nxt = time.monotonic() + (PLAY_RING - PLAY_LEAD_CHUNKS * PLAY_CHUNK) / float(FS)
             while not self.stop_ev.is_set():
                 now = time.monotonic()
                 if now < nxt:
                     time.sleep(nxt - now)
+                late = time.monotonic() - nxt
+                if late > 0.020:
+                    print("PLAYLATE %.3f pos=%d" % (late, pos), flush=True)
                 self.bram.write((pos % PLAY_RING) * 4, _slice_bytes(self.w, pos, PLAY_CHUNK))
                 pos += PLAY_CHUNK
                 nxt += PLAY_CHUNK / float(FS)

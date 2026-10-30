@@ -777,27 +777,47 @@ function drawWave(sc){
   const {g,w,h} = c;
   const padL = 34, padR = 6, padT = 4, padB = 12;
   const iw = w - padL - padR, ih = h - padT - padB;
-  const Y = v => padT + (1 - (v + 32768) / 65536) * ih;
-  g.font = "10px Consolas,monospace"; g.textBaseline = "middle"; g.textAlign = "right";
-  [32767, 0, -32767].forEach(v=>{
-    const y = Math.round(Y(v)) + .5;
-    g.strokeStyle = v===0 ? "#333b42" : "#1a2024";
-    g.beginPath(); g.moveTo(padL, y); g.lineTo(padL+iw, y); g.stroke();
-    g.fillStyle = v===0 ? "#8a939b" : "#565e66";
-    g.fillText(v===0 ? "0" : (v>0 ? "满" : "−满"), padL-4, y);
-  });
   const n = sc.in.length;
+  /* 纵轴自动量程（2026-10-30）。原来写死 ±32768，麦克风/小音量时整条曲线
+   * 贴着中线，看着像"波形不显示"。取窗口内 in/out 的最大绝对值，向上取到
+   * 2 的幂；地板 256（-42 dBFS），避免静音时把噪声放大成满屏毛刺。 */
+  let peak = 0;
+  for (let i = 0; i < n; i++){
+    const a = Math.abs(sc.in[i]), b = Math.abs(sc.out[i]);
+    if (a > peak) peak = a;
+    if (b > peak) peak = b;
+  }
+  let span = 256;
+  while (span < peak && span < 32768) span *= 2;
+  const Y = v => padT + (1 - (v + span) / (2 * span)) * ih;
+  const fullScale = span >= 32768;
+  g.font = "10px Consolas,monospace"; g.textBaseline = "middle"; g.textAlign = "right";
+  [[span, fullScale ? "满" : "+" + span],
+   [0, "0"],
+   [-span, fullScale ? "−满" : "−" + span]].forEach(([v, txt])=>{
+    const y = Math.round(Y(v)) + .5;
+    g.strokeStyle = v === 0 ? "#333b42" : "#1a2024";
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(padL+iw, y); g.stroke();
+    g.fillStyle = v === 0 ? "#8a939b" : "#565e66";
+    g.fillText(txt, padL-4, y);
+  });
   const draw = (arr, color, lw) => {
     g.beginPath();
     for (let px = 0; px < iw; px++){
-      const i0 = Math.floor(px * n / iw), i1 = Math.floor((px+1) * n / iw);
-      let lo = 32767, hi = -32768;
-      if (i1 <= i0){ lo = hi = arr[Math.min(n-1, i0)]; }
+      const i0 = Math.floor(px * n / iw);
+      const i1 = Math.max(i0 + 1, Math.floor((px + 1) * n / iw));
+      let lo = span, hi = -span;
       for (let i = i0; i < i1 && i < n; i++){
         const v = arr[i]; if (v < lo) lo = v; if (v > hi) hi = v;
       }
+      if (hi < lo){ lo = hi = arr[Math.min(n - 1, i0)]; }
+      /* 必须连成折线。原来每列只画 moveTo(x,hi)→lineTo(x,lo)：
+       * 画布比样点多时（1138 列 vs 1024 点）每列只装得下一个样点，
+       * hi==lo，线段长度为 0，canvas 默认 lineCap=butt ⇒ 一个像素都不画。
+       * 这就是"波形不显示图像"的真因，和信号大小无关。 */
       const x = Math.round(padL + px) + .5;
-      g.moveTo(x, Y(hi)); g.lineTo(x, Y(lo));
+      if (px === 0) g.moveTo(x, Y(hi)); else g.lineTo(x, Y(hi));
+      if (lo !== hi) g.lineTo(x, Y(lo));
     }
     g.strokeStyle = color; g.lineWidth = lw; g.stroke();
   };
@@ -811,7 +831,8 @@ function drawWave(sc){
   });
   let pk = 0;
   for (let i = 0; i < n; i++){ const a = Math.abs(sc.out[i]); if (a > pk) pk = a; }
-  $("#wave-note").textContent = "出核峰值 " + (20*Math.log10(Math.max(1,pk)/32768)).toFixed(1) + " dBFS";
+  $("#wave-note").textContent = "出核峰值 " + (20*Math.log10(Math.max(1,pk)/32768)).toFixed(1)
+    + " dBFS · 纵轴 ±" + span;
 }
 
 /* 迭代基 2 FFT（原地） */

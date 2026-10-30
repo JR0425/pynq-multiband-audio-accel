@@ -28,6 +28,7 @@ import numpy as np
 BASE = 0x43C40000
 OFF_PEAK_IN = 0x40
 OFF_PEAK_OUT = 0x44
+OFF_SCOPE_WR = 0x6C
 OFF_CAP_IDX = 0x78
 OFF_CAP_DATA = 0x7C
 N = 1024
@@ -47,6 +48,11 @@ def read_raw(mv):
         mv[OFF_CAP_IDX >> 2] = (i * 4) & 0xFFF
         w[i] = mv[OFF_CAP_DATA >> 2]
     return w
+
+
+def wp_now(mv):
+    """抓取写指针（0x6C）。两次读之间它没动 = 抓取被 live 冻住了。"""
+    return mv[OFF_SCOPE_WR >> 2]
 
 
 def longest_stable(a, b):
@@ -100,9 +106,13 @@ def main():
 
     print("录 %ss（%s），判据 Δ⁸ > %.0f" % (a.secs, a.tag, a.cond), flush=True)
     while time.time() - t0 < a.secs:
+        p1 = wp_now(mv)
         w1 = read_raw(mv)
         w2 = read_raw(mv)
+        p2 = wp_now(mv)
         n_read += 1
+        if p1 == p2:                     # 抓取被 live 冻住了，两次读必然全同 —— 丢掉
+            continue
         s, ln = longest_stable(w1, w2)
         if ln < a.minlen:
             continue
