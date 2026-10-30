@@ -10,7 +10,7 @@
 
 本脚本验证四件事：
 
-  [1] 窗口能读：4096 个字读一遍，不是全 0、确实有幅度（测试音是方波，只有 ±两个值）
+  [1] 窗口能读：1024 点读一遍，不是全 0、确实有幅度（测试音是方波，只有 ±两个值）
   [2] 快照稳定：同一秒内连读两次，指针不动时数值应当一致
   [3] 位置对应：tone 打开（1500 Hz）时，出核那一路的零穿越频率要对得上
   [4] 不动音频：读窗口期间 STAT0 的 ovf/und 不涨
@@ -47,20 +47,20 @@ CTRL_FLUSH = 1 << 2
 CTRL_TONE = 1 << 3
 
 FS = 48828.0
-N = 4096
+N = 1024          # 读口对字节地址解释，下标要 ×4；1024 点 = 21 ms
 
 
 def read_window(regs):
-    """冻 → 逐字读 → 解冻。返回 (in[], out[], ptr)。"""
+    """冻 → 按下标步进 4 读 1024 点 → 解冻。返回 (in[], out[], ptr)。"""
     regs.write(OFF_SCOPE_CTL, 1)
     time.sleep(0.002)
-    ptr = regs.read(OFF_SCOPE_WR) & 0xFFF
+    ptr = regs.read(OFF_SCOPE_WR)
     words = []
     for i in range(N):
-        regs.write(OFF_CAP_IDX, i)
+        regs.write(OFF_CAP_IDX, (i * 4) & 0xFFF)
         words.append(regs.read(OFF_CAP_DATA))
     regs.write(OFF_SCOPE_CTL, 0)
-    rot = ptr % N
+    rot = (((ptr >> 2) & 0x3FF) + 1) & 0x3FF
     words = words[rot:] + words[:rot]
     ins = [((x & 0xFFFF) ^ 0x8000) - 0x8000 for x in words]
     outs = [(((x >> 16) & 0xFFFF) ^ 0x8000) - 0x8000 for x in words]
@@ -105,7 +105,7 @@ def main():
     ctrl.write(OFF_CTRL, CTRL_RUN | CTRL_DRC | CTRL_TONE)
     time.sleep(0.6)
 
-    say("== 2. 读一遍窗口（4096 点）")
+    say("== 2. 读一遍窗口（1024 点 = 21 ms）")
     t0 = time.time()
     ins, outs, ptr = read_window(regs)
     dt = (time.time() - t0) * 1000.0

@@ -205,7 +205,7 @@ input[type=range]:disabled{opacity:.4}
       <canvas id="wave"></canvas>
     </section>
     <section class="sect" id="sec-spec">
-      <h3>频谱<span class="sub">出核 · 4096 点 FFT</span><span class="end" id="spec-note">—</span></h3>
+      <h3>频谱<span class="sub">出核 · 1024 点 FFT</span><span class="end" id="spec-note">—</span></h3>
       <canvas id="spec"></canvas>
     </section>
   </div>
@@ -881,7 +881,15 @@ function drawSpec(sc){
     if (px === 0) g.moveTo(x, y); else g.lineTo(x, y);
   }
   g.strokeStyle = "#8fbf6a"; g.lineWidth = 1.4; g.stroke();
-  $("#spec-note").textContent = "峰 " + (bestK*binHz).toFixed(0) + " Hz " + best.toFixed(1) + " dBFS";
+  // 1024 点的 bin 宽 47.7 Hz，直接报 bestK*binHz 会把 250 Hz 读成 238 或 286。
+  // 用峰和左右两点的 dB 做三点抛物线插值，峰位能准到几 Hz。
+  let df = 0;
+  if (bestK > 0 && bestK < N/2 - 1){
+    const a = dbOf(bestK-1), b = dbOf(bestK), c = dbOf(bestK+1);
+    const den = a - 2*b + c;
+    if (den < 0) df = 0.5*(a - c)/den;
+  }
+  $("#spec-note").textContent = "峰 " + ((bestK + df)*binHz).toFixed(0) + " Hz " + best.toFixed(1) + " dBFS";
 }
 
 async function pollScope(){

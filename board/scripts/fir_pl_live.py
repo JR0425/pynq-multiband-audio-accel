@@ -104,7 +104,7 @@ RUN_PATH = os.environ.get("FIR_PL_RUN", "/dev/shm/fir_pl_run.txt")
 # 读完写 /dev/shm/fir_scope.json，网页从 /api/scope 取。
 SCOPE_PATH = os.environ.get("FIR_PL_SCOPE", "/dev/shm/fir_scope.json")
 # 抓取刷新周期（秒）。见主循环里的注释：读一遍 165 ms，别设得比 1 s 小。
-SCOPE_EVERY = float(os.environ.get("FIR_PL_SCOPE_EVERY", "3.0"))
+SCOPE_EVERY = float(os.environ.get("FIR_PL_SCOPE_EVERY", "0.5"))
 CAP_BASE_DEFAULT = 0x43C60000        # 仅作日志/兼容，不再用于读数
 OFF_SCOPE_CTL = 0x64
 OFF_SCOPE_WR = 0x6C
@@ -244,9 +244,9 @@ def write_run(on):
 
 # ---------------------------------------------------------------- 抓取缓冲
 def read_scope(regs, cap, path=None):
-    """冻指针 → 逐字读 4096 个 → 解锁 → 写 scope json。返回样本数，0 = 失败。
+    """冻指针 → 按下标步进 4 读 1024 点 → 解锁 → 写 scope json。返回样本数，0 = 失败。
 
-    必须先冻再读：读 4096 个字要几毫秒，不冻的话新样本会盖掉环形缓冲的一截，
+    必须先冻再读：读 1024 个字要几毫秒，不冻的话新样本会盖掉环形缓冲的一截，
     画出来是断的。冻结只停抓取，音频通路照跑。
 
     **读法（2026-10-30 夜改）**：不再直接从 0x43C60000 读。
@@ -254,23 +254,37 @@ def read_scope(regs, cap, path=None):
     读回来恒等于 0x8，波表那片也一样，而同一块 AXI 上的寄存器读得好好的。
     现在 BRAM 的 A 口接在 fir_pl_regs 上：
         写 0x78 = 下标  →  读 0x7C = 该字
-    冻结之后环形缓冲不再变，4096 点分 8192 次 MMIO 大约 10 ms，够 1 Hz 刷新。
+
+    **步进 4（2026-10-30 深夜）**：这块 BRAM 的 A 口被当成字节地址解释，
+    读下标 i 拿回的是第 i>>2 个字。写侧是字地址（回放 1 倍速已实测），
+    所以只有读侧折了 4 倍：抓 4096 个下标每个字重复 4 次，时间轴和图上的
+    频率都只有真值的 1/4。板上三组实测：空闲话筒连续 4 个下标完全相同；
+    250 Hz 的 WAV 按 4096 点读 DFT 峰在 60 Hz（真值 62.5 = 250/4）；
+    同一次数据步进 4 读 1024 点，DFT 峰在 223 Hz（≈250）。
+    所以下标乘 4 读，拿到的才是连续样点。窗口是 1024 点 = 21 ms（不是 84 ms）。
+
+    环形缓冲 2048 字深，读口只够到第 0~1023 字，所以窗口取这一段。
+    但回绕点会落在这段中间：每窗口恰好有一处大跳变，位置随写指针漂。
+    板上量了 6 次，缝的下标每次都精确等于 ((cap_wr>>2) & 0x3FF) + 1，
+    所以按这个位置转一下，接缝就落到窗口两端。配合页面上的 Hann 窗
+    （两端衰减到 0）不会往频谱里扔一条宽带。
     """
     path = path or SCOPE_PATH
     import array
+    N = 1024
     regs.wr(OFF_SCOPE_CTL, 1)
     time.sleep(0.002)
-    ptr = regs.rd(OFF_SCOPE_WR) & 0xFFF
-    words = [0] * 4096
-    for i in range(4096):
-        regs.wr(OFF_CAP_IDX, i)
+    ptr = regs.rd(OFF_SCOPE_WR)
+    words = [0] * N
+    for i in range(N):
+        regs.wr(OFF_CAP_IDX, (i * 4) & 0xFFF)
         words[i] = regs.rd(OFF_CAP_DATA)
     regs.wr(OFF_SCOPE_CTL, 0)
     v = array.array("I", words)
-    rot = ptr % 4096                # cap_wr 是下一个要写的地址，从它开始 = 最旧在前
-    v = v[rot:] + v[:rot]
     ins = [((x & 0xFFFF) ^ 0x8000) - 0x8000 for x in v]
     outs = [(((x >> 16) & 0xFFFF) ^ 0x8000) - 0x8000 for x in v]
+    k = (((ptr >> 2) & 0x3FF) + 1) & 0x3FF
+    ins, outs = ins[k:] + ins[:k], outs[k:] + outs[:k]
     obj = {"ok": True, "t": time.time(), "fs": 48828.0, "n": len(ins),
            "in": ins, "out": outs}
     try:
@@ -913,10 +927,10 @@ def main():
                     set_ctrl(ctrl_for(cur, src_on))
             busy = read_busy(regs)
 
-            # ---- C3 抓取缓冲：默认 3 s 刷一次 ----
+            # ---- C3 抓取缓冲：默认 0.5 s 刷一次 ----
             # 2026-10-30 板上实测：读一遍 4096 点要 165 ms（每次 MMIO 事务在 AXI 上
-            # 有固定开销，不是设计时估的 10 ms）。1 Hz 抓的话控制环有 16% 的时间
-            # 卡在读窗口上，参数拖动会一顿一顿；3 s 一次既看不出延迟，又留足余量。
+            # 有固定开销，不是设计时估的 10 ms）。折成 1024 点约 41 ms，按 0.5 s
+            # 刷一次占控制环约 8%，拖参数手不顿；页面本身 1 s 轮询一次。
             if time.time() - scope_tick >= SCOPE_EVERY:
                 scope_tick = time.time()
                 read_scope(regs, cap)

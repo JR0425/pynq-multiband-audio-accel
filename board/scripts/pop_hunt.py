@@ -6,14 +6,14 @@
 为什么要这样抓：
   · peak_in/peak_out 是每 768 采样（16 ms）一个窗的 |max|，10 ms 读一次正好不漏窗；
   · 判据用「比最近 5 秒的典型值高一大截」，不看绝对值 —— 底噪本来就有几百；
-  · 尖峰出现的当下立刻冻抓取缓冲，那 84 ms 里就含着刚响的那一下；
+  · 尖峰出现的当下立刻冻抓取缓冲，那 21 ms 里就含着刚响的那一下；
   · 进侧（peak_in）是共用的单声道输入，出侧（peak_out）只有左耳 ——
     如果两边都不动而人听到了，说明响在右耳的数字链路之后或模拟侧。
 
 输出：
   控制台每秒一行；事件行以 POP 开头；
   /home/xilinx/dma_exp/pop_hunt.csv  每行 t,pin,pout,ovf,und,oovf,mpocnt,mpopeak
-  /home/xilinx/dma_exp/pop_<t>.json  出事的那个 84 ms 窗口（in / out 各 4096 点）
+  /home/xilinx/dma_exp/pop_<t>.json  出事的那个 21 ms 窗口（in / out 各 1024 点）
 """
 
 import argparse
@@ -51,7 +51,7 @@ def main():
                     help="相对最近典型值的倍数")
     ap.add_argument("--period", type=float, default=0.010)
     ap.add_argument("--cap", type=int, default=0,
-                    help="1 = 出事时把 84 ms 抓取窗口存下来（走 0x78/0x7C 窗口读）。"
+                    help="1 = 出事时把 21 ms 抓取窗口存下来（走 0x78/0x7C 窗口读）。"
                          "需要 2026-10-30 夜之后的位流（抓取缓冲已接到 fir_pl_regs），"
                          "老位流上 0x78/0x7C 是空的，读出来全 0 —— 默认关。")
     a = ap.parse_args()
@@ -122,23 +122,28 @@ def main():
 
 
 def grab_window(regs, cap):
-    """冻 → 逐字读 4096 个 → 解冻。
+    """冻 → 按下标步进 4 读 1024 点（21 ms）→ 解冻。
 
     2026-10-30 夜：不再从 0x43C60000 整块读。那片 AXI BRAM 的读通路断的
     （读回恒 0x8），现在 BRAM 的 A 口接在 fir_pl_regs 上：写 0x78 选下标、
-    读 0x7C 取字。冻结期间环形缓冲不变，4096 个点大约读 10 ms。
+    读 0x7C 取字。
+
+    **步进 4**：这个读口把下标当字节地址，读 i 拿回第 i>>2 个字。按 1 读
+    会拿到每个样点重复 4 次的假波形（频率、时间轴都只剩 1/4）。写侧是字
+    地址，所以只有读侧要折。环形回绕点在读出来这一段的中间，位置实测
+    恒等于 ((cap_wr>>2)&0x3FF)+1，按它转一下就是连续的一段。
     """
     import array
     regs.write(OFF_SCOPE_CTL, 1)
     time.sleep(0.002)
-    ptr = regs.read(OFF_SCOPE_WR) & 0xFFF
+    ptr = regs.read(OFF_SCOPE_WR)
     words = []
-    for i in range(4096):
-        regs.write(OFF_CAP_IDX, i)
+    for i in range(1024):
+        regs.write(OFF_CAP_IDX, (i * 4) & 0xFFF)
         words.append(regs.read(OFF_CAP_DATA))
     regs.write(OFF_SCOPE_CTL, 0)
     v = array.array("I", words)
-    rot = ptr % 4096
+    rot = (((ptr >> 2) & 0x3FF) + 1) & 0x3FF
     v = v[rot:] + v[:rot]
     return {
         "fs": 48828.0,
