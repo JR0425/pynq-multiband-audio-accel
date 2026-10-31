@@ -89,7 +89,6 @@ build/*.txt
 !build/requirements.txt
 build/*_stdout.log
 build/run_*.bat
-build/run_pl_build.sh
 build/run_cap_build2.sh
 build/dbg_*.py
 build/read_test.tcl
@@ -103,6 +102,15 @@ build/tmp/probes/
 .DS_Store
 Thumbs.db
 pynq_venv/
+
+# 编辑器 / 补丁残留
+*.bak
+*.orig
+*.rej
+*.swp
+*~
+.idea/
+.vscode/
 
 # xsim 工作目录（每次跑仿真都会重建）
 sim/rtl_sim/xsim_*/
