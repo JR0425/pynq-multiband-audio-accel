@@ -394,6 +394,8 @@ def apply_tune(regs, tune, last=None):
     g = tune.get("gain_db") or [30.0] * 4   # 演示默认 +30 dB（2026-10-28 听感拍板）
     # thr/ratio/atk/rel 的默认值必须等于寄存器出厂值（419456 / 2936064 / 17408 / 896），
     # 否则后端一启动就把位流上电的那套 v25 参数顶掉。2026-10-28 批 2 定案。
+    # 例外：ATK 默认 5 ms 在真实帧率 48.828 kHz 下算出 17152（出厂 17408 是按 48 kHz 算的），
+    # 差 1 个步进 = 4.93 ms vs 5.00 ms，启动时会写这一格，不影响听感。
     thr = tune.get("thr_db") or [-20.0] * 4
     rat = tune.get("ratio") or [0.7] * 4
     atk = tune.get("attack_ms") or [5.0] * 4
@@ -668,7 +670,9 @@ def selftest():
         ("dbfs_to_thr(-20)", dbfs_to_thr(-20), 419456),
         ("dbfs_to_thr(-10)", dbfs_to_thr(-10), 1326336),
         ("ratio_to_reg(0.7)", ratio_to_reg(0.7), 2936064),
-        ("ms_to_coef(5)", ms_to_coef(5), 17408),
+        # 5 ms @ 48.828 kHz。RTL 出厂值 17408 是按 48 kHz 算的（= 4.93 ms @ 48.828 kHz），
+        # FS 改成真实帧率后这里差 1 个步进，时间常数 5.00 vs 4.93 ms，听不出来。
+        ("ms_to_coef(5)", ms_to_coef(5), 17152),
         ("ms_to_coef(100)", ms_to_coef(100), 896),
         ("ms_to_coef(0)", ms_to_coef(0), 0),
     ]
