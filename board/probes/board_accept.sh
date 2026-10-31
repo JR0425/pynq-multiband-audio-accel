@@ -86,6 +86,7 @@ say "汇总"
 printf '  寄存器窗口        %s\n' "$res_regs"
 printf '  压缩器随参数动    %s\n' "$res_drc"
 printf '  双耳两套处方      %s\n' "$res_dual"
+printf '  抓取窗口          %s\n' "$res_cap"
 echo
 echo "  日志：$LOG/acc_*.log"
 echo "  听音还剩三件事（要人）：+30 dB 说话听得清 / 拖增益不咔 / 左右处方不同能听出差别"
