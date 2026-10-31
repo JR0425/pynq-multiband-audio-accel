@@ -3,24 +3,33 @@
 数字侧已经证明左右耳拿到的样本逐位相同（PROGRESS §12.16），所以耳朵之间的
 任何差别只能来自 codec 或模拟链路。
 
-寄存器含义按 ADAU1761 数据手册 Rev. F 第 64-65 页（Table 78-81）：
+寄存器含义按 ADAU1761 数据手册 Rev. F（Table 78–83，p64–66；Rev. E 同编号在 p69–70）：
 
-    0x401C  R22  Playback Mixer Left (Mixer 3) Control 0
-                bit0 MX3EN / bit4:1 MX3AUXG / bit5 MX3LM / bit6 MX3RM
-    0x401D  R23  Playback Mixer Left (Mixer 3) Control 1
-                bit7:4 MX3G2 / bit3:0 MX3G1（旁路增益，0x00 = 静音，0x06 = 0 dB）
-    0x401E  R24  Playback Mixer Right (Mixer 4) Control 0（同结构，MX4*）
-    0x401F  R25  Playback Mixer Right (Mixer 4) Control 1
-    0x4023  R29  Playback HP Left volume  bit5:0 LHPVOL / bit6 LHPM / bit7 HPEN
-    0x4024  R30  Playback HP Right volume（同结构，RHPVOL / RHPM / HPMODE）
+    0x401C  R22  Playback Mixer Left  (Mixer 3) Control 0   Table 78/79
+                bit7 Reserved，bit6 MX3RM，bit5 MX3LM，bit4:1 MX3AUXG，bit0 MX3EN
+    0x401D  R23  Playback Mixer Left  (Mixer 3) Control 1   Table 80/81
+                bit7:4 MX3G2 / bit3:0 MX3G1（**旁路**增益，0x00 = Mute 默认，0x06 = 0 dB）
+    0x401E  R24  Playback Mixer Right (Mixer 4) Control 0   Table 82/83
+                位布局与 R22 完全相同：bit6 MX4RM，bit5 MX4LM，bit0 MX4EN
+    0x401F  R25  Playback Mixer Right (Mixer 4) Control 1   （MX4G2 / MX4G1）
+    0x4023  R29  Playback HP Left  volume  （bit5:0 音量码，bit1 参与静音，见下）
+    0x4024  R30  Playback HP Right volume  （位布局与 R29 相同）
+                —— 这两条的位名本次没有逐位核对，只用 2026-10-28 实测差分的
+                   0xF3（0xE5 不响、0xF3 响）；T2 只负责 0x401C–0x401F。
 
-所以 (0x401C, 0x401D) 不是"左/右一对"，是同一个左混音器的控制寄存器和增益
-寄存器。真正的左右音量对是 (0x4023, 0x4024) 和线路输出的 (0x4025, 0x4026)。
-早期版本把 0x401C 的值镜像进 0x401D，等于把控制位写进了旁路增益位，测到的
-东西和想测的不是一回事。
+所以 (0x401C, 0x401D) 不是"左/右一对"，是**同一个左混音器**的控制寄存器和
+旁路增益寄存器。真正的左右一对是 (0x401C, 0x401E) 混音器和 (0x4023, 0x4024)
+耳机音量。早期版本把 0x401C 的值镜像进 0x401D，等于把控制位写进了旁路增益位
+—— 那是把录音通路直通到播放混音器（sidetone），会啸叫，而且测的东西完全变了。
 
-另外一个容易读错的地方：0x401C 和 0x401E 的数值本来就该不同（左是 bit5
-解静音、右是 bit6），直接比数值会把"对称"误判成"不对称"。
+另外一个容易读错的地方：0x401C 和 0x401E 的数值本来就该不同（都是 bit6 = 右
+DAC、bit5 = 左 DAC 进混音器，所以左路取左 DAC = bit5、右路取右 DAC = bit6），
+直接比数值会把"对称"误判成"不对称"。
+
+还有第三点：0x401D / 0x401F 读回 **0x00 是正常的**（Table 81/83，旁路增益默认
+Mute）。10-30 深夜把这两个 0x00 当成"右声道从没配过"的证据是误读 ——
+右声道的通路在 0x401E，不在 0x401F。这两个寄存器只要不是 0，反而是故障
+（话筒信号会串进耳机）。
 
     sudo python3 codec_lr_balance.py status     # 只读，给出对称性结论
     sudo python3 codec_lr_balance.py mirror     # 把 0x4023 镜像到 0x4024

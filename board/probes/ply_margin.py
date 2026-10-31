@@ -9,10 +9,19 @@
 
 为什么要它：`ply_cnt` 只在 `fe_din_vld && ply_sel` 时自增（`room` 是输出
 FIFO 水位节流，`fe_din_ready` 是前端背压）。所以读指针**不是**匀速的 ——
-它一卡，写端（PS 按绝对时刻、每 1024 样本一块）还在往前走。余量 =
-`PLAY_RING - PLAY_LEAD_CHUNKS * PLAY_CHUNK` 个样本：4 块是 84 ms，现在默认
-5 块是 230.7 ms。卡超过这个余量，写端就绕一圈盖掉读端还没读的字，耳朵听到
-的就是一次跳变。
+它一卡，写端（PS 按绝对时刻、每 1024 样本一块）还在往前走。
+
+两个容易混的量（单位都是秒，但含义不同，别互相套）：
+
+  lead    = LEAD_CHUNKS * CHUNK / FS      写头领先读头多少
+          4 块 = 83.9 ms，5 块 = 104.9 ms（也就是常说的「预读 105 ms」）
+  margin  = (RING - LEAD_CHUNKS*CHUNK)/FS 读头能停多久还不被写头套圈
+          4 块 = 251.6 ms，5 块 = 230.7 ms
+
+预读加一块 = lead 多 21 ms、margin 少 21 ms。判据用的是 **margin**：卡超过
+margin，写端就绕一圈盖掉读端还没读的字，耳朵听到的就是一次跳变。
+8a6e7f5 之前这里把「4 块的 lead（84 ms）」当阈值用，比真 margin 小 3 倍，
+会漏报套圈。
 
 `--lead-chunks` 要和板上跑的 `fir_pl_live.py` 里 `PLAY_LEAD_CHUNKS` 一致，
 否则判据会偏。板上还是 4 块时用 `--lead-chunks 4`。
@@ -22,8 +31,10 @@ FIFO 水位节流，`fe_din_ready` 是前端背压）。所以读指针**不是*
 
 最后一行打印 PLY_MARGIN {json} 汇总：
     rd_rate_hz       读指针推进速率（逐点解绕后累加，14 位计数器绕圈不影响）
-    stall_max_ms     最长的一次「读指针不动」
-    stall_n_ge_margin  超过余量的卡顿次数（非 0 = 已经套圈）
+    stall_max_ms     最长的一次「读指针不动」，**不是**「慢了」。读指针只要还在
+                     动就不算卡顿，即使这几毫秒只走了几个字。判断卡顿要不要紧
+                     看它和 margin 的比：stall_max_ms < margin_ms 就还没套圈。
+    stall_n_ge_margin  超过 margin 的卡顿次数（非 0 = 已经套圈）
     pop_delta        这轮 POP_CNT（0x80，|Δ|>8192 的次数）涨了多少
 """
 import argparse
@@ -48,7 +59,14 @@ def margin_sec_of(lead_chunks):
 
 
 def analyze(rows, margin_sec):
-    """rows: [{"t", "rd", "pop"}]。逐点解绕后累加，再找最长静止。"""
+    """rows: [{"t", "rd", "pop"}]。逐点解绕后累加，再找最长静止。
+
+    解绕（T4）：相邻两点差值先按 14 位折到 ±8192 以内，再累加。**不能**用
+    (last - first) & 0x3FFF —— 计数器一圈只有 16384 个字（335 ms @ 48.8 kHz），
+    60 秒的采集会绕 179 圈，只看首尾等于把圈数全丢掉。
+    逐点解绕的前提是「相邻两点之间读指针不会真的走超过 8192 个字」，
+    也就是采样率不能低于 FS/8192 ≈ 6 Hz；默认 500 Hz 时每点只走 98 个字。
+    """
     total = 0
     stalls = []
     stall = 0.0
@@ -91,15 +109,22 @@ def selftest():
     rows = []
     pos = 0.0
     t = 0.0
+    wraps = 0
+    prev = 0
     for _ in range(30000):
         pos += FS * dt
-        rows.append({"t": t, "rd": int(pos) & RD_MASK, "pop": 0})
+        rd = int(pos) & RD_MASK
+        if rd < prev:
+            wraps += 1
+        prev = rd
+        rows.append({"t": t, "rd": rd, "pop": 0})
         t += dt
     r = analyze(rows, margin_sec_of(5))
-    good = abs(r["rate_err_ppm"]) < 50
+    good = abs(r["rate_err_ppm"]) < 1.0          # 判据：< 1 ppm
     ok &= good
-    print("SELFTEST rate  %s  %.2f Hz (err %.1f ppm)"
-          % ("PASS" if good else "FAIL", r["rd_rate_hz"], r["rate_err_ppm"]))
+    print("SELFTEST rate  %s  %.2f Hz (err %.2f ppm), 绕圈 %d 次, 推进 %d 字"
+          % ("PASS" if good else "FAIL", r["rd_rate_hz"], r["rate_err_ppm"],
+             wraps, r["rd_advance"]))
 
     # 2) 中间卡 200 ms，余量按 100 ms 判 —— 必须抓到 1 次
     rows = []
@@ -133,6 +158,13 @@ def main():
 
     if a.selftest:
         return selftest()
+
+    # 解绕的前提：相邻两点之间读指针走不到半圈（8192 字）
+    step = FS / a.rate
+    if step > RD_MASK // 2:
+        print("!! --rate %.2f 太低：每点要走 %.0f 个字（>8192），解绕分不清方向。"
+              "最低用 %.2f Hz。" % (a.rate, step, FS / (RD_MASK // 2)))
+        return 2
 
     from pynq import MMIO
 

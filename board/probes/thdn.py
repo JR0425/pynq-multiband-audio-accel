@@ -62,6 +62,29 @@ def grab(regs):
     return s16(x), s16(x >> 16)
 
 
+def harm_table(x, k0, n_h=9):
+    """基波相对 dBc：k0*2..k0*n_h 每个整数倍 bin 的电平（相对基波）。
+
+    离散的 3/5/7 次峰 = 无记忆非线性；整片抬高没有峰 = 抖动/噪声。
+    这是 T7 用来分开「压缩器包络纹波」和「定点链截断」的主要判据。
+    """
+    x = np.asarray(x, dtype=np.float64)
+    x = x - x.mean()
+    X = np.fft.rfft(x * np.hanning(N))
+    p = np.abs(X) ** 2
+    fund = p[k0]
+    out = {}
+    for h in range(2, n_h + 1):
+        k = k0 * h
+        if k >= len(p):
+            continue
+        # 取峰所在 bin（±1 内最大），避开重采样把频率推偏半个 bin
+        kk = k + int(np.argmax(p[max(1, k - 1):k + 2])) - 1
+        out[h] = (round(kk * FS / N, 1),
+                  round(10.0 * np.log10(p[kk] / fund + 1e-30), 1))
+    return out
+
+
 def thdn(x):
     """返回 (THD+N dB, 百分比, 基波 bin, 基波幅度)。"""
     x = np.asarray(x, dtype=np.float64)
@@ -96,11 +119,12 @@ def main():
     time.sleep(a.settle)
 
     runs = []
+    best = None
     for _ in range(a.loop):
         ins, outs = grab(regs)
         di = thdn(ins)
         do = thdn(outs)
-        runs.append({
+        rec = {
             "peak_in": int(np.max(np.abs(ins))),
             "peak_out": int(np.max(np.abs(outs))),
             "in_db": None if di is None else round(di[0], 1),
@@ -111,20 +135,28 @@ def main():
             "out_pct": None if do is None else round(do[1], 4),
             "out_bin": None if do is None else do[2],
             "fund_hz": round(di[2] * FS / N, 1) if di else None,
-        })
+        }
+        if di is not None and do is not None:
+            rec["harm_out"] = harm_table(outs, do[2])
+            rec["harm_in"] = harm_table(ins, di[2])
+            # 取「进核最干净」的那一帧做谐波代表：重采样污染帧会把整片抬高
+            if best is None or di[0] < best[0]:
+                best = (di[0], rec["harm_out"], rec["harm_in"], rec)
+        runs.append(rec)
         time.sleep(0.2)
 
     outs_db = [r["out_db"] for r in runs if r["out_db"] is not None]
     ins_db = [r["in_db"] for r in runs if r["in_db"] is not None]
+    out_pct = [r["out_pct"] for r in runs if r["out_pct"] is not None]
     summary = {
         "tag": a.tag,
         "wav": a.wav,
         "loop": len(runs),
         "peak_in_max": max(r["peak_in"] for r in runs),
         "peak_out_max": max(r["peak_out"] for r in runs),
-        "in_db_median": float(np.median(ins_db)) if ins_db else None,
-        "out_db_median": float(np.median(outs_db)) if outs_db else None,
-        "out_pct_median": float(np.median([r["out_pct"] for r in runs])),
+        "in_db_median": round(float(np.median(ins_db)), 1) if ins_db else None,
+        "out_db_median": round(float(np.median(outs_db)), 1) if outs_db else None,
+        "out_pct_median": round(float(np.median(out_pct)), 4) if out_pct else None,
         "fund_hz": runs[0]["fund_hz"],
         "chain_db": (round(float(np.median(outs_db)) - float(np.median(ins_db)), 1)
                      if (ins_db and outs_db) else None),
@@ -132,6 +164,13 @@ def main():
         "runs": runs,
     }
     print("THDN " + json.dumps(summary))
+    if best is not None:
+        print("HARM  fund=%s  (dBc, best-in frame: in=%s dB)"
+              % (summary["fund_hz"], best[0]))
+        for h in sorted(best[1]):
+            hz, db = best[1][h]
+            hz_i, db_i = best[2].get(h, (0, 0))
+            print("  %dx  %8.1f Hz  out %6.1f dBc   in %6.1f dBc" % (h, hz, db, db_i))
     return 0
 
 
