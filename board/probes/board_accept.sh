@@ -54,10 +54,22 @@ fi
 
 # 2026-10-30：**必须先停常驻服务**。
 # 每个探针里都会 Overlay() 重配一次 PL，而 fir_pl_live 同时在 100 Hz 地读写 PL 寄存器。
-# 重配的那几毫秒里 AXI 从机是消失的，live 的访问拿不到响应 → AXI 挂死 → PS 卡死
-# （实测：跑到 3/5 时整块板失联，只能断电）。验收脚本自己负责停/起。
+# 重配的那几毫秒里 AXI 从机是消失的，live 的访问拿不到响应 → AXI 挂死 → PS 卡死。
+#
+# 2026-10-31：光 pkill 不够。板上装了 fir-pl-webui.service，它跑的是 pl_supervise.sh，
+# 每 30 秒检查一次，发现 live 不在就整套重启 —— pkill 之后最多半分钟 live 又回来了，
+# 正好撞上下一个探针的 Overlay，整机重启。两次验收分别死在 3/5 和 4/5 就是这么来的。
+# 必须用 systemctl stop，让它不再拉起；再自己确认一遍进程真的没了。
 say "1.5/5 停掉常驻服务（探针要重载位流，和 live 抢 AXI 会把板子卡死）"
-ssh_ --sudo "pkill -f fir_pl_live || true; pkill -f fir_pl_webui || true; sleep 1; echo STOPPED" 2>&1 | tail -2
+# 注意 pgrep/pkill 的 -f 会把执行这条命令的 sh 自己也匹配上（它的命令行里就带着
+# "fir_pl_live" 这几个字），所以必须写成 [f]ir_pl_live —— 字面串里多了方括号，匹配不到自己。
+ssh_ --sudo "systemctl stop fir-pl-webui 2>/dev/null || true; \
+             pkill -f '[f]ir_pl_live' || true; pkill -f '[f]ir_pl_webui' || true; sleep 2; \
+             pgrep -f '[f]ir_pl_live' >/dev/null && echo LIVE_STILL_UP || echo STOPPED" 2>&1 | tail -2
+if ssh_ --sudo "pgrep -f '[f]ir_pl_live' >/dev/null && echo LIVE_UP || echo LIVE_DOWN" 2>&1 | grep -q LIVE_UP; then
+    echo "fir_pl_live 还活着，探针会和它抢 AXI 把板子跑死。先 systemctl stop fir-pl-webui 再重跑。"
+    exit 1
+fi
 
 res_regs=NA; res_drc=NA; res_dual=NA; res_cap=NA
 LOG="$ROOT/build/tmp/probes"; mkdir -p "$LOG"
@@ -93,7 +105,10 @@ echo "  听音还剩三件事（要人）：+30 dB 说话听得清 / 拖增益�
 
 if [ "$KEEP_DOWN" = "0" ]; then
     say "恢复常驻服务（live + 网页）"
-    ssh_ --sudo "cd $REMOTE && sh pl_webui_up.sh" 2>&1 | tail -3
+    ssh_ --sudo "if systemctl cat fir-pl-webui.service >/dev/null 2>&1; then \
+                     systemctl start fir-pl-webui; sleep 8; \
+                 else cd $REMOTE && sh pl_webui_up.sh; fi; \
+                 pgrep -af '[f]ir_pl_(live|webui)'" 2>&1 | tail -4
 fi
 
 [ "$res_regs" = "FAIL" ] && exit 1
