@@ -1,6 +1,12 @@
 # board/ 目录：工件与现状
 
-## 哪些脚本是演示用的
+> **当前演示通路（2026-10-31）是 PL 直连**：位流 `overlay/fir_pl.bit`，板上目录
+> `/home/xilinx/dma_exp/`，进程是 `fir_pl_live.py` + `fir_pl_webui.py`（服务名
+> `fir-pl-webui`）。启动与验收命令见仓库根 `README.md` 的「当前演示版」。
+> 下面关于 `fir.bit` / `fir_live.py` / `/home/xilinx/jupyter_notebooks/` 的描述是
+> 上一代块模式线，保留作历史，别和演示线混用。
+
+## 哪些脚本是演示用的（块模式线，历史）
 
 `scripts/` 下分两组，跑演示只用得到第一组。
 
@@ -18,7 +24,7 @@
 
 ### 自研 RTL 的三颗实验位流（2026-10-25）
 
-这三颗**不是演示用的，也从不替代 `fir.bit`**。它们证明手写 Verilog 前端（3 低通 + 相减 + 4 段 + DRC）能在板上逐位跑对，出货通路仍然只有 `fir.bit`。
+这三颗**不是演示用的，也从不替代当前演示位流 `fir_pl.bit`**。它们证明手写 Verilog 前端（3 低通 + 相减 + 4 段 + DRC）能在板上逐位跑对。
 
 | 位流 | 结构 | 用途 |
 |---|---|---|
@@ -35,7 +41,9 @@
 
 ### 把音频数据从 PS 手里挪开的五颗（2026-10-25 晚）
 
-同样**不是演示用的**，出货演示仍然只有 `fir.bit`。这一组的共同底座是自写的
+同样**不是全部都在演示通路上**：这一组里的 `fir_pl.bit` 后来补了寄存器窗口和网页验配，
+就是当前演示位流；`fir_dma.bit` / `fir_dma_tx9.bit` / `fir_dma_core.bit` / `i2sdbg.bit`
+只作实验与诊断。这一组的共同底座是自写的
 `i2s_duplex`（`src/rtl/i2s_duplex.v` + `axis_fifo.v`）—— 自己产生 bclk/lrclk、
 自己收发，不再经过厂商那颗 `audio_codec_ctrl`。
 
@@ -44,14 +52,14 @@
 | `overlay/fir_dma.bit` | 自写 I2S + `axi_dma`，不含核 | 量 DMA 这条路的结构地板 | +1.514 ns |
 | `overlay/fir_dma_tx9.bit` | 同上，播放 FIFO 1024 → 512 字 | 对照「延迟是从哪来的」；积压余量不够，没保留这一版 | +0.739 ns |
 | `overlay/fir_dma_core.bit` | 同上再加出货那颗 v25 核 | 核插进 PS 的循环里，量口到耳延迟 | +0.135 ns |
-| `overlay/fir_pl.bit` | `i2s_duplex` + `fir_mb_fe` + `fir_drc4`，音频全程不出 PL | 全 PL 直连 | +0.027 ns |
+| `overlay/fir_pl.bit` | `i2s_duplex` + `fir_mb_fe` + `fir_drc4` + 寄存器窗口，音频全程不出 PL | 当前演示（全 PL 直连） | +0.090 ns |
 | `overlay/i2sdbg.bit` | 同上，加内置 440 Hz 音源 + 片内自收 + 翻转计数 | 诊断仪器：证明 `sdata_o` 上确实有波形 | +0.675 ns |
 
 - 构建脚本：`overlay/build_audio_dma.tcl`（`FIR_AUDIO_DMA_WITH_FIR=0/1` 选含不含核，
   `FIR_AUDIO_DMA_TX_AW` 选播放 FIFO 深度）、`overlay/build_audio_pl.tcl`
   （`FIR_PL_TX_TARGET` 选播放 FIFO 水位）、`overlay/build_audio_i2sdbg.tcl`。
 - 每颗配套 `*.hwdef`、`*.hwh`、`*_timing.rpt`、`*_util.rpt`。五颗的时序全部收敛
-  （0 条失败端点）；`fir_pl` 的 +0.027 ns 余量很薄，再改它之前先看时序。
+  （0 条失败端点）；`fir_pl` 当前是 +0.090 ns，余量仍然薄，再改它之前先看时序。
 - 探针：`scripts/dma_audio_probe.py`（a/b/c/d 四段验收）、`dma_fir_loop.py`
   （带核的整条链路，**必须** `chrt -f 60`）、`pl_direct_probe.py`（全 PL，只读状态）、
   `pl_listen.py`（人耳听）、`core_dump.py`（两块位流的核输出逐位对拍）、

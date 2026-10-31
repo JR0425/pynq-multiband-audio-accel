@@ -139,8 +139,8 @@ REGS_BASE_DEFAULT = 0x43C40000
 def db_to_gain(db):
     """页面 gain_db（−24..+42）→ GAIN[i]（Q7.8，int16 范围）。
 
-    2026-10-28 听感拍板：演示默认 +30 dB（8095）—— 18 dB 用户嫌小，
-    24 dB 勉强、30 dB 合适（板上 gain_ladder/gain30 实测）。
+    2026-10-28 听感拍板时选的是 +30 dB（8095）；10-31 演示默认改成 +22 dB，
+    以 `fir_pl_webui.py` 的 `DEFAULT_TUNE` 为准。
     """
     v = int(round(GAIN_UNITY * (10.0 ** (float(db) / 20.0))))
     return max(-32768, min(32767, v))
@@ -391,7 +391,7 @@ def apply_tune(regs, tune, last=None):
     只在字段真的变了的时候写 —— 每 20 ms 无脑写一遍会让 ramp 反复重置，
     表现是"增益永远爬不到头"。
     """
-    g = tune.get("gain_db") or [30.0] * 4   # 演示默认 +30 dB（2026-10-28 听感拍板）
+    g = tune.get("gain_db") or [22.0] * 4   # 与 fir_pl_webui.DEFAULT_TUNE 一致
     # thr/ratio/atk/rel 的默认值必须等于寄存器出厂值（419456 / 2936064 / 17408 / 896），
     # 否则后端一启动就把位流上电的那套 v25 参数顶掉。2026-10-28 批 2 定案。
     # 例外：ATK 默认 5 ms 在真实帧率 48.828 kHz 下算出 17152（出厂 17408 是按 48 kHz 算的），
@@ -628,10 +628,10 @@ def publish(regs, tune_cur, t0, ramp_busy, err=None, sink=None, run=True, ctrl=N
         "i2s_stat1": st1,
         "l": 0,
         "nbuf": 0,
-        # 端到端延迟 = 采集 FIFO 积压 + 播放 FIFO 水位 + 核组延迟（0.98 ms）+ 声学（1.23 ms）
-        # 2026-10-29 夜：原来是写死的 2.3，那是**只算核**的数；实测采集 FIFO 常驻
-        # 3960/4096，实际是 80 ms 级。现在按真实水位算，flush 之后应该掉到 3 ms 左右。
-        "lat_ms": round((st1 >> 16) / 48.828 + (st1 & 0xFFFF) / 97.656 + 2.2, 2),
+        # 延迟估算 = 采集 FIFO 积压 + 播放 FIFO 水位 + 核群延迟（96 采样 = 1.97 ms）+ 声学（1.23 ms）
+        # 2026-10-29 夜：原来写死 2.3，那只算了核；实测采集 FIFO 常驻 3960/4096，
+        # 实际是 80 ms 级。核群延迟 96/48.828 = 1.966 ms（旧注释按 0.98 算，少了一半）。
+        "lat_ms": round((st1 >> 16) / 48.828 + (st1 & 0xFFFF) / 97.656 + 3.2, 2),
         "io_ms": 0.0,
         "dsp_ms": 0.0,
         "uptime_s": round(now - t0, 2),

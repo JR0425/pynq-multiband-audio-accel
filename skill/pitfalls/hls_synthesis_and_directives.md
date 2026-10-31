@@ -125,6 +125,8 @@ HLS 的 pragma 解析器**不展开 C 宏**，所以：
 复现命令见 `build/hls/run_synth.tcl` 文件头；完整表格见 `data/results/hls_synth_metrics.md`。
 
 **实时预算**：48 kHz、每采样 20.83 µs、100 MHz → **2083 拍/采样的上限**。
+（这是块模式线：PS 以 48 kHz 喂核。PL 直连线是自写 I2S，帧长 2048 拍 = 48.828 kHz，
+预算 20.48 µs。）
 
 | 版本 | 拍/采样 | DSP | LUT |
 |---|---|---|---|

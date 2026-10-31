@@ -5,6 +5,9 @@
 
 > **这份指南还没在一台真正的干净机器上跑过。**
 
+> **两条构建线**：§1–§5 是块模式线（`fir.bit` + `fir_live.py`）的完整流程，属于上一代；
+> 当前演示用的是 §6 的 PL 直连线（`fir_pl.bit` + `fir_pl_live.py`）。两条线的产物不通用。
+
 ---
 
 ## 1. 需要什么
@@ -91,7 +94,11 @@ IP 包，C 代码的改动一点都进不去。
 
 ---
 
-## 3. 上板
+## 3. 上板（块模式线，历史）
+
+> 这一节对应的是上一代块模式通路：`fir.bit`、`/home/xilinx/jupyter_notebooks/`、`fir_live.py`。
+> **当前演示的上板流程在 §6**（`fir_pl.bit`、`/home/xilinx/dma_exp/`、`fir_pl_live.py`），
+> 目录、服务和脚本名都不一样，别混着照抄。
 
 ### 3.1 网络（直连，没有路由器）
 
@@ -242,14 +249,19 @@ BD_ONLY=1 bash build/run_pl_build.sh    # 只验 BD 接线，过了就停，几�
 
 脚本最后会打印 `### WNS_ns = ...`。**这一行要人眼看。** 位流编出来不等于能用：
 
+当前演示位流（`board/overlay/fir_pl.bit`，md5 `628b75b3d7a13015a69125fb8ac2d228`）：
+**WNS +0.090 ns、TNS 0、0 个失败端点（49,518 个端点全过）、WHS +0.007 ns**。
+
 | 版本 | WNS | 说明 |
 |---|---|---|
+| 当前（`fir_pl.bit`） | +0.090 ns | 0 失败端点，可用 |
 | 批 1 | +0.253 ns | 能用 |
 | 批 2 第一版 | −1.612 ns | 529 个失败端点，照样出 bit，但会偶发算错 |
 | 批 2 定版 | +0.136 ns | 能用（余量薄） |
 
 WNS 为负时先看 `board/overlay/fir_pl_timing.rpt` 里第一条 VIOLATED 的起止点，
-再去 RTL 里给那一级加一拍流水。逐级对照见 `docs/PL直连_资源与时序.md`。
+再去 RTL 里给那一级加一拍流水。逐级资源与路径见 `board/overlay/fir_pl_util.rpt`、
+`board/overlay/fir_pl_timing.rpt`。
 
 ### 6.3 上板验收（不需要耳朵的两条）
 
@@ -280,7 +292,8 @@ sudo env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u /home/xilinx/
 sudo env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u /home/xilinx/dma_exp/fir_pl_webui.py --port 8080
 ```
 
-浏览器开 `http://192.168.2.99:8080/`。接口与文件协议见 `docs/PL直连_网页第三档.md`。
+浏览器开 `http://192.168.2.99:8080/`。接口与文件协议写在 `board/scripts/fir_pl_webui.py`
+和 `fir_pl_live.py` 的文件头里。
 
 ### 6.5 坑（2026-10-28 踩的）
 
