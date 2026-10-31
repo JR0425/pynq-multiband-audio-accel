@@ -77,7 +77,7 @@ IP 包，C 代码的改动一点都进不去。
 
 ### 其它 overlay 的构建脚本
 
-`rebuild.sh` 只管出货那一颗。仓库里另有几颗实验位流，各自一个脚本，
+`rebuild.sh` 只管块模式那一颗。仓库里另有几颗实验位流，各自一个脚本，
 直接 `vivado -mode batch -source <脚本>` 跑：
 
 | 脚本 | 环境变量 | 产物 |
@@ -89,7 +89,7 @@ IP 包，C 代码的改动一点都进不去。
 | `board/overlay/build_audio_pl.tcl` | `FIR_PL_TX_TARGET`（默认 128） | `fir_pl.bit` / `fir_pl_tx<T>.bit` |
 | `board/overlay/build_audio_i2sdbg.tcl` | — | `i2sdbg.bit`（内置音源 + 片内自收的诊断位流） |
 
-**这些都不在演示通路上**，出货演示只有 `fir.bit`。它们的功能、延迟数字和适用范围在
+**这些都不在演示通路上**，本节的块模式产物只有 `fir.bit`。它们的功能、延迟数字和适用范围在
 `data/results/dma_pl_direct_20261025.md` 和 `data/results/rtl_vs_hls.md` §9。
 
 ---

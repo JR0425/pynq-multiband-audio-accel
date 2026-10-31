@@ -23,7 +23,7 @@
 | 实时通路会不会丢块 | `live_dropout_recheck_20261024.md` | 16.2 ms 档 600 秒 0 丢块；10-23 那次「两档都在丢」是探针插桩自己造成的 |
 | 长时间跑会不会挂 | `soak600_20261023.md` | 两趟 600 秒不挂（36 拍核、演示同配置）；原始转储在 `soak600_20261023/` |
 | 压缩特性对不对 | `wdrc_characteristic.md` | 板上实测的 WDRC 输入-输出曲线 |
-| 异常输入会不会崩 | `robustness.md` | 10-23 在出货版上实测 |
+| 异常输入会不会崩 | `robustness.md` | 10-23 在块模式版上实测 |
 | 四件事一起测（延迟/CPU/功耗/质量） | `performance_profile_20261022.md` | 10-22 的性能线汇总（当时是 49 拍核，延迟与 CPU 两项需以 10-23 复测为准） |
 | Python 基线的数 | `baseline_metrics.md` | 48 kHz / 4 段 / 193 抽头 |
 | 自研 RTL 的数值与上板结果 | `rtl_vs_hls.md` | 逐位对拍 + 三颗实验位流实测（§9）：前端 3 拍/采样、块模式 14407 拍、DMA 版 25.7 M 采样/秒；**不在演示通路上** |
@@ -50,7 +50,7 @@
 
 | 类 | 文件 |
 | --- | --- |
-| 加速比跑测 | `compare_cpu_fpga_run_20261023.txt`（16.7×，出货版）、`compare_cpu_fpga_run_20261022.txt`（12.5×，v21/49 拍）、`compare_cpu_fpga_run_20261008.txt`（19.5×，v19/31 拍）、`compare_cpu_fpga_run_20261001_fix.txt` |
+| 加速比跑测 | `compare_cpu_fpga_run_20261023.txt`（16.7×，块模式版）、`compare_cpu_fpga_run_20261022.txt`（12.5×，v21/49 拍）、`compare_cpu_fpga_run_20261008.txt`（19.5×，v19/31 拍）、`compare_cpu_fpga_run_20261001_fix.txt` |
 | 实时通路运行 | `fir_live_run_20261015.txt`、`fir_gain_ab_run_20261015.txt`、`fir_audio_loop_run_20261006.txt`、`fir_audio_loop_run_20261001.txt`、`fir_wdrc_ab_run_20261019.txt` |
 | 延迟 / 质量 / 鲁棒性 | `latency_n2_*_20261023.json`、`latency_n3_l480_20261023.json`、`quality_metrics_20261022.txt`、`robustness_20261023.json`、`robustness_run_20261023.txt`、`wdrc_curve_20261023.json`、`wdrc_curve_run_20261023.txt`、`acoustic_lat_20261022.npz`、`four_band_response_20261022.csv`、`cpu_20261022.csv` |
 | HLS / RTL 比对 | `python_golden.txt`、`hw_output.txt`、`hw_transparent_i16.txt`、`v25_output.txt`、`v25_transparent.txt`、`v25_wdrc_output.txt`、`fixed_dw16_cw*.txt`、`regress_float.txt`、`rtl_fe_*.rpt` |
