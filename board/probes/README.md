@@ -26,9 +26,8 @@
 
 | 文件 | 干什么 | 状态 |
 |---|---|---|
-| `hangmon4.sh` | 黑匣子：每秒往 `/dev/shm/hangmon.log` 抄一份内核计数 + `fir_live.py` 的状态文件 | **当前版** |
+| `hangmon4.sh` | 黑匣子：每秒往 `/dev/shm/hangmon.log` 抄一份内核计数 + `fir_live.py` 的状态文件 | **当前版**，`next_round.py` 直接调用 |
 | `one_run.sh` | 走一遍 notebook 那条路：起实时 → 等稳 → 拖一次滑杆 → 发 SIGINT。行为由 `$1` 里的一串开关控制（`IDLE` / `DUMP` / `FASTSTALL` / `NOJRNL` / `WD` / `IRQ1` / `NOSIG` / `NOTUNE` / `STOP9` / `NOBOX`）。跑完打一行 `RESULT=done` | 当前版 |
-| `hangmon3.sh` | 早期黑匣子 | **已废弃**，会写 SD、可能就是它自己把板子弄死的。留作反面教材 |
 | `wd_guard.sh` | 只在 `fir_live.py` 活着时武装硬件看门狗 | **已判死**，这块板的 SWDT 实测不复位。留作记录 |
 
 ### 板上跑（2026-10-25 晚：DMA 与全 PL 直连那条线）
@@ -61,7 +60,6 @@
 | `probe_config.py` | 问清板上还能用哪些抓栈手段。只读为主，唯一的写是 `kernel.panic_print=31` | 当前版 |
 | `pynq_console_cmd.py` | 往串口发**一条**命令并把回显抓回来。命令一律写成单行 | 当前版 |
 | `put.py` | 走 base64 把一个小文件推到板上（SFTP 那条路不通）。`--exec` 加可执行位 | 当前版 |
-| `soak_notebook.py` | 反复走 notebook 那条路并数"多少次里挂一次" | **已被 `next_round.py` 取代**，留作参考 |
 | `board_ssh.py` | 从 Windows 跑板上的命令 / 传文件（paramiko，密码登录；这台机器没有 sshpass，公钥也没配）。`--put` 传完会在板上再算一次 md5，对不上就报错退出 | 当前版 |
 | `board_run.py` | 跑一条板上命令，回显**按字节**原样打回来。板上输出是 UTF-8、Windows 控制台是 GBK，直接 `print` 会成乱码 | 当前版 |
 | `push_dma_exp.py` | 把 DMA 那套位流和探针推到 `/home/xilinx/dma_exp/`，走 base64，逐个核 md5 | 当前版 |

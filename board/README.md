@@ -11,9 +11,9 @@
 `scripts/` 下分两组，跑演示只用得到第一组。
 
 - **演示入口**：`run_live.sh`（实时通路）、`run_webui.sh` + `fir_webui.py` + `page.html`（浏览器界面）、`fir_live.py`、`fir_core.py`、`fir_selftest.py`、`fir_tune.py`、`fir_audio_loop.py`、`gain_ab_live.sh`、`wdrc_ab_live.sh`、`hearing_tone.py`、`mic_level.py`、`mic_live.py`。
-- **开发探针**：`cap_probe*.py`（14 个，2026-10-10 ~ 10-15，用于定位麦克风通路和符号扩展 bug）、`audio_duplex_probe.py`、`audio_overhead_probe.py`、`fir_chunk_sweep.py`、`mic_watch.py`、`acoustic_lat.py`、`robustness.py`、`wdrc_curve.py`、`compare_cpu_fpga.py`、`verify_*.py`、`replay_own_overlay_tone.py`、`audio_stream_test.py`、`rtl_*.py`（5 个，2026-10-25，只测自研 RTL 的三颗实验位流）、`dma_audio_probe.py`、`dma_fir_loop.py`、`pl_direct_probe.py`、`pl_listen.py`、`core_dump.py`（2026-10-25 晚，测 DMA 与全 PL 直连那五颗，见下）。
+- **开发探针**：`audio_duplex_probe.py`、`audio_overhead_probe.py`、`fir_chunk_sweep.py`、`mic_watch.py`、`acoustic_lat.py`、`robustness.py`、`wdrc_curve.py`、`compare_cpu_fpga.py`、`verify_*.py`、`replay_own_overlay_tone.py`、`audio_stream_test.py`、`rtl_*.py`（5 个，2026-10-25，只测自研 RTL 的三颗实验位流）、`dma_audio_probe.py`、`dma_fir_loop.py`、`pl_direct_probe.py`、`pl_listen.py`、`core_dump.py`（2026-10-25 晚，测 DMA 与全 PL 直连那五颗，见下）。
 
-它们留在 `scripts/` 而不单开目录，是因为 `data/results/` 下的原始结果文件按这个路径引用它们。`cap_probe6.py` 和 `cap_probe7.py` 已在头部声明作废：测量方法有缺陷，结论被 `cap_probe11.py` 取代。
+它们留在 `scripts/` 而不单开目录，是因为 `data/results/` 下的原始结果文件按这个路径引用它们。2026-10-10 ~ 10-15 定位麦克风通路的那 14 个 `cap_probe*.py` 已删除，结论见 `data/results/board_hang_evidence_20261016.md`。
 
 ## 仓库里的文件
 
