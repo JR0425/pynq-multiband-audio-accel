@@ -14,16 +14,21 @@ frontmatter 里一句能被检索到的描述、正文开头写明什么时候�
 ## 分档：换一个题目还能不能用
 
 判据是**不与该项目绑定、换项目换板卡仍可用**。
-按这个判据，本目录的 23 篇分三档：
+按这个判据，本目录的 27 篇分三档：
 
 | 档 | 含义 | 条目数 |
 |---|---|---|
-| A | 与题目、板卡都无关，任何 FPGA/嵌入式题目可用 | 9 |
+| A | 与题目、板卡都无关，任何 FPGA/嵌入式题目可用 | 13 |
 | B | 任意 PYNQ-Z2 题目可用（换板卡要改端口和 IP） | 8 |
 | C | 音频/信号处理类题目可用（依赖 PYNQ 出厂 base overlay 的音频通路） | 6 |
 
 没有第四档。**没有一篇是绑死在本项目的 DRC/FIR 设计上的**——即使 C 档那几篇，讲的也是
 base overlay 的音频通路怎么用，换个音频题目照样成立。
+
+A 档里有 4 篇是**工具类**（脚本本体在 `checkers/` 与 `templates/` 下，不是笔记）：
+把"优化前后的资源对比表""黄金参考比对""DMA 搬运""寄存器契约→驱动"这四件每人都要重做的事
+封装成了能直接跑的东西。判据和其余各篇一致：只依赖报告的字段名、黄金文件格式、
+寄存器表的排版和 AXI-Stream 语义，**不含本项目的任何算法**。
 
 ## 索引
 
@@ -40,6 +45,10 @@ base overlay 的音频通路怎么用，换个音频题目照样成立。
 | `audio-algorithm-prompts`<br>`prompts/audio_algorithm_prompt.md` | 让模型设计滤波器、出频谱图、实现 DRC | 套模板，注意模板里标出的参数陷阱 | 本项目算法初版由这些提示词产出，随后人工修正 | 要参数本身——唯一定义处是 `src/python/band_design.py` |
 | `hls-testbench-template`<br>`templates/hls_testbench_template.md` | 新起一个 HLS 测试台，先要骨架 | 复制骨架，按接口填端口 | 本项目 `src/hls/fir_tb.cpp` 由它起步 | 改现有测试台（真实接口在 `fir_tb.cpp`） |
 | `refactor-path-breakage`<br>`pitfalls/refactor_path_breakage.md` | 拆/并顶层目录之后脚本报「找不到文件」但文件明明在；`git status` 里一堆 `RD`；批量改路径只改了一半 | 先搜 `dirname(dirname(__file__))`；`git mv` 目标建空再搬内容；清单用 `grep -rln`；替换规则按长度从长到短；`mkdir -p` 自建锁目录 | `tools/` 拆进 `board/probes/` 与 `sim/model/` 后，六个脚本补一层 `dirname` 全部恢复，两个模型脚本重跑对拍仍通过 | 只是改文件名、目录层级没变；有打包机制的项目（路径不该由脚本算） |
+| **`csynth-report-table`**<br>`checkers/csynth_report_table.py` | 一堆 HLS 版本要出一张"优化前后"的对比表；某个资源数被质疑要现场复核 | `python csynth_report_table.py <reports根目录> -o out.md` | 本项目 68 个版本一次拉成表，`v25_env_indep` 抠出 36 拍 / DSP 200 / LUT 11491，与既有记录逐项吻合 | 要的是实测值（这时要用布局布线报告，不能用 csynth 估算）；想靠 csynth 的 Fmax 区分方案（实测无区分度） |
+| **`golden-compare`**<br>`checkers/golden_compare.py` | 硬件/HLS 输出与参考"看着一样但对不上"；相关系数只有零点几 | `python golden_compare.py got.txt ref.txt --delay 96 --passthrough` | 用本项目的 `hw_output.txt` / `python_golden.txt` 跑通；直通检验与最佳位移两项能分别定位"结构错"和"延迟取错" | 两边精度不同却想逐位比（那只能报 SNR，且必须写明精度不同） |
+| **`axi-stream-dma-host`**<br>`templates/axi_stream_dma_host.py` | 自研 AXI-Stream 核第一次接 `axi_dma`；传输"成功"但点数变少；主机侧吞吐远低于核的拍数折算 | 拷 `DmaBlockXfer`，改 `IP_NAME` / `MAX_BYTES` | 本项目 DMA 线 65535 点连发十次拿到 25.7 M 采样/秒；长度截断、cache 顺序、计时窗口三个坑都是那轮踩出来的 | 块很小、次数很少（逐字 MMIO 更简单）；要连续流不断字（得在 PL 里加 FIFO） |
+| **`register-map-stub`**<br>`templates/register_map_stub.py` | 自研 AXI-Lite IP 的寄存器表写在设计文档里，驱动要跟着写；上板读回不对要排除"地址抄错" | `python register_map_stub.py spec.md -o regs.py` | 从 `report/hardware_interface_spec.md` 生成 14 个寄存器，偏移与契约逐项一致，生成物可直接编译 | 契约本身就是错的（生成器只会忠实复制错误）；位域语义复杂（读清零/写一触发，它只分 rw/ro/wo/rr） |
 
 ### B 档：任意 PYNQ-Z2 题目可用
 
@@ -111,7 +120,7 @@ frontmatter 按官方 Agent Skill（`Xilinx/ross-ai-assistant` 里那套 `SKILL.
 
 ## 校验脚本
 
-`checkers/` 下是五件能直接跑的小工具：
+`checkers/` 下是七件能直接跑的小工具：
 
 | 脚本 | 用途 |
 |---|---|
@@ -120,3 +129,13 @@ frontmatter 按官方 Agent Skill（`Xilinx/ross-ai-assistant` 里那套 `SKILL.
 | `pynq_serial_send.ps1` | 往串口发一行命令 |
 | `check_audio_length.py` | 比对两个 wav 的时长和采样率 |
 | `pynq_jupyter_files.py` | 走 Jupyter HTTP API 传文件、跑 notebook |
+| `csynth_report_table.py` | **通用**：一堆 HLS 报告 → 一张性能/资源对比表（拍数、II、DSP、LUT、FF、BRAM） |
+| `golden_compare.py` | **通用**：黄金参考比对（最佳位移 → 逐位 → SNR → 直通检验），带 0/1 退出码 |
+
+`templates/` 下有两件能直接拷走用的骨架：
+
+| 模板 | 用途 |
+|---|---|
+| `hls_testbench_template.md` | HLS C++ 测试台最小骨架 |
+| `axi_stream_dma_host.py` | **通用**：AXI DMA 整块往返，含 cache 维护与状态轮询的正确形状 |
+| `register_map_stub.py` | **通用**：markdown 寄存器表 → Python 访问器 + 读回自检 |

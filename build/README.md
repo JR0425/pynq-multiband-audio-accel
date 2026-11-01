@@ -26,9 +26,17 @@
 `data/results/hls_synth_metrics.md` 由 `src/python/parse_hls_csynth.py` 从这里自动汇总，
 不要手改那份汇总。
 
-**出货配置是 `v25_env_indep`（csynth）和 `v25_env_indep_impl`（布局布线）**，其余是
-被替换掉的历史版本。整机 overlay 自己的时序与资源报告不在本目录，在
-`board/overlay/fir_timing.rpt` 和 `board/overlay/fir_util.rpt`。
+**这里有两个"出货"，指的是两条不同的实现线，别混：**
+
+| 线 | 当前版本 | 位流 | 时序/资源报告 | 用途 |
+|---|---|---|---|---|
+| **HLS 核**（块模式，上一代演示） | `v25_env_indep`（csynth）/ `v25_env_indep_impl`（布局布线） | `board/overlay/fir.bit` | `board/overlay/fir_timing.rpt`（WNS **+0.533**，0 条失败端点）、`fir_util.rpt` | 加速比 16.7× 是在这颗上量的 |
+| **手写 RTL**（全 PL 直连，**当前演示通路**） | `src/rtl/fir_mb_fe.v` + `fir_drc4.v` + `fir_pl_direct.v` | `board/overlay/fir_pl.bit` | `board/overlay/fir_pl_timing.rpt`（WNS **+0.090**，49518 端点 0 失败）、`fir_pl_util.rpt`（DSP 213/220） | 演示、验配网页、人耳验收 |
+
+两根线的构建脚本都在 `board/overlay/`（不是本目录）：HLS 线是 `build_fir.tcl`，
+PL 直连是 `build_audio_pl.tcl`，其余几颗实验位流的脚本见 `board/README.md`。
+本目录 `hls/reports/` 下只有 HLS 那一串版本；RTL 线的综合/实现报告在
+`board/overlay/*.rpt` 与 `data/results/rtl_vs_hls.md`。
 
 | 目录后缀 | 里面是什么 |
 | --- | --- |
@@ -48,6 +56,9 @@ WDRC）、`v25_env_indep`（36 拍，出货）。
 
 - 资源和拍数：`data/results/impl_metrics.md`（实测）和 `hls_synth_metrics.md`（估算）
 - 加速比：`data/results/accel_cpu_vs_fpga.md`
-- 时序验收：`board/overlay/fir_timing.rpt`（出货位流的 WNS +0.533 ns、0 条失败端点）
+- 时序验收：
+  - HLS 核线（`fir.bit`）：`board/overlay/fir_timing.rpt`，WNS **+0.533 ns**、0 条失败端点
+  - PL 直连线（`fir_pl.bit`，**当前演示**）：`board/overlay/fir_pl_timing.rpt`，
+    WNS **+0.090 ns**、49518 端点上 0 条失败 —— 余量很薄，再加功能必须重量
 - DMA / 全 PL 直连那五颗位流（`fir_dma*` / `fir_pl` / `i2sdbg`）的结构、延迟和适用范围：
   `data/results/dma_pl_direct_20261025.md`；它们的构建脚本不在本目录，在 `board/overlay/`

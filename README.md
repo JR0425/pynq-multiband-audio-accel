@@ -105,8 +105,12 @@ bash board/probes/board_accept.sh   # 上板：寄存器窗口、压缩器、双
 | `data/audio/` | 测试音频与生成的音频 |
 | `data/figures/` | 生成的分析图 |
 | `data/results/` | 所有实测读数；**哪个文件是当前结论、哪些不能引用，见 `data/results/README.md`** |
-| `skill/` | 提示词、模板、检查脚本、踩坑笔记 |
-| `report/` | 接口说明、提交清单、协作日志、板端截图 |
+| `skill/` | 提示词、模板、校验脚本、踩坑笔记；索引见 `skill/README.md` |
+| `report/` | **设计报告（`design_report.md`）**、合规对照与提交清单（`SUBMISSION_CHECKLIST.md`）、寄存器级接口说明（`hardware_interface_spec.md`）、大模型协作日志（`llm_collab_log/`）、板端截图（`img/`） |
+
+**先读哪一份**：要了解项目全貌看 `report/design_report.md`（一页速览 + 前人工作 + 优化轨迹 +
+验证链）；要核对是否符合赛道要求看 `report/SUBMISSION_CHECKLIST.md`；要动手跑看本文件
+开头的「当前演示版」两条命令。
 
 参考模型、系数生成、质量指标和演示素材生成脚本在 `sim/model/`，板子调试探针在 `board/probes/`。
 
