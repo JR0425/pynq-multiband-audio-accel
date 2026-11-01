@@ -1,11 +1,13 @@
 """生成最终报告用的图，输出到 data/figures/report/。
 
+统一口径：全篇按演示线 PL 直连 fir_pl.bit 取值，不与块模式 fir.bit 并列。
+
 数据来源：
   2-3  data/results/four_band_response_20261022.csv
-  2-4  data/results/impl_metrics.md（拍数与资源）
-  3-1  data/results/impl_metrics.md（整机实现）
-  3-2  data/results/latency_n*_20261023.json（数字段）；声学段 R 见 latency_retest_20261023.md
-  3-3  data/results/soak600_20261023.md、live_dropout_recheck_20261024.md
+  2-4  data/results/impl_metrics.md（拍数与资源，核级 v25，两条位流共用）
+  3-1  board/overlay/fir_pl_util.rpt、fir_pl_timing.rpt（整机实现）
+  3-2  data/results/dma_pl_direct_20261025.md（延迟预算，推算非实测）
+  3-3  data/results/soak600_20261023.md、live_dropout_recheck_20261024.md（块模式出货线回归）
   3-4  3-5  data/results/wdrc_curve_20261023.json
 """
 
@@ -25,6 +27,7 @@ os.makedirs(OUT, exist_ok=True)
 
 plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "DejaVu Sans"]
 plt.rcParams["axes.unicode_minus"] = False
+plt.rcParams["axes.axisbelow"] = True
 plt.rcParams["figure.dpi"] = 160
 
 INK = "#1f2933"
@@ -82,7 +85,10 @@ def fig_flow():
 
 
 def fig_block():
-    """系统整体框图（中文版，对应 fig2_1）。英文版见 plot_block_diagram.py。"""
+    """系统整体框图（中文版，对应 fig2_1）：PL 直连 fir_pl.bit，音频全程不出 PL。
+
+    英文版见 plot_block_diagram.py。
+    """
     ORANGE = "#fbe3cc"
     GREEN = "#dcefd9"
     LBLUE = "#dbe7f3"
@@ -93,52 +99,64 @@ def fig_block():
         ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
                 fontsize=fs, color=INK, weight=weight, linespacing=1.45)
 
-    def ar(p0, p1, label="", rad=0.0, fs=9, dx=0, dy=0):
+    def ar(p0, p1, label="", rad=0.0, fs=9, dx=0, dy=0, ls="-"):
         ax.add_patch(FancyArrowPatch(p0, p1, arrowstyle="-|>", mutation_scale=12,
-                                     lw=1.1, color=INK,
+                                     lw=1.1, color=INK, linestyle=ls,
                                      connectionstyle="arc3,rad=%s" % rad))
         if label:
             ax.text((p0[0] + p1[0]) / 2 + dx, (p0[1] + p1[1]) / 2 + dy, label,
                     ha="center", va="center", fontsize=fs, color=INK,
                     bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none"))
 
-    fig, ax = plt.subplots(figsize=(9.8, 5.4))
+    fig, ax = plt.subplots(figsize=(9.8, 5.6))
     ax.set_xlim(0, 124)
-    ax.set_ylim(0, 66)
+    ax.set_ylim(0, 64)
     ax.axis("off")
 
-    ax.add_patch(Rectangle((46, 36), 76, 27, fill=False, ls="--", lw=1.2,
+    # PL / PS 边界
+    ax.add_patch(Rectangle((46, 35), 76, 25, fill=False, ls="--", lw=1.2,
                            edgecolor="#888888"))
     tag_box = dict(boxstyle="round,pad=0.15", fc="white", ec="none")
-    ax.text(47.5, 61.0, "PL（可编程逻辑，100 MHz）", fontsize=9.5, color="#555555",
-            bbox=tag_box)
-    ax.add_patch(Rectangle((46, 3), 76, 25, fill=False, ls="--", lw=1.2,
+    ax.text(47.5, 58.6, "PL（可编程逻辑，100 MHz）· 音频全程不出 PL", fontsize=9.5,
+            color="#555555", bbox=tag_box)
+    ax.add_patch(Rectangle((46, 6), 76, 24, fill=False, ls="--", lw=1.2,
                            edgecolor="#888888"))
-    ax.text(47.5, 26.4, "PS（ARM Cortex-A9，Linux，PYNQ 2.7 / Python 3.6）",
+    ax.text(47.5, 28.2, "PS（ARM Cortex-A9，Linux，PYNQ 2.7 / Python 3.6）",
             fontsize=9.5, color="#555555", bbox=tag_box)
 
-    bx(2, 46, 20, 10, "麦克风\n(TRRS, HP+Mic)", fc=ORANGE)
-    bx(2, 30, 20, 10, "耳机 / 扬声器\n(TRRS, HP+Mic)", fc=ORANGE)
-    bx(25, 33, 18, 24, "ADAU1761\ncodec\n\nADC / DAC\n48 kHz, int16", fc=ORANGE, fs=9.5)
-    bx(50, 48, 26, 11, "audio_codec_ctrl\n(PYNQ 音频 IP)\nMMIO，无 DMA", fc=GREEN)
-    bx(84, 48, 34, 11,
-       "fir_multiband 核 v25\n四段相减 FIR + WDRC\n36 拍/采样 @ 100 MHz",
-       fc=LBLUE, weight="bold", fs=9.5)
-    bx(88, 22, 30, 9, "DDR3\n块缓冲 in[] / out[]", fc="#eeeeee")
-    bx(48, 6, 22, 12, "fir_live.py\n搬样线程\n(SCHED_FIFO)", fc=LBLUE, fs=9.5)
-    bx(76, 6, 20, 9, "网页验配界面\n/dev/shm/fir_tune.json", fc=LBLUE, fs=8.5)
+    # 板外器件与 codec
+    bx(2, 45, 18, 9, "麦克风\n(TRRS, HP+Mic)", fc=ORANGE, fs=9.5)
+    bx(2, 29, 18, 9, "耳机 / 扬声器\n(TRRS, HP+Mic)", fc=ORANGE, fs=9.5)
+    bx(24, 31, 17, 22, "ADAU1761\ncodec\n\nADC / DAC\n48 kHz, int16", fc=ORANGE, fs=9.5)
 
-    ar((22, 51), (25, 51), "mic", dy=1.9, fs=8.5)
-    ar((25, 35), (22, 35), "out", dy=-1.9, fs=8.5)
-    ar((43, 45), (50, 51), "I2S", dy=-6.5)
-    ar((101, 48), (101, 31), "AXI4 主机 → S_AXI_HP0", fs=8.5)
-    ar((88, 24.5), (70, 15), "cffi：拷 in[] / out[]", dx=9, dy=-2, fs=8.5)
-    ar((59, 18), (59, 48), "MMIO 读写 FIFO\n(duplex_block)", dx=13, fs=8.5)
-    ar((70, 18), (86, 48), "AXI-Lite", rad=-0.28, dx=9, dy=10, fs=8.5)
+    # PL 内：蛇形闭环 codec → 收 → 四段 → WDRC → 发 → codec
+    bx(49, 47, 19, 9, "i2s_duplex（收）\nADC 样本入 PL", fc=GREEN, fs=8.5)
+    bx(75, 47, 20, 9, "fir_mb_fe\n四段相减 FIR", fc=LBLUE, weight="bold", fs=9)
+    bx(99, 47, 21, 9, "fir_drc4\n四段 WDRC", fc=LBLUE, weight="bold", fs=9)
+    bx(99, 36.5, 21, 7.5, "i2s_duplex（发）\n样本出 PL → DAC", fc=GREEN, fs=8.5)
 
-    ax.text(62, 0.6,
-            "虚线框是 PL / PS 边界。音频 IP 没有 DMA：PS 用 MMIO 读写它的 FIFO，\n"
-            "核通过自己的 AXI4 主机口从 DDR 取块。",
+    # PS 内：最小驱动面
+    bx(50, 11, 34, 12, "fir_pl_demo.py\n加载 fir_pl.bit overlay\nI2C 配一次 codec · 轮询 ctrl/stat",
+       fc=LBLUE, fs=8.5)
+    bx(90, 11, 28, 12, "四段增益 / WDRC 参数\n编译期写死，无寄存器\n网页验配驱动不了",
+       fc="#f6f0e8", fs=8.5)
+
+    # 连线
+    ar((20, 49.5), (24, 49.5), "mic", dy=1.7, fs=8.5)
+    ar((24, 33.5), (20, 33.5), "out", dy=-1.7, fs=8.5)
+    ar((41, 46), (49, 51.5), "I2S", dy=-4.6, fs=8.5)
+    ar((68, 51.5), (75, 51.5), "逐样点流", fs=8)
+    ar((95, 51.5), (99, 51.5), fs=8.5)
+    ar((109.5, 47), (109.5, 44), fs=8.5)
+    ar((99, 40.25), (41, 40.25), "I2S 返回 codec", dy=1.8, dx=8, fs=8.5)
+    ar((67, 23), (67, 35), ls="--")
+    ax.text(69, 32.2, "AXI-Lite：ctrl / stat（PS 只读状态）", fontsize=8.5, color=INK,
+            ha="left", va="center",
+            bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none"))
+
+    ax.text(62, 2.6,
+            "虚线框是 PL / PS 边界。音频全程在 PL 内闭环：codec → i2s_duplex → fir_mb_fe（相减四段）→ fir_drc4（WDRC）→ i2s_duplex → codec，\n"
+            "不过 PS、不过 DDR；PS 只在启动时加载 overlay、配一次 codec，之后轮询 ctrl/stat。",
             fontsize=8.5, color="#666666", ha="center", va="center", linespacing=1.4)
 
     fig.tight_layout()
@@ -227,40 +245,56 @@ def fig_versions():
 
 
 def fig_resources():
+    """fir_pl.bit 整机资源：数值取自 board/overlay/fir_pl_util.rpt，时序取自 fir_pl_timing.rpt。"""
     names = ["LUT", "FF", "DSP", "BRAM"]
-    pct = [12.54, 10.22, 93.18, 39.29]
-    counts = ["6,669", "10,876", "205 / 220", "55"]
+    pct = [38.55, 12.74, 96.82, 7.14]
+    counts = ["20,509", "13,556", "213 / 220", "10"]
     fig, ax = plt.subplots(figsize=(7.6, 3.6))
     bars = ax.barh(names, pct, color=[BLUE, BLUE, ACCENT, BLUE], height=0.55)
     ax.set_xlim(0, 100)
     ax.set_xlabel("占 xc7z020clg400-1 可用资源 / %")
     for b, p, c in zip(bars, pct, counts):
-        ax.text(b.get_width() + 1.5, b.get_y() + b.get_height() / 2,
-                "%s（%.1f%%）" % (c, p), va="center", fontsize=9)
-    ax.set_title("v25 整机资源占用（WNS +0.533 ns，失败端点 0）", fontsize=11)
+        lab = "%s（%.1f%%）" % (c, p)
+        if p > 90:  # 长条标签放到柱内右端，避免超出坐标框被裁
+            ax.text(b.get_width() - 2, b.get_y() + b.get_height() / 2, lab,
+                    va="center", ha="right", fontsize=9, color="white")
+        else:
+            ax.text(b.get_width() + 1.5, b.get_y() + b.get_height() / 2, lab,
+                    va="center", fontsize=9)
+    ax.set_title("fir_pl.bit 整机资源占用（WNS +0.090 ns，失败端点 0）", fontsize=11)
     ax.grid(axis="x", color="#dfe3e6", lw=0.6)
     save(fig, "fig3_1_resources.png")
 
 
 def fig_latency():
-    tiers = ["稳定档\n480 / 3", "中间档\n480 / 2", "低延迟档\n360 / 2"]
-    digital = [29.80, 19.86, 14.92]
-    acoustic = [1.23, 1.23, 1.23]
-    end = [31.0, 21.1, 16.2]
-    fig, ax = plt.subplots(figsize=(7.4, 4.2))
-    x = range(len(tiers))
-    ax.bar(x, digital, width=0.5, color=BLUE, label="数字段（块流水）")
-    ax.bar(x, acoustic, width=0.5, bottom=digital, color="#b8cbd8",
-           label="声学段 R（DAC→耳机→空气→话筒→ADC）")
-    for i in range(len(tiers)):
-        ax.text(i, end[i] + 0.8, "%.1f ms" % end[i], ha="center", fontsize=10, color=INK)
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(tiers)
-    ax.set_ylim(0, 36)
+    """PL 直连 fir_pl.bit 只有一条通路，不存在块模式的三档延迟。
+
+    1.97 ms 核群延迟 = FIFO 水位 + 核内 2048 拍；1.23 ms 声学往返 R。
+    两者均为预算推算，未实测、未做人耳验收。
+    """
+    core, acou = 1.97, 1.23
+    total = core + acou
+    fig, ax = plt.subplots(figsize=(6.0, 4.4))
+    ax.bar([0], [core], width=0.44, color=BLUE)
+    ax.bar([0], [acou], width=0.44, bottom=[core], color="#b8cbd8")
+    ax.text(0, core / 2, "核群 %.2f ms" % core, ha="center", va="center",
+            fontsize=10, color="white", weight="bold")
+    ax.text(0, core + acou / 2, "声学 R %.2f ms" % acou, ha="center", va="center",
+            fontsize=10, color=INK)
+    ax.text(0, total + 0.13, "%.1f ms（推算）" % total, ha="center", va="bottom",
+            fontsize=11.5, color=ACCENT, weight="bold")
+    ax.set_xlim(-0.6, 0.6)
+    ax.set_ylim(0, 4.1)
+    ax.set_xticks([0])
+    ax.set_xticklabels(["fir_pl.bit\n单一通路，无三档"])
     ax.set_ylabel("端到端延迟 / ms")
-    ax.set_title("三档数字段与端到端延迟", fontsize=12)
-    ax.legend(fontsize=8.5, loc="upper right")
+    ax.set_title("PL 直连端到端延迟预算", fontsize=12)
     ax.grid(axis="y", color="#dfe3e6", lw=0.6)
+    ax.text(0.5, -0.20,
+            "PL 直连没有「稳定 / 中间 / 低延迟」三档：延迟由 FIFO 水位、核内拍数与 codec 固定时延决定，\n"
+            "不随增益 / 门限改变。核群 1.97 ms + 声学 1.23 ms 为预算推算，未实测、未做人耳验收。",
+            transform=ax.transAxes, ha="center", va="top", fontsize=8,
+            color="#666666", linespacing=1.5)
     save(fig, "fig3_2_latency.png")
 
 
@@ -295,7 +329,12 @@ def fig_soak():
     a2.set_ylabel("最大块间空档 / ms")
     a2.set_title("0 丢块不等于 0 空档", fontsize=10)
     a2.grid(axis="y", color="#dfe3e6", lw=0.6)
-    fig.tight_layout()
+    fig.suptitle("块模式（出货线 fir.bit）约 600 秒长跑：鲁棒性回归", fontsize=11.5)
+    fig.tight_layout(rect=(0, 0.075, 1, 0.96))
+    fig.text(0.5, 0.015,
+             "口径说明：本图为出货线 fir.bit（块模式，音频经 PS 逐块搬运）的鲁棒性回归，与正文 PL 直连 fir_pl.bit 的性能数值不并列；\n"
+             "PL 直连的对应结论为 60 秒零丢字、零断流，未做 600 秒计数。",
+             ha="center", va="bottom", fontsize=7.5, color="#70787f", linespacing=1.5)
     save(fig, "fig3_3_soak.png")
 
 
@@ -375,10 +414,13 @@ def fig_ab_loudness():
 
 
 def fig_software():
-    """2.3.1 软件架构：控制面与数据面只在一对 /dev/shm json 上相交。"""
-    fig, ax = plt.subplots(figsize=(9.4, 8.2))
+    """2.3.1 软件架构（PL 直连）：PS 只剩启动编排，没有音频数据路径。
+
+    PS 不搬样、不起实时线程、不与 /dev/shm 交换参数；四段增益与 WDRC 参数在编译期写死。
+    """
+    fig, ax = plt.subplots(figsize=(8.8, 7.6))
     ax.set_xlim(0, 100)
-    ax.set_ylim(-8, 108)
+    ax.set_ylim(0, 108)
     ax.axis("off")
 
     def bx(x, y, w, h, text, fc="#eef2f5", ec=INK, fs=8, weight="normal"):
@@ -387,62 +429,55 @@ def fig_software():
         ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fs,
                 color=INK, weight=weight, linespacing=1.45, zorder=3)
 
-    def poly(pts, label="", lx=None, ly=None, ha="left", ls="-", fs=7.5):
-        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=INK, lw=1.0, ls=ls,
-                solid_capstyle="butt", solid_joinstyle="miter", zorder=1)
-        ax.add_patch(FancyArrowPatch(pts[-2], pts[-1], arrowstyle="-|>",
-                                     mutation_scale=10, lw=1.0, color=INK, linestyle=ls,
+    def arr(p0, p1, label="", fs=7.5, dx=0, dy=0, ls="-"):
+        ax.add_patch(FancyArrowPatch(p0, p1, arrowstyle="-|>", mutation_scale=10,
+                                     lw=1.0, color=INK, linestyle=ls,
                                      shrinkA=0, shrinkB=0, zorder=2))
         if label:
-            ax.text(lx, ly, label, ha=ha, va="center", fontsize=fs, color=INK, zorder=4,
+            ax.text((p0[0] + p1[0]) / 2 + dx, (p0[1] + p1[1]) / 2 + dy, label,
+                    ha="center", va="center", fontsize=fs, color=INK, zorder=4,
                     bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none"))
 
-    # 区域：板端 PS / 板端 PL，标签竖排在框内左边，不压任何走线
-    ax.add_patch(Rectangle((2, 44), 96, 48, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
-    ax.text(4.6, 68, "板端 PS：ARM Cortex-A9 · PYNQ 2.7 · Linux", fontsize=7.5,
-            color="#70787f", rotation=90, ha="center", va="center")
-    ax.add_patch(Rectangle((2, 2), 96, 38, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
-    ax.text(4.6, 21, "板端 PL：100 MHz", fontsize=7.5, color="#70787f",
-            rotation=90, ha="center", va="center")
+    # 左：PS 侧启动编排（无音频数据路径）
+    ax.add_patch(Rectangle((2, 20), 56, 84, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
+    ax.text(4, 101.5, "PS：ARM Cortex-A9 · PYNQ 2.7 · Linux", fontsize=8, color="#70787f")
 
-    # 浏览器（PC 上）
-    bx(12, 96, 46, 10, "浏览器（PC）：验配页面 page.html\n四段增益 / 门限 / 压缩比 / 起振 / 释放",
-       fc="#fdf1e8", ec=ACCENT)
-    poly([(32, 96), (32, 90)], "HTTP：/api/tune · /api/start · /api/status", 33.5, 93)
+    bx(6, 88, 48, 9, "上电：加载 PYNQ 2.7 镜像，启动 Python 3.6", fc="#dbe7f3", fs=8.5)
+    bx(6, 74, 48, 9, "Overlay(\"fir_pl.bit\")：编程 PL", fc="#dbe7f3", fs=8.5, weight="bold")
+    bx(6, 60, 48, 9, "I2C 配一次 ADAU1761：采样率 / 增益", fc="#dbe7f3", fs=8.5)
+    bx(6, 46, 48, 9, "轮询 ctrl / stat：溢出 · 欠载 · 块计数", fc="#dbe7f3", fs=8.5)
+    bx(6, 24, 48, 11, "PL：codec → 四段 FIR → WDRC → codec\n音频全程在 PL 内闭环（详见图 2-1）",
+       fc="#dcefd9", fs=8.5)
 
-    # 控制面
-    bx(8, 80, 38, 10, "fir_webui.py　HTTP 服务 :8080\n起停 fir_live 子进程、写参数文件", fc="#dbe7f3")
-    poly([(32, 80), (32, 72)], "写参数", 33.5, 76.5)
-    bx(20, 62, 26, 10, "/dev/shm/fir_tune.json\n旋钮参数", fc="#eeeeee")
-    bx(8, 50, 38, 10, "/dev/shm/fir_status.json\n状态 + 电平", fc="#eeeeee")
-    poly([(12, 60), (12, 80)], "读状态（20 Hz）", 13.5, 75)
+    arr((30, 88), (30, 83), fs=7)
+    arr((30, 74), (30, 69), fs=7)
+    arr((30, 60), (30, 55), fs=7)
+    arr((30, 46), (30, 35), "AXI-Lite ctrl / stat（不含音频）", fs=7.5, dx=3)
 
-    # 数据面：两条线程 + 一个 C 库
-    bx(54, 78, 20, 12, "dsp 线程\nSCHED_FIFO 10\n过核 + 写状态", fc="#dbe7f3")
-    bx(82, 78, 16, 12, "io 线程\nSCHED_FIFO 20\n只调 duplex_block", fc="#dbe7f3")
-    poly([(74, 86), (82, 86)], "q1", 78, 88.3, ha="center", fs=7)
-    poly([(82, 82), (74, 82)], "q2", 78, 79.7, ha="center", fs=7)
-    bx(82, 46, 16, 10, "libaudio_stream.so\n（C++，cffi）", fc="#e8eef3")
-    poly([(90, 78), (90, 56)], "cffi", 91.5, 67)
+    # 右：编译期固定参数
+    ax.add_patch(Rectangle((60, 20), 38, 84, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
+    ax.text(62, 101.5, "编译期（Vivado / Vitis HLS 2020.2）", fontsize=8, color="#70787f")
 
-    # 调参通道：dsp 每 0.05 s 读一次，写完状态再写回文件
-    poly([(46, 67), (50, 67), (50, 76), (56, 76), (56, 78)], "每 0.05 s 读一次", 51, 76.9, fs=7)
-    poly([(62, 78), (62, 72), (53, 72), (53, 54), (46, 54)], "写状态 / 电平", 52, 70.4, fs=7)
+    bx(64, 76, 30, 9, "综合 · 实现\n→ fir_pl.bit", fc="#fdf1e8", ec=ACCENT, fs=8.5,
+       weight="bold")
+    bx(64, 62, 30, 9, "固化为 RTL 常量\nQ1.17 / Q7.8", fc="#f7f2ec", fs=8.5)
+    bx(64, 48, 30, 9, "四段增益 · 门限 · 压缩比\n起振 / 释放", fc="#f7f2ec", fs=8.5)
 
-    # PL：核与 DDR、音频 IP 与 codec
-    bx(52, 22, 22, 12, "fir_multiband 核 v25\n36 拍 / 采样", fc="#dbe7f3", weight="bold")
-    bx(76, 22, 22, 12, "音频 IP（codec ctrl）\nMMIO FIFO，无 DMA", fc="#dcefd9")
-    bx(52, 6, 22, 10, "DDR3 块缓冲\ncin[] / cout[]", fc="#eeeeee")
-    bx(76, 6, 22, 10, "ADAU1761 codec\n麦克风 / 耳机（TRRS）", fc="#fbe3cc")
-    poly([(63, 78), (63, 34)], "AXI-Lite 写寄存器", 64.5, 60)
-    poly([(90, 46), (90, 34)], "MMIO 读写 FIFO", 88.5, 42, ha="right")
-    poly([(63, 22), (63, 16)], "AXI4 主机 S_AXI_HP0", 64.5, 19)
-    poly([(87, 22), (87, 16)], "I2S", 85.5, 19, ha="right")
+    arr((79, 57), (79, 62), fs=7)
+    arr((79, 71), (79, 76), fs=7)
+    arr((64, 80.5), (54, 78.5), "位流", fs=7.5, dx=-1, dy=2.5)
 
-    ax.text(2, -4.5,
-            "左为控制面、右为数据面：两条线程不共享内存里的任何旋钮，只通过 /dev/shm 下两个 json 文件交换参数与状态。\n"
-            "q1 / q2 是两条 queue.SimpleQueue —— io 把收到的整块交给 dsp，dsp 把算好的一块交回 io；界面不碰 MMIO。",
-            fontsize=7.5, color="#70787f", linespacing=1.6)
+    ax.text(64, 42,
+            "fir_pl.bit 没有增益寄存器：四段增益与\n"
+            "WDRC 参数编译期写死。改参数必须重新\n"
+            "综合 + 重新加载 overlay，网页验配那一\n"
+            "套驱动不了它。",
+            fontsize=7.8, color="#6b6257", ha="left", va="top", linespacing=1.6)
+
+    ax.text(2, 4,
+            "PL 直连下 PS 侧没有音频数据路径：不搬样、不起 SCHED_FIFO 实时线程、不与 /dev/shm 交换参数，\n"
+            "因此也没有 dsp / io 双线程与 queue 队列 —— 音频吞吐完全由 PL 内的 I2S 收发与核流水决定。",
+            fontsize=7.8, color="#70787f", ha="left", va="center", linespacing=1.6)
     save(fig, "fig2_5_software.png")
 
 
