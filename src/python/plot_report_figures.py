@@ -36,10 +36,16 @@ BLUE = "#2f6f9f"
 GREEN = "#3f7d4f"
 GREY = "#8a939b"
 
+# 这三张同时提供矢量版（报告里缩放用），随 PNG 一并重导出，避免两者脱节
+SVG_FIGS = {"fig1_1_flow.png", "fig2_1_block.png", "fig2_2_chain.png"}
+
 
 def save(fig, name):
     path = os.path.join(OUT, name)
     fig.savefig(path, bbox_inches="tight", facecolor="white")
+    if name in SVG_FIGS:
+        # svg.fonttype 默认 path：文字转轮廓，换机器/缺字体也不会变样
+        fig.savefig(path[:-4] + ".svg", bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print("wrote", os.path.relpath(path, ROOT))
 
