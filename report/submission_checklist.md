@@ -35,7 +35,7 @@
 | 允许使用公开大模型，须提交体现协作过程的交互记录 | `report/llm_collab_log/` 49 篇，每篇含【任务】【提示词】【模型回答】【哪里错了】【怎么修正】【验证边界】 | ✅ |
 | 须将协作过程中沉淀的可复用经验提炼为技能包 | `skill/` 27 条，A/B/C 三档 | ✅ |
 | 强烈要求在 GitHub/Gitee 开源，推荐 MIT / Apache-2.0 | 仓库根 `LICENSE` = MIT | ✅ |
-| 仓库对外可访问 | ⚠️ **需在提交前把仓库转为 public**（当前公开 API 访问返回 404） | ⬜ |
+| 仓库对外可访问 | 已转 public。2026-11-01 23:59 匿名复查：`private: false`、`visibility: public`、默认分支 `main`、许可 `MIT`、`HEAD` = `1a91bb1`；Release `demo-20261101` 的 `demo_full_20261101.mp4`（59.5 MB）匿名可见 | ✅ |
 
 ---
 
