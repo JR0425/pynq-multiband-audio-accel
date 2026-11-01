@@ -125,7 +125,7 @@ def fig_block():
     tag_box = dict(boxstyle="round,pad=0.15", fc="white", ec="none")
     ax.text(47.5, 58.6, "PL（可编程逻辑，100 MHz）· 音频全程不出 PL", fontsize=9.5,
             color="#555555", bbox=tag_box)
-    ax.add_patch(Rectangle((46, 6), 76, 24, fill=False, ls="--", lw=1.2,
+    ax.add_patch(Rectangle((46, 4), 76, 26, fill=False, ls="--", lw=1.2,
                            edgecolor="#888888"))
     ax.text(47.5, 28.2, "PS（ARM Cortex-A9，Linux，PYNQ 2.7 / Python 3.6）",
             fontsize=9.5, color="#555555", bbox=tag_box)
@@ -134,18 +134,18 @@ def fig_block():
     bx(2, 45, 18, 9, "麦克风\n(TRRS, HP+Mic)", fc=ORANGE, fs=9.5)
     bx(2, 29, 18, 9, "耳机 / 扬声器\n(TRRS, HP+Mic)", fc=ORANGE, fs=9.5)
     bx(24, 31, 17, 22, "ADAU1761\ncodec\n\nADC / DAC\n48 kHz, int16", fc=ORANGE, fs=9.5)
+    bx(2, 8, 18, 8, "浏览器（PC）\n验配页面", fc="#fdf1e8", fs=8.5)
 
     # PL 内：蛇形闭环 codec → 收 → 四段 → WDRC → 发 → codec
     bx(49, 47, 19, 9, "i2s_duplex（收）\nADC 样本入 PL", fc=GREEN, fs=8.5)
     bx(75, 47, 20, 9, "fir_mb_fe\n四段相减 FIR", fc=LBLUE, weight="bold", fs=9)
-    bx(99, 47, 21, 9, "fir_drc4\n四段 WDRC", fc=LBLUE, weight="bold", fs=9)
+    bx(99, 47, 21, 9, "fir_drc4 ×2\n双耳 WDRC", fc=LBLUE, weight="bold", fs=8.5)
     bx(99, 36.5, 21, 7.5, "i2s_duplex（发）\n样本出 PL → DAC", fc=GREEN, fs=8.5)
 
-    # PS 内：最小驱动面
-    bx(50, 11, 34, 12, "fir_pl_demo.py\n加载 fir_pl.bit overlay\nI2C 配一次 codec · 轮询 ctrl/stat",
+    # PS 内：只做控制面（100 Hz 写寄存器 / 读状态），不碰音频样本流
+    bx(50, 14, 30, 10, "fir_pl_webui.py :8080\nHTTP ＋ 验配页面", fc=LBLUE, fs=8.5)
+    bx(84, 14, 34, 10, "fir_pl_live.py（100 Hz）\n读 tune → 写寄存器 → 读回状态",
        fc=LBLUE, fs=8.5)
-    bx(90, 11, 28, 12, "四段增益 / WDRC 参数\n编译期写死，无寄存器\n网页验配驱动不了",
-       fc="#f6f0e8", fs=8.5)
 
     # 连线
     ar((20, 49.5), (24, 49.5), "mic", dy=1.7, fs=8.5)
@@ -155,15 +155,19 @@ def fig_block():
     ar((95, 51.5), (99, 51.5), fs=8.5)
     ar((109.5, 47), (109.5, 44), fs=8.5)
     ar((99, 40.25), (41, 40.25), "I2S 返回 codec", dy=1.8, dx=8, fs=8.5)
-    ar((67, 23), (67, 35), ls="--")
-    ax.text(69, 32.2, "AXI-Lite：ctrl / stat（PS 只读状态）", fontsize=8.5, color=INK,
-            ha="left", va="center",
+    ar((22, 12), (50, 18), "HTTP", dy=3.2, dx=-3, fs=8.5)
+    ar((80, 19), (84, 19), fs=8.5)
+    ar((101, 24), (101, 35), ls="--")
+    ax.text(101, 32.4, "AXI-Lite 写寄存器 / 读状态", fontsize=8.2,
+            color=INK, ha="center", va="center",
             bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none"))
+    ax.text(51, 6.6, "PS 不搬样、不接触音频样本流：只在控制面每 100 ms 写一次寄存器并读回状态",
+            fontsize=8.2, color="#70787f", ha="left", va="center")
 
-    ax.text(62, 2.6,
-            "虚线框是 PL / PS 边界。音频全程在 PL 内闭环：codec → i2s_duplex → fir_mb_fe（相减四段）→ fir_drc4（WDRC）→ i2s_duplex → codec，\n"
-            "不过 PS、不过 DDR；PS 只在启动时加载 overlay、配一次 codec，之后轮询 ctrl/stat。",
-            fontsize=8.5, color="#666666", ha="center", va="center", linespacing=1.4)
+    ax.text(62, 1.6,
+            "虚线框是 PL / PS 边界。音频全程在 PL 内闭环：codec → i2s_duplex → fir_mb_fe（相减四段）→ fir_drc4 ×2（双耳 WDRC）→ 限幅 → i2s_duplex → codec，\n"
+            "不过 PS、不过 DDR；PS 只做控制面，每 100 ms 经 AXI-Lite 写一次寄存器并读回状态。",
+            fontsize=8.2, color="#666666", ha="center", va="center", linespacing=1.4)
 
     fig.tight_layout()
     save(fig, "fig2_1_block.png")
@@ -420,13 +424,14 @@ def fig_ab_loudness():
 
 
 def fig_software():
-    """2.3.1 软件架构（PL 直连）：PS 只剩启动编排，没有音频数据路径。
+    """2.3.1 软件架构（PL 直连）：PS 只做控制面，音频数据面完全在 PL 内。
 
-    PS 不搬样、不起实时线程、不与 /dev/shm 交换参数；四段增益与 WDRC 参数在编译期写死。
+    PS 每 100 ms 读一次 /dev/shm/fir_tune.json，写进 AXI-Lite 寄存器，再读回状态；
+    不搬运任何音频样本。
     """
-    fig, ax = plt.subplots(figsize=(8.8, 7.6))
+    fig, ax = plt.subplots(figsize=(8.4, 8.8))
     ax.set_xlim(0, 100)
-    ax.set_ylim(0, 108)
+    ax.set_ylim(0, 106)
     ax.axis("off")
 
     def bx(x, y, w, h, text, fc="#eef2f5", ec=INK, fs=8, weight="normal"):
@@ -444,47 +449,118 @@ def fig_software():
                     ha="center", va="center", fontsize=fs, color=INK, zorder=4,
                     bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none"))
 
-    # 左：PS 侧启动编排（无音频数据路径）
-    ax.add_patch(Rectangle((2, 20), 56, 84, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
-    ax.text(4, 101.5, "PS：ARM Cortex-A9 · PYNQ 2.7 · Linux", fontsize=8, color="#70787f")
+    # PS：控制面
+    ax.add_patch(Rectangle((2, 42), 96, 62, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
+    ax.text(4, 100.5, "PS：ARM Cortex-A9 · PYNQ 2.7 · Linux（只做控制面）",
+            fontsize=8, color="#70787f")
 
-    bx(6, 88, 48, 9, "上电：加载 PYNQ 2.7 镜像，启动 Python 3.6", fc="#dbe7f3", fs=8.5)
-    bx(6, 74, 48, 9, "Overlay(\"fir_pl.bit\")：编程 PL", fc="#dbe7f3", fs=8.5, weight="bold")
-    bx(6, 60, 48, 9, "I2C 配一次 ADAU1761：采样率 / 增益", fc="#dbe7f3", fs=8.5)
-    bx(6, 46, 48, 9, "轮询 ctrl / stat：溢出 · 欠载 · 块计数", fc="#dbe7f3", fs=8.5)
-    bx(6, 24, 48, 11, "PL：codec → 四段 FIR → WDRC → codec\n音频全程在 PL 内闭环（详见图 2-1）",
-       fc="#dcefd9", fs=8.5)
+    bx(6, 88, 42, 9, "浏览器（PC）：验配页面 page.html\n四段增益 / 压缩四参数 / MPO / 双耳",
+       fc="#fdf1e8", ec=ACCENT)
+    bx(6, 72, 42, 10, "fir_pl_webui.py　HTTP :8080\n/api/tune · /status · /start · /scope",
+       fc="#dbe7f3")
+    bx(6, 54, 42, 12, "/dev/shm（tmpfs）参数与状态\nfir_tune.json · fir_status.json\nfir_scope.json · fir_pl_run.txt",
+       fc="#eeeeee")
+    bx(58, 54, 36, 12, "fir_pl_live.py（100 Hz）\n读 tune → 写 AXI-Lite 寄存器\n读回 → 写 status / scope",
+       fc="#dbe7f3")
 
-    arr((30, 88), (30, 83), fs=7)
-    arr((30, 74), (30, 69), fs=7)
-    arr((30, 60), (30, 55), fs=7)
-    arr((30, 46), (30, 35), "AXI-Lite ctrl / stat（不含音频）", fs=7.5, dx=3)
+    arr((27, 88), (27, 82), "HTTP", dx=4)
+    arr((27, 72), (27, 66), "写参数 / 读状态", dx=9)
+    arr((48, 62), (58, 62), "读参数", dy=2.2)
+    arr((58, 57), (48, 57), "写状态", dy=-2.2)
 
-    # 右：编译期固定参数
-    ax.add_patch(Rectangle((60, 20), 38, 84, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
-    ax.text(62, 101.5, "编译期（Vivado / Vitis HLS 2020.2）", fontsize=8, color="#70787f")
+    # PL：数据面（闭环）
+    ax.add_patch(Rectangle((2, 4), 96, 34, fill=False, ls="--", lw=1.1, edgecolor="#9aa2a9"))
+    ax.text(4, 35.5, "PL：100 MHz · 音频全程在 PL 内闭环", fontsize=8, color="#70787f")
 
-    bx(64, 76, 30, 9, "综合 · 实现\n→ fir_pl.bit", fc="#fdf1e8", ec=ACCENT, fs=8.5,
-       weight="bold")
-    bx(64, 62, 30, 9, "固化为 RTL 常量\nQ1.17 / Q7.8", fc="#f7f2ec", fs=8.5)
-    bx(64, 48, 30, 9, "四段增益 · 门限 · 压缩比\n起振 / 释放", fc="#f7f2ec", fs=8.5)
+    bx(6, 20, 88, 11,
+       "I2S 收 → fir_mb_fe（3×193 抽头低通，3 拍/采样）→ 四段相减\n"
+       "→ fir_drc4 ×2（bank0 左 / bank1 右）→ 软膝限幅（≤29465）→ MPO 限幅（−6 dBFS）→ I2S 发",
+       fc="#dcefd9", fs=8)
+    bx(6, 6, 42, 9, "Player 环 16384 字 BRAM\n板载 WAV 循环（48.828 kHz）", fc="#eef2f5", fs=7.8)
+    bx(52, 6, 42, 9, "抓取窗口 1024 点 / 21 ms\n波形 + rFFT 频谱", fc="#eef2f5", fs=7.8)
 
-    arr((79, 57), (79, 62), fs=7)
-    arr((79, 71), (79, 76), fs=7)
-    arr((64, 80.5), (54, 78.5), "位流", fs=7.5, dx=-1, dy=2.5)
+    arr((76, 54), (76, 38), "AXI-Lite 写寄存器（不含音频）", dx=22, dy=0, ls="--")
+    arr((27, 20), (27, 15), ls="--")
+    arr((73, 20), (73, 15), ls="--")
 
-    ax.text(64, 42,
-            "fir_pl.bit 没有增益寄存器：四段增益与\n"
-            "WDRC 参数编译期写死。改参数必须重新\n"
-            "综合 + 重新加载 overlay，网页验配那一\n"
-            "套驱动不了它。",
-            fontsize=7.8, color="#6b6257", ha="left", va="top", linespacing=1.6)
-
-    ax.text(2, 4,
-            "PL 直连下 PS 侧没有音频数据路径：不搬样、不起 SCHED_FIFO 实时线程、不与 /dev/shm 交换参数，\n"
-            "因此也没有 dsp / io 双线程与 queue 队列 —— 音频吞吐完全由 PL 内的 I2S 收发与核流水决定。",
-            fontsize=7.8, color="#70787f", ha="left", va="center", linespacing=1.6)
+    ax.text(2, 1.0,
+            "PS 不搬运任何音频样本：数据面整条链都在 PL 内，PS 侧只有 100 Hz 的控制环与状态回读；\n"
+            "调参写入 /dev/shm/fir_tune.json（tmpfs），重启即失效，板上基线备份在 tune_baseline.json。",
+            fontsize=7.6, color="#70787f", ha="left", va="center", linespacing=1.6)
     save(fig, "fig2_5_software.png")
+
+
+def fig_ctrl_flow():
+    """2.3.2 控制环流程图：fir_pl_live.py 的 100 Hz 主循环。"""
+    fig, ax = plt.subplots(figsize=(7.6, 8.6))
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 121)
+    ax.axis("off")
+
+    def bx(y, h, text, fc="#eef2f5", fs=9, bold=False, ec=INK):
+        ax.add_patch(FancyBboxPatch((16, y), 52, h, boxstyle="round,pad=0.25,rounding_size=0.6",
+                                    lw=1.1, edgecolor=ec, fc=fc, zorder=2))
+        ax.text(42, y + h / 2, text, ha="center", va="center", fontsize=fs, color=INK,
+                zorder=3, linespacing=1.4,
+                weight="bold" if bold else "normal")
+
+    def down(y0, y1, label=""):
+        ax.add_patch(FancyArrowPatch((42, y0), (42, y1), arrowstyle="-|>", mutation_scale=11,
+                                     lw=1.1, color=INK, shrinkA=0, shrinkB=0, zorder=1))
+        if label:
+            ax.text(44, (y0 + y1) / 2, label, ha="left", va="center", fontsize=7.8,
+                    color="#555555")
+
+    # 侧注：关键寄存器
+    def side(y, text):
+        ax.text(70, y, text, ha="left", va="center", fontsize=7.2, color="#70787f",
+                linespacing=1.35)
+
+    bx(106, 9, "① 读 /dev/shm/fir_tune.json\n（四段增益 · 门限 · 比 · 起振 · 释放 · MPO）",
+       fc="#dbe7f3", fs=8.5)
+    down(106, 99)
+
+    bx(88, 9, "② 范围钳制：增益 ±24 dB、ratio 0.1–1.0\n时间常数换算为采样数（48.828 kHz）",
+       fc="#dbe7f3", fs=8.5)
+    side(92.5, "GAIN[0..3]  Q7.8（1.0=256）\nTHR/RATIO  Q2.22\nATK/REL    采样数")
+
+    down(88, 81)
+
+    bx(70, 9, "③ 写 bank0（左耳）/ bank1（右耳）寄存器\n仅写与上次不同的位，避免每拍重配",
+       fc="#dbe7f3", fs=8.5)
+    side(74.5, "0x43C40000\nbank0 +0x100\nbank1 +0x200")
+
+    down(70, 63)
+
+    bx(52, 9, "④ 读 RAMP_BUSY（0x74），斜坡落零\n才认为新参数已生效",
+       fc="#fdf1e8", ec=ACCENT, fs=8.5)
+
+    down(52, 45)
+
+    bx(34, 9, "⑤ 读回观测：PEAK_IN / PEAK_OUT / ENV / GR\n/ MPO_CNT / MPO_PEAK（每 768 采样锁存）",
+       fc="#dcefd9", fs=8.5)
+    side(38.5, "0x040 / 0x044\n0x50 / 0x60\nRO，只读不改流")
+
+    down(34, 27)
+
+    bx(16, 9, "⑥ 写 /dev/shm/fir_status.json\n（页面 20 Hz 轮询取用）", fc="#eeeeee", fs=8.5)
+
+    down(18, 13)
+
+    bx(2, 9, "⑦ 每 0.5 s 读抓取窗：写 0x78 选下标\n读 0x7C 取字 → /dev/shm/fir_scope.json",
+       fc="#eeeeee", fs=8)
+
+    # 回环
+    ax.plot([16, 8, 8], [6.5, 6.5, 110.5], color=INK, lw=1.0, zorder=1)
+    ax.add_patch(FancyArrowPatch((8, 110.5), (16, 110.5), arrowstyle="-|>",
+                                 mutation_scale=11, lw=1.0, color=INK,
+                                 shrinkA=0, shrinkB=0, zorder=1))
+    ax.text(6.5, 58, "sleep 10 ms → 下一轮（≈100 Hz）", fontsize=8, color=INK,
+            rotation=90, ha="center", va="center")
+
+    ax.text(2, 118.6, "fir_pl_live.py 主循环：只写寄存器、只读回状态，不接触音频样本",
+            fontsize=10.5, color=INK)
+    save(fig, "fig2_6_ctrl_flow.png")
 
 
 if __name__ == "__main__":
@@ -500,3 +576,4 @@ if __name__ == "__main__":
     fig_thd()
     fig_ab_loudness()
     fig_software()
+    fig_ctrl_flow()
