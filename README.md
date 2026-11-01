@@ -122,7 +122,7 @@ FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声�
 | `data/figures/` | 生成的分析图 |
 | `data/results/` | 所有实测读数；**哪个文件是当前结论、哪些不能引用，见 `data/results/README.md`** |
 | `skill/` | 提示词、模板、校验脚本、踩坑笔记；索引见 `skill/README.md` |
-| `report/` | **设计报告（`design_report.md`）**、合规对照与提交清单（`SUBMISSION_CHECKLIST.md`）、寄存器级接口说明（`hardware_interface_spec.md`）、大模型协作日志（`llm_collab_log/`）、板端截图（`img/`） |
+| `report/` | **设计报告（`design_report.md`）**、合规对照与提交清单（`SUBMISSION_CHECKLIST.md`）、寄存器级接口说明（`hardware_interface_spec.md`）、大模型协作日志（`llm_collab_log/`）、板端截图（`img/`）、海报源文件（`poster/`）；演示视频在 [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101)（59.5 MB，不进 Git 历史） |
 
 **先读哪一份**：要了解项目全貌看 `report/design_report.md`（一页速览 + 前人工作 + 优化轨迹 +
 验证链）；要核对是否符合赛道要求看 `report/SUBMISSION_CHECKLIST.md`；要动手跑看本文件

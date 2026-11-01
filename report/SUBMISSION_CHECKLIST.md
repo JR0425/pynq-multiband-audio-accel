@@ -87,6 +87,8 @@
 |---|---|---|
 | 演示通路 | `board/overlay/fir_pl.bit`（全 PL 直连）+ 网页验配，启动命令见根 `README.md`「当前演示版」 | ✅ |
 | 人耳验收 | 2026-10-15 端到端 40 秒跑通，操作者确认听到处理后的声音；四段增益实时改动 6 次全部接住 | ✅ |
+| 演示视频（全片） | [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101) 的 `demo_full_20261101.mp4`：59.5 MB / 1920×1080 / 2 分 59 秒，实机演示 + 验收过程；口径与报告 §3、§5 一致。**视频放 Release 不放 Git 历史**：59.5 MB 超过 GitHub 单文件建议体积，且历史里的大二进制删不掉 | ✅ |
+| 海报（中／英） | `report/poster/poster_cn.pptx`、`report/poster/poster_en.pptx`（可编辑源，各 2 页版式）；导出图上板照片见 `report/img/` | ✅ |
 
 ---
 
