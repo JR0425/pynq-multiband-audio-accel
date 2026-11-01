@@ -1,0 +1,10 @@
+# 行尾与内容转换白名单
+#
+# 目的：让「clone 之后的文件」与「仓库里记录的文件」逐字节相同。
+# 背景：本机 core.autocrlf=true 时，文本格式的 .hwh 会在 checkout 被写成 CRLF，
+#       md5 从 7fa8e8b3… 变成 6c0ef06b…，而 README 与 data/results/soak_pl_600_20261029_1031.md
+#       记录的都是仓库内那份（LF）。评委 clone 后按 README 校验会判"位流与硬件描述不配套"。
+#
+# 规则：这几类工件禁止做任何换行/编码转换。
+*.bit binary
+*.hwh -text

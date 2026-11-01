@@ -19,6 +19,7 @@
 | `board/` 上板工程与脚本 | `board/overlay/`（位流 + hwh + 构建 tcl）、`board/scripts/`、`board/probes/`、`board/notebooks/` | ✅ |
 | `data/` 测试数据与结果 | `data/audio/`、`data/figures/`、`data/results/`（含索引 `README.md`） | ✅ |
 | `skill/` 技能包 | 27 条，三档，索引见 `skill/README.md` | ✅ |
+| `tools/` 提交打包（本仓库额外） | `make_submission_package.py`，见 §七；指南的推荐结构里没有这一层，属额外的交付工具 | ✅ |
 | `report/` 设计报告与大模型协作记录 | 见下表 | ✅ |
 | 目录与文件名：小写字母、数字、下划线或连字符 | 目录全小写、无中文、无空格；文件名为小写，仅 `README.md` / `BUILD_GUIDE.md` / `LICENSE` 三个常规大写名 | ✅ |
 
@@ -88,11 +89,41 @@
 | 演示通路 | `board/overlay/fir_pl.bit`（全 PL 直连）+ 网页验配，启动命令见根 `README.md`「当前演示版」 | ✅ |
 | 人耳验收 | 2026-10-15 端到端 40 秒跑通，操作者确认听到处理后的声音；四段增益实时改动 6 次全部接住 | ✅ |
 | 演示视频（全片） | [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101) 的 `demo_full_20261101.mp4`：59.5 MB / 1920×1080 / 2 分 59 秒，实机演示 + 验收过程；口径与报告 §3、§5 一致。**视频放 Release 不放 Git 历史**：59.5 MB 超过 GitHub 单文件建议体积，且历史里的大二进制删不掉 | ✅ |
-| 海报（中／英） | `report/poster/poster_cn.pptx`、`report/poster/poster_en.pptx`（可编辑源，各 2 页版式）；导出图上板照片见 `report/img/` | ✅ |
+| 海报（中／英） | **已删除**（原 `report/poster/*.pptx`，见 git 历史 `e1e1d84`）：英文版单页含作者姓名与校名，与指南第六章「不包含队伍信息」冲突；且版面为 16:9，非 A4。决赛前需按 A4 重出一版无队伍信息的英文海报 | 待重做 |
 
 ---
 
-## 七、提交前 30 分钟自检
+## 七、交付包（打包脚本）
+
+指南要求材料一次性打包提交。打包不用"右键压缩整个目录"，用脚本
+`tools/make_submission_package.py`：
+
+```bash
+python tools/make_submission_package.py          # 产物落 dist/，文件名带 commit 与日期
+```
+
+它做四件事：
+
+| 行为 | 为什么 |
+|---|---|
+| 清单只取 `git ls-tree -r HEAD` | 本机目录 661 MB，其中 `pynq_venv/` 564 MB、`.chart-data-*/` 三个隐藏目录 —— 压缩整个目录会一起带走 |
+| 内容按 `git cat-file` 取 blob 字节 | 与 clone 后逐字节一致，不受本机 `core.autocrlf` 影响（见 `.gitattributes`） |
+| 打包后重算 `fir_pl.bit` / `fir_pl.hwh` 的 md5，与 README 记录比对 | 位流被换过、或内容取错，立即非 0 退出，不会打出一个"看起来正常"的包 |
+| 生成 `MANIFEST.txt` 放进包内 | 提交记录、每个文件的 sha256 与大小、md5 复核结果、视频是否包含 |
+
+边界与前提：
+
+- **演示视频不在仓库里**，脚本只从 `report/video/*.mp4` 取。该目录在 git 里不存在（空目录不跟踪），
+  所以正常 clone 下来是空的，脚本会打印警告并继续 —— 要带视频，先从
+  [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101)
+  下载 `demo_full_20261101.mp4` 放进 `report/video/`，再打一次。`--no-video` 可显式跳过。
+- **工作区有未提交改动时默认拒绝打包**（退出码 3），避免打出一份与提交记录对不上的材料；
+  确认无误再加 `--allow-dirty`。
+- 产物 `dist/` 已在 `.gitignore` 里，不会被自己打进去。
+
+---
+
+## 八、提交前 30 分钟自检
 
 ```bash
 # 1. 无板验收（五项，任何一项挂了返回非 0）

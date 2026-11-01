@@ -122,10 +122,17 @@ FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声�
 | `data/figures/` | 生成的分析图 |
 | `data/results/` | 所有实测读数；**哪个文件是当前结论、哪些不能引用，见 `data/results/README.md`** |
 | `skill/` | 提示词、模板、校验脚本、踩坑笔记；索引见 `skill/README.md` |
-| `report/` | **设计报告（`design_report.md`）**、合规对照与提交清单（`SUBMISSION_CHECKLIST.md`）、寄存器级接口说明（`hardware_interface_spec.md`）、大模型协作日志（`llm_collab_log/`）、板端截图（`img/`）、海报源文件（`poster/`）；演示视频在 [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101)（59.5 MB，不进 Git 历史） |
+| `report/` | **设计报告（`design_report.md`）**、合规对照与提交清单（`submission_checklist.md`）、寄存器级接口说明（`hardware_interface_spec.md`）、大模型协作日志（`llm_collab_log/`）、板端截图（`img/`） |
+| `tools/` | 提交打包脚本（`make_submission_package.py`）；产物落 `dist/`，不入库 |
+
+**演示视频不在本仓库里。** 全片在 [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101) 的 `demo_full_20261101.mp4`（59.5 MB / 1920×1080 / 2 分 59 秒）。
+它不入库有两个原因：59.5 MB 超过 GitHub 单文件建议体积，且历史里的大二进制删不掉。所以
+`report/video/` 在仓库里**是空目录、git 不跟踪**，clone 下来什么都没有；断网环境同样拿不到。
+提交或带走材料时用 `python tools/make_submission_package.py` 打包，它会把 Release 里下载到
+`report/video/` 的 mp4 一并收进去（文件不在则打印警告、不静默跳过）。
 
 **先读哪一份**：要了解项目全貌看 `report/design_report.md`（一页速览 + 前人工作 + 优化轨迹 +
-验证链）；要核对是否符合赛道要求看 `report/SUBMISSION_CHECKLIST.md`；要动手跑看本文件
+验证链）；要核对是否符合赛道要求看 `report/submission_checklist.md`；要动手跑看本文件
 开头的「当前演示版」两条命令。
 
 参考模型、系数生成、质量指标和演示素材生成脚本在 `sim/model/`，板子调试探针在 `board/probes/`。

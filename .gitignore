@@ -113,3 +113,6 @@ pynq_venv/
 # xsim 工作目录（每次跑仿真都会重建）
 sim/rtl_sim/xsim_*/
 build/_probe/
+
+# 提交打包产物（tools/make_submission_package.py 生成）
+/dist/
