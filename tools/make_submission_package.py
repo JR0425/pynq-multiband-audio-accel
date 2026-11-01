@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成提交用压缩包：只收 git 跟踪的文件 + 演示视频，并在打包时重新校验关键工件的 md5。
+"""生成提交用压缩包：git 跟踪的文件 + 本机附加材料（演示视频、海报），打包时复核关键工件 md5。
 
 为什么不用 `git archive` / 直接压缩整个目录：
   * 直接压缩目录会把 pynq_venv/（本机 564 MB）、.chart-data-*/、dist/ 一起带进去；
@@ -8,12 +8,13 @@
 这个脚本的做法：
   1. 文件清单只取 `git ls-tree -r HEAD` —— 仓库外的东西（venv、临时目录、未提交的草稿）天然进不来；
   2. 内容按 `git cat-file` 取 blob 字节 —— 与 clone 得到的字节一致，不受本机 core.autocrlf 影响；
-  3. 打完包重新算 md5，与 README 记录的位流 / hwh 值逐项比对，不一致直接非 0 退出；
-  4. 写 MANIFEST.txt（commit、文件数、每个文件的 sha256 与大小）一并放进包内。
+  3. 演示视频与海报**故意不入库**（体积、版式会改），只从本机目录收，收没收到写进清单；
+  4. 打完包重新算 md5，与 README 记录的位流 / hwh 值逐项比对，不一致直接非 0 退出；
+  5. 写 MANIFEST.txt（commit、文件数、每个文件的 sha256 与大小、附加材料的取舍）一并放进包内。
 
 用法：
     python tools/make_submission_package.py                # 产物落 dist/
-    python tools/make_submission_package.py --no-video     # 不带演示视频（视频太大时）
+    python tools/make_submission_package.py --no-extras    # 不带视频与海报
     python tools/make_submission_package.py --out D:/tmp/pack.zip
 
 工作区有未提交改动时默认拒绝打包（避免打出一份和提交记录对不上的材料），
@@ -38,6 +39,22 @@ EXPECTED_MD5 = {
     "board/overlay/fir_pl.bit": "628b75b3d7a13015a69125fb8ac2d228",
     "board/overlay/fir_pl.hwh": "7fa8e8b3b53aa8bcc9d7ecfac2f546a5",
 }
+
+# 故意不入库、但提交时要带上的本机材料。文件不存在时只警告，不静默跳过。
+EXTRAS = [
+    {
+        "name": "演示视频",
+        "glob": "report/video/*.mp4",
+        "missing": "report/video/ 下没有 mp4：视频在 Release demo-20261101"
+        "（demo_full_20261101.mp4），先下载再打包",
+    },
+    {
+        "name": "海报",
+        "glob": "report/poster/*.pptx",
+        "missing": "report/poster/ 下没有 pptx：海报源文件不入库，从本机成品目录取，"
+        "或从 git 历史 e1e1d84 取回",
+    },
+]
 
 # 明确不该出现在包里的东西。清单本身来自 git，这几项只是打包后的兜底断言。
 FORBIDDEN_PREFIX = (
@@ -89,6 +106,12 @@ def blobs(paths):
         proc.wait()
 
 
+def pad(text, width):
+    """按终端显示宽度补空格（中文占 2 列），让中英混排的标签对齐。"""
+    shown = sum(2 if ord(c) > 0x2E80 else 1 for c in text)
+    return text + " " * max(0, width - shown)
+
+
 def dirty_state():
     out = git("status", "--porcelain")
     return [ln for ln in out.splitlines() if ln.strip()]
@@ -97,7 +120,13 @@ def dirty_state():
 def main():
     ap = argparse.ArgumentParser(description="生成提交用压缩包并校验关键工件")
     ap.add_argument("--out", help="输出 zip 路径（默认 dist/<仓库名>_<commit7>_<日期>.zip）")
-    ap.add_argument("--no-video", action="store_true", help="不打包演示视频")
+    ap.add_argument(
+        "--no-extras",
+        "--no-video",
+        dest="no_extras",
+        action="store_true",
+        help="不打包视频与海报等本机附加材料（--no-video 是旧名，保留兼容）",
+    )
     ap.add_argument("--allow-dirty", action="store_true", help="工作区有未提交改动也照打")
     args = ap.parse_args()
 
@@ -137,26 +166,27 @@ def main():
         digests[path] = (hashlib.sha256(data).hexdigest(), len(data))
         total += len(data)
 
-    # 演示视频：不在 git 里，只有本机 report/video/ 下存在时才带上
-    video_src = sorted((ROOT / "report" / "video").glob("*.mp4"))
-    video_note = "未包含"
-    if args.no_video:
-        video_note = "按 --no-video 跳过"
-    elif video_src:
-        for v in video_src:
-            target = stage / "report" / "video" / v.name
+    # 附加材料：故意不入库，只从本机目录收。收没收到都写清楚，不静默跳过。
+    extras = []
+    for spec in EXTRAS:
+        got = sorted(ROOT.glob(spec["glob"]))
+        if args.no_extras:
+            extras.append((spec["name"], "按 --no-extras 跳过", []))
+        elif got:
+            extras.append((spec["name"], "已包含 %d 个" % len(got), got))
+        else:
+            extras.append((spec["name"], "未包含：" + spec["missing"], []))
+            print("\n[警告] %s %s" % (spec["name"], spec["missing"]))
+
+    for name, note, files in extras:
+        for src in files:
+            rel = src.relative_to(ROOT).as_posix()
+            target = stage / rel
             target.parent.mkdir(parents=True, exist_ok=True)
-            data = v.read_bytes()
+            data = src.read_bytes()
             target.write_bytes(data)
-            digests["report/video/" + v.name] = (hashlib.sha256(data).hexdigest(), len(data))
+            digests[rel] = (hashlib.sha256(data).hexdigest(), len(data))
             total += len(data)
-            video_note = "已包含 %s（%.1f MB）" % (v.name, len(data) / 1048576)
-    else:
-        video_note = (
-            "未包含：report/video/ 下没有 mp4。视频只在 Release "
-            "demo-20261101（demo_full_20261101.mp4），先下载再打包"
-        )
-        print("\n[警告] " + video_note)
 
     # 关键工件 md5 复核：不通过就不出包
     checks = []
@@ -176,7 +206,14 @@ def main():
         "提交     : %s（分支 %s）" % (commit, branch),
         "文件数   : %d（含清单自身）" % (len(digests) + 1),
         "总大小   : %.1f MB" % (total / 1048576),
-        "演示视频 : %s" % video_note,
+        "",
+        "[附加材料（不入库，从本机收）]",
+    ]
+    for name, note, files in extras:
+        lines.append("  " + pad(name, 10) + note)
+        for f in files:
+            lines.append("           %s" % f.relative_to(ROOT).as_posix())
+    lines += [
         "",
         "[关键工件 md5 复核]",
     ]
@@ -208,7 +245,8 @@ def main():
     print("提交包 : %s" % out)
     print("大小   : %.1f MB（解压后 %.1f MB）" % (out.stat().st_size / 1048576, total / 1048576))
     print("文件数 : %d" % (len(digests) + 1))
-    print("视频   : %s" % video_note)
+    for name, note, _ in extras:
+        print(pad(name, 10) + ": " + note)
     print("md5    : 两个关键工件均 PASS" if all(c[3] for c in checks) else "md5    : 有失败")
     print("清单   : 包内 MANIFEST.txt")
     return 0

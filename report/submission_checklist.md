@@ -89,7 +89,8 @@
 | 演示通路 | `board/overlay/fir_pl.bit`（全 PL 直连）+ 网页验配，启动命令见根 `README.md`「当前演示版」 | ✅ |
 | 人耳验收 | 2026-10-15 端到端 40 秒跑通，操作者确认听到处理后的声音；四段增益实时改动 6 次全部接住 | ✅ |
 | 演示视频（全片） | [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101) 的 `demo_full_20261101.mp4`：59.5 MB / 1920×1080 / 2 分 59 秒，实机演示 + 验收过程；口径与报告 §3、§5 一致。**视频放 Release 不放 Git 历史**：59.5 MB 超过 GitHub 单文件建议体积，且历史里的大二进制删不掉 | ✅ |
-| 海报（中／英） | **已删除**（原 `report/poster/*.pptx`，见 git 历史 `e1e1d84`）：英文版单页含作者姓名与校名，与指南第六章「不包含队伍信息」冲突；且版面为 16:9，非 A4。决赛前需按 A4 重出一版无队伍信息的英文海报 | 待重做 |
+| 海报（中／英） | **已制作完成，但不入库**：可编辑源在本机 `report/poster/*.pptx`（`/report/poster/` 已进 `.gitignore`），Git 历史 `e1e1d84` 里另存一份可随时取回；提交时由打包脚本从本机目录收进包内 | ✅ |
+| 海报打印前要确认的两条 | ① 指南第六章要求海报「**不包含队伍信息**」，而 `poster_en.pptx` 单页里现有三位作者姓名与校名，现场打印版必须去掉；② 版面 16:9（`12192000 × 6858000` EMU），非 A4，直打会留白边，需按 A4 重排或加边 | ⚠️ 待确认 |
 
 ---
 
@@ -109,14 +110,16 @@ python tools/make_submission_package.py          # 产物落 dist/，文件名�
 | 清单只取 `git ls-tree -r HEAD` | 本机目录 661 MB，其中 `pynq_venv/` 564 MB、`.chart-data-*/` 三个隐藏目录 —— 压缩整个目录会一起带走 |
 | 内容按 `git cat-file` 取 blob 字节 | 与 clone 后逐字节一致，不受本机 `core.autocrlf` 影响（见 `.gitattributes`） |
 | 打包后重算 `fir_pl.bit` / `fir_pl.hwh` 的 md5，与 README 记录比对 | 位流被换过、或内容取错，立即非 0 退出，不会打出一个"看起来正常"的包 |
-| 生成 `MANIFEST.txt` 放进包内 | 提交记录、每个文件的 sha256 与大小、md5 复核结果、视频是否包含 |
+| 生成 `MANIFEST.txt` 放进包内 | 提交记录、每个文件的 sha256 与大小、md5 复核结果、附加材料（视频/海报）是否收进去 |
 
 边界与前提：
 
-- **演示视频不在仓库里**，脚本只从 `report/video/*.mp4` 取。该目录在 git 里不存在（空目录不跟踪），
-  所以正常 clone 下来是空的，脚本会打印警告并继续 —— 要带视频，先从
-  [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101)
-  下载 `demo_full_20261101.mp4` 放进 `report/video/`，再打一次。`--no-video` 可显式跳过。
+- **两类材料故意不入库，只从本机目录收**：演示视频（`report/video/*.mp4`，59.5 MB，只在
+  [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101)）
+  与海报（`report/poster/*.pptx`，`/report/poster/` 已进 `.gitignore`）。
+  clone 下来这两个目录都是空的，脚本会逐项打印"未包含"的警告并继续 —— 缺件不会静默消失，
+  但也**不会替你下载**：视频要先去 Release 取，海报要从本机成品目录或 `git show e1e1d84:` 取回。
+  `--no-extras` 可显式跳过这两个（旧名 `--no-video` 仍可用）。
 - **工作区有未提交改动时默认拒绝打包**（退出码 3），避免打出一份与提交记录对不上的材料；
   确认无误再加 `--allow-dirty`。
 - 产物 `dist/` 已在 `.gitignore` 里，不会被自己打进去。

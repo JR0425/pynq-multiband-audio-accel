@@ -131,6 +131,11 @@ FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声�
 提交或带走材料时用 `python tools/make_submission_package.py` 打包，它会把 Release 里下载到
 `report/video/` 的 mp4 一并收进去（文件不在则打印警告、不静默跳过）。
 
+**海报同理，做了但不入库。** 可编辑源在 `report/poster/*.pptx`，`/report/poster/` 已进 `.gitignore`
+（海报会反复改版式，二进制 pptx 进历史就删不干净）；Git 历史 `e1e1d84` 里另有一份，需要时
+`git show e1e1d84:report/poster/poster_en.pptx > report/poster/poster_en.pptx` 取回。打包脚本
+同样按本机文件收。注意决赛打印版有两条硬要求：**不包含队伍信息**（指南第六章）、A4 彩打。
+
 **先读哪一份**：要了解项目全貌看 `report/design_report.md`（一页速览 + 前人工作 + 优化轨迹 +
 验证链）；要核对是否符合赛道要求看 `report/submission_checklist.md`；要动手跑看本文件
 开头的「当前演示版」两条命令。

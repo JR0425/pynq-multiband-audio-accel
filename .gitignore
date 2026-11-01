@@ -116,3 +116,7 @@ build/_probe/
 
 # 提交打包产物（tools/make_submission_package.py 生成）
 /dist/
+
+# 海报：已制作，按队伍决定不入库（可编辑源在 git 历史 e1e1d84 里仍可取回）
+# 提交包由 tools/make_submission_package.py 从本机目录收，不进 Git 历史
+/report/poster/
