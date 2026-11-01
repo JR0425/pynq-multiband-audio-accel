@@ -129,6 +129,9 @@ PLAY_CHUNK = 1024
 # 写头领先读头几块。一块 = 20.97 ms，5 块 ≈ 105 ms：上位机或网络卡顿不超过
 # 105 ms 就不会写到还没播的区域，也就不会出「啪」。
 PLAY_LEAD_CHUNKS = 5
+# 板载 WAV 进核时先衰减这么多。WAV 走的是和话筒同一条四段增益（默认每段 +22 dB），
+# 录音本身峰值 −12 dBFS 上下，抬完就顶到限幅，蹦出来是破音而不是变响。
+PLAY_GAIN_DB = -32.0
 
 BIT_DEFAULT = "/home/xilinx/dma_exp/fir_pl.bit"
 CTRL_BASE_DEFAULT = 0x43C00000  # gpio_ctrl，ctrl 位仍走这里
@@ -328,7 +331,8 @@ def load_wav_words(path):
     if sr != FS and len(a) > 1:
         m = int(len(a) * FS / float(sr))
         a = array.array("h", [a[min(len(a) - 1, int(i * sr / FS))] for i in range(m)])
-    return array.array("I", [(int(v) & 0xFFFF) << 16 for v in a])
+    g = 10.0 ** (PLAY_GAIN_DB / 20.0)
+    return array.array("I", [(int(v * g) & 0xFFFF) << 16 for v in a])
 
 
 def _slice_bytes(words, pos, k):
@@ -392,11 +396,11 @@ def apply_tune(regs, tune, last=None):
     表现是"增益永远爬不到头"。
     """
     g = tune.get("gain_db") or [22.0] * 4   # 与 fir_pl_webui.DEFAULT_TUNE 一致
-    # thr/ratio/atk/rel 的默认值必须等于寄存器出厂值（419456 / 2936064 / 17408 / 896），
-    # 否则后端一启动就把位流上电的那套 v25 参数顶掉。2026-10-28 批 2 定案。
+    # 默认值必须和 fir_pl_webui.DEFAULT_TUNE 一致：tune 文件缺格时这边先用，
+    # 不一致会让后端一启动就把位流上电那套参数顶掉，页面再写回来。
     # 例外：ATK 默认 5 ms 在真实帧率 48.828 kHz 下算出 17152（出厂 17408 是按 48 kHz 算的），
     # 差 1 个步进 = 4.93 ms vs 5.00 ms，启动时会写这一格，不影响听感。
-    thr = tune.get("thr_db") or [-20.0] * 4
+    thr = tune.get("thr_db") or [-10.0] * 4
     rat = tune.get("ratio") or [0.7] * 4
     atk = tune.get("attack_ms") or [5.0] * 4
     rel = tune.get("release_ms") or [100.0] * 4
@@ -408,8 +412,8 @@ def apply_tune(regs, tune, last=None):
     tone_sel = int(tone.get("band") or 0) & 0x3
     tone_amp = db_to_amp15(tone.get("amp_db", -22.0))
 
-    # B6 MPO 限幅：输出上限（dBFS）。0 dBFS = 满量程 = 不动作，正是寄存器出厂值 32767。
-    mpo_th = db_to_amp15(float(tune.get("mpo_db", 0.0)))
+    # B6 MPO 限幅：输出上限（dBFS）。0 dBFS = 满量程 = 不动作；默认 -6 dBFS。
+    mpo_th = db_to_amp15(float(tune.get("mpo_db", -6.0)))
 
     # 2026-10-29 双耳：tune["b1"] 存在就用它当右耳的处方，不存在就左右同一套
     # （默认行为不变 —— 单耳时两只耳机听到的内容必须完全一样）。

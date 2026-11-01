@@ -67,18 +67,18 @@ R_ATK = (0.0, 50.0)
 R_REL = (0.0, 500.0)
 R_MPO = (-40.0, 0.0)           # 输出上限（dBFS）；0 = 不动作
 
-# 第一次打开页面时给什么。三个 DRC 参数 = 寄存器出厂值（419456 / 2936064 /
-# 17408 / 896 换算成 dB、ratio、ms）。
+# 第一次打开页面时给什么。三个 DRC 时间参数 = 寄存器出厂值（419456 / 2936064 /
+# 17408 / 896 换算成 dB、ratio、ms）；门限和输出限幅按演示口径改成 -10 / -6 dBFS。
 # 增益默认 +22 dB：模拟 PGA 已经抬到 +35.25 dB（比出厂的 +21 高 14 dB），
 # 数字这边同量减回去，总响度不变、底噪里能被数字抬起来的那部分少 14 dB。
 DEFAULT_TUNE = {
     "gain_db": [22.0, 22.0, 22.0, 22.0],
-    "thr_db": [-20.0, -20.0, -20.0, -20.0],
+    "thr_db": [-10.0, -10.0, -10.0, -10.0],
     "ratio": [0.7, 0.7, 0.7, 0.7],
     "attack_ms": [5.0, 5.0, 5.0, 5.0],
     "release_ms": [100.0, 100.0, 100.0, 100.0],
     "bypass": False,
-    "mpo_db": 0.0,
+    "mpo_db": -6.0,
 }
 
 
@@ -522,7 +522,7 @@ def selftest():
     chk("tune 无文件 -> ok/tune 包装 + 演示默认",
         j.get("ok") is True and isinstance(t0, dict)
         and t0.get("gain_db") == [22.0] * 4
-        and t0.get("thr_db") == [-20.0] * 4 and t0.get("ratio") == [0.7] * 4, t0)
+        and t0.get("thr_db") == [-10.0] * 4 and t0.get("ratio") == [0.7] * 4, t0)
     code, j = get("/api/health")
     chk("health.ok=false", j.get("ok") is False and j.get("mode") == "pl")
     chk("health 报告位流存在", j.get("bit", {}).get("exists") is True)
