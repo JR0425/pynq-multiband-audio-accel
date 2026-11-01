@@ -37,7 +37,7 @@ RUN = 1 << 0
 DRC = 1 << 1
 TONE = 1 << 3
 
-# fir_pl_regs 里的地址（docs/PL直连_寄存器表.md）
+# fir_pl_regs 里的地址（见 src/rtl/fir_pl_regs.v 文件头；报告侧同表 report/design_report.md §2.4）
 BANK0 = 0x100
 OFF_GAIN = 0x00
 OFF_RAMP_BUSY = 0x74

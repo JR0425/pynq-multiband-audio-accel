@@ -48,6 +48,22 @@ bash board/probes/board_accept.sh   # 上板：寄存器窗口、压缩器、双
 `board_accept.sh` 会自己停服务、跑完起回来，跑的时候板子不能有别人在用。
 各项的单独命令、期望输出和失败时看哪个日志，写在 `board/probes/` 各探针的文件头里。
 
+### 演示素材与调参基线：这两个文件不在仓库里
+
+板上播放列表（落在 `/home/xilinx/dma_exp/`）引用两个**私有文件**，随板子走、没进 Git。
+复现时按右列替代：
+
+| 板上文件 | 干什么用 | 仓库里拿什么替 |
+|---|---|---|
+| `wav/voice_20261031_184837.wav` | 播放列表里的人声素材，循环放 | `data/audio/demo_voice_loop_48k.wav`（48 kHz 单声道循环段）；想让四段分频更“听得出来”用 `data/audio/demo_bands_loop_48k.wav` |
+| `tune_baseline.json` | 板上调参备份，重启后从这里恢复 `/dev/shm/fir_tune.json` | **没有数值备份**：能复现的是功能（四段增益 / 门限 / 比率 / MPO 都能运行期改），不是现场那一组具体数值 |
+
+这两件都不影响判据：板载播放的验收看的是 `board/probes/ply_margin.py` 报的送数速率与
+FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声道 wav 都成立。
+
+**换素材时看首尾接缝。** 首尾不衔接的片段每绕一圈会“啪”一声，是循环接缝不是 PL 的毛病
+（10-31 排查时换成 `demo_voice_loop_48k.wav` 就没了）。
+
 ---
 
 **上一代块模式版**：tag `v1.0-submission`，位流 `board/overlay/fir.bit`，md5

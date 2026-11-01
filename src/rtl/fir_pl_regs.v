@@ -1,6 +1,8 @@
 /* fir_pl_regs —— 全 PL 直连版的 AXI4-Lite 从机寄存器文件
  *
- * 契约就是 `桌面\PYNQ音频项目\PL直连_寄存器表.md`,地址/位/默认值一个字都别单边改。
+ * 契约以本文件的地址分区（见下）为准，报告侧同一张表在 `report/design_report.md` §2.4；
+ * 地址/位/默认值一个字都别单边改 —— 后端 `board/scripts/fir_pl_live.py` 与探针
+ * `board/probes/pl_demo_check.py` 都按这份分区读写。
  *
  * ================= 为什么用 initial 给默认值 =================
  *

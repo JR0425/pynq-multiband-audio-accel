@@ -2,3 +2,6 @@ numpy==2.0.2
 scipy==1.13.1
 matplotlib==3.9.4
 soundfile==0.13.1
+# 主机侧远程执行：board/probes/board_ssh.py、board_run.py、demo_rec.py 走 paramiko，
+# board_accept.sh 也依赖它；装在 PC 上，不装到板子上。
+paramiko>=3.4,<4
