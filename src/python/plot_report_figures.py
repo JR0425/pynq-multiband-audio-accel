@@ -9,6 +9,7 @@
   3-2  data/results/dma_pl_direct_20261025.md（延迟预算，推算非实测）
   3-3  data/results/soak600_20261023.md、live_dropout_recheck_20261024.md（块模式出货线回归）
   3-4  3-5  data/results/wdrc_curve_20261023.json
+  3-5  data/results/soak_pl_20261102.json（PL 直连 600 s 逐次采样）
 """
 
 import csv
@@ -563,6 +564,70 @@ def fig_ctrl_flow():
     save(fig, "fig2_6_ctrl_flow.png")
 
 
+def fig_soak_pl():
+    """PL 直连 fir_pl.bit 的 600 s 长跑，直接读板上 JSON 明细。"""
+    path = os.path.join(ROOT, "data", "results", "soak_pl_20261102.json")
+    if not os.path.exists(path):
+        print("skip fig3_5_soak_pl：缺", os.path.relpath(path, ROOT))
+        return
+    with open(path, encoding="utf-8") as f:
+        rows = json.load(f)["rows"]
+    t = np.array([r["t"] for r in rows], dtype=float)
+
+    def series(key):
+        v = [r.get(key) for r in rows]
+        mask = np.array([x is not None for x in v])
+        return np.array([x for x, m in zip(v, mask) if m], dtype=float), t[mask]
+
+    fig, axes = plt.subplots(2, 2, figsize=(9.8, 5.2))
+
+    a1 = axes[0][0]
+    for key, label, color in (("peak_in", "进核峰值", BLUE), ("peak_out", "出核峰值", ACCENT)):
+        y, tt = series(key)
+        if len(y):
+            a1.plot(tt, y, lw=1.0, color=color, label=label)
+    a1.set_title("电平：输入有起伏且未恒满", fontsize=9.5)
+    a1.set_ylabel("峰值（Q1.15 计数）")
+    a1.legend(fontsize=7.5, loc="upper right", frameon=False)
+
+    a2 = axes[0][1]
+    for key, label, color in (("ovf", "采集 overrun", ACCENT), ("und", "播放 underrun", BLUE)):
+        y, tt = series(key)
+        if len(y):
+            a2.step(tt, y, where="post", lw=1.2, color=color, label=label)
+    a2.set_title("计数：overrun 不增长、underrun 恒 0", fontsize=9.5)
+    a2.set_ylabel("累计计数")
+    a2.legend(fontsize=7.5, loc="upper left", frameon=False)
+
+    a3 = axes[1][0]
+    y, tt = series("temp")
+    if len(y):
+        a3.plot(tt, y, lw=1.2, color=GREEN)
+        a3.annotate("%.1f → %.1f °C" % (y[0], y[-1]),
+                    xy=(0.03, 0.86), xycoords="axes fraction", fontsize=8, color=INK)
+    a3.set_title("XADC 温度", fontsize=9.5)
+    a3.set_ylabel("°C")
+
+    a4 = axes[1][1]
+    y, tt = series("mem")
+    if len(y):
+        a4.plot(tt, y, lw=1.2, color=GREY)
+        a4.annotate("%.0f → %.0f MB" % (y[0], y[-1]),
+                    xy=(0.03, 0.86), xycoords="axes fraction", fontsize=8, color=INK)
+    a4.set_title("进程内存占用", fontsize=9.5)
+    a4.set_ylabel("MB")
+
+    for a in axes.flat:
+        a.set_xlabel("时间 / s")
+        a.grid(color="#e3e7ea", lw=0.6)
+        a.tick_params(labelsize=7.5)
+
+    fig.suptitle("PL 直连 fir_pl.bit 连续 %d s 运行监控（%d 次采样，每 2 s）"
+                 % (int(t[-1]), len(rows)), fontsize=11)
+    fig.tight_layout(rect=(0, 0.03, 1, 0.95))
+    save(fig, "fig3_5_soak_pl.png")
+
+
 if __name__ == "__main__":
     fig_flow()
     fig_block()
@@ -572,6 +637,7 @@ if __name__ == "__main__":
     fig_resources()
     fig_latency()
     fig_soak()
+    fig_soak_pl()
     fig_wdrc_curve()
     fig_thd()
     fig_ab_loudness()
