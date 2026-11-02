@@ -183,6 +183,8 @@ def main():
                     help="连续方波只测电平（不算延迟）")
     ap.add_argument("--listen", action="store_true",
                     help="不出测试音、不放音，只打印 ADC 峰值（查话筒通路）")
+    ap.add_argument("--watch", type=float, default=0.0,
+                    help="连续出测试音并实时打印进/出峰值 N 秒；拔插耳机座时盯电平用")
     ap.add_argument("--secs", type=float, default=60.0, help="--listen 的时长")
     a = ap.parse_args()
 
@@ -238,6 +240,31 @@ def main():
                   % (time.time() - t0, peak, rms, base))
             sys.stdout.flush()
             time.sleep(0.5)
+        return 0
+
+    if a.watch > 0:
+        # 连续出单音，实时看进核/出核峰值。拔插耳机座时进核峰值
+        # 若从几十跳到几十万，说明 U41 这次锁上了话筒触点。
+        amp = amps[0]
+        ctrl.write(0, CTRL_RUN | CTRL_DRC | CTRL_FLUSH)
+        time.sleep(0.02)
+        regs.write(OFF_TONE_SEL, 0)
+        regs.write(OFF_TONE_AMP, amp)
+        ctrl.write(0, CTRL_RUN | CTRL_DRC | CTRL_TONE)
+        time.sleep(0.05)
+        print("\n== 连续测试音 amp=%d，实时看电平 %g 秒 ==" % (amp, a.watch))
+        print("  （现在拔插耳机座/分线器，进核 in_peak 应随插入次第变化）")
+        t0 = time.time()
+        while time.time() - t0 < a.watch:
+            ins, outs = read_window(regs)
+            peak_out = int(np.max(np.abs(outs)))
+            base = float(np.median(ins))
+            peak_in = int(np.max(np.abs(ins - base)))
+            print("  %5.1fs  out_peak=%6d  in_peak=%8d  base=%7.0f"
+                  % (time.time() - t0, peak_out, peak_in, base))
+            sys.stdout.flush()
+            time.sleep(0.4)
+        ctrl.write(0, CTRL_RUN | CTRL_DRC)
         return 0
 
     # 清掉上一次可能残留的 TONE 位
