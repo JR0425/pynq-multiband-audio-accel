@@ -591,7 +591,7 @@ python board/probes/soak_pl_600.py --secs 600 --json soak_pl.json
 
 复现结果先对 MD5，再对数字；MD5 不一致说明不是同一版位流，后续数字不可比。各测试的原始输出与数据出处约定见 `data/results/README.md`，该文件标明哪些文件是当前结论、哪些仅作历史记录不可引用。本项目所有引用过的数字都能在那份索引里找到原始输出。
 
-上述流程已在无本地构建缓存的干净副本（`git worktree add --detach` 拉取 HEAD）上完整执行过一次：第一轮在 Vivado 的 IP 脚本上偶发报错（`roe_framer` 的 `xipi_bd_helper_procs.tcl: invalid argument`），脚本重试后第二轮完成布局布线与位流生成。干净副本的产物与交付位流不是逐位相同（MD5 `534a4b60…` 对 `628b75b3…`）——Vivado 的布局布线不保证可复现，本仓库同一设计的两次构建位流 MD5 也不相同；一致性以资源与时序为判据：LUT 20497 对 20509，FF 13556、BRAM 10、DSP 213 完全相同，WNS +0.065 ns 对 +0.090 ns，时序端点 49524 对 49518，均零失败。干净副本重建的位流只做了资源与时序核对，没有替换到板上做验收；板上所有实测数据都来自交付位流。
+上述流程已在无本地构建缓存的干净副本（`git worktree add --detach` 拉取 HEAD）上完整执行过一次：第一轮在 Vivado 的 IP 脚本上偶发报错（`roe_framer` 的 `xipi_bd_helper_procs.tcl: invalid argument`），脚本重试后第二轮完成布局布线与位流生成。干净副本的产物与交付位流不是逐位相同（MD5 `534a4b60…` 对 `628b75b3…`）——Vivado 的布局布线不保证可复现，本仓库同一设计的两次构建位流 MD5 也不相同；一致性以资源与时序为判据：LUT 20497 对 20509，FF 13556、BRAM 10、DSP 213 完全相同，WNS +0.065 ns 对 +0.090 ns，时序端点 49524 对 49518，均零失败。干净副本的位流另外临时替换上板跑过四项验收（`board_accept.sh --skip-push`），4/4 PASS，读数与交付位流同一量级（`data/results/clean_build_accept_20261102.md`）；长跑、THD 与延迟仍来自交付位流，验收后已换回交付位流并重启服务。
 
 ### 8.7 已知限制
 

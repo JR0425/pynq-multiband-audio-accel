@@ -1,0 +1,79 @@
+
+=== 0/5 板子在不在
+在线
+
+=== 1/5 跳过推送（--skip-push）
+
+=== 1.5/5 停掉常驻服务（探针要重载位流，和 live 抢 AXI 会把板子卡死）
+[sudo] password for xilinx: STOPPED
+
+=== 2/5 寄存器窗口（ID / 出厂值 / 四段写读 / 斜坡）
+[sudo] password for xilinx: [1] fir_pl_regs_0 @ 0x43C40000
+[2] ID = 0x504C0002  expect 0x504C0002  OK
+[3] default GAIN = [256, 256, 256, 256] (expect [256,256,256,256])  RAMP_DIV = 0 (expect 0)  OK
+[4] write [256, 511, 1019, 2033] -> read [256, 511, 1019, 2033]  OK
+[4b] default DRC: THR=[419456, 419456, 419456, 419456]  RATIO=[2936064, 2936064, 2936064, 2936064]  ATK=[17408, 17408, 17408, 17408]  REL=[896, 896, 896, 896]  OK
+[4c] per-band THR/ATK write->read  OK
+[4d] bank0/bank1 互不影响  b0=[300, 400, 500, 600] b1=[700, 800, 900, 1000]  OK
+[5] ramp_busy: 稳定=0  刚写完=1  100ms 后=0
+    判据：100 ms 后 busy=0 且 GAIN[3] 到位  OK
+[6] STAT0: 0x0000754A -> 0x0000754A  没动（run=0 时正常，放音时应该会动）
+[7] restored GAIN to 0 dB
+
+REGS PASS
+
+=== 3/5 压缩器随参数动（会从耳机放测试音，约 3 秒）
+[sudo] password for xilinx:   codec 模拟输入 0x400E/0x400F = 0xFF (35.25 dB)
+[0] regs @ 0x43C40000  bram @ 0x43C50000  ctrl @ 0x43C00000
+[1] tone written: 150 cycles / 16384 samples (439.5 Hz), amp 8000
+[2] factory: env=[584566, 352753, 2086, 180] gr=[49844, 0, 0, 0] (max [50060, 0, 0, 0])
+    GR/(ENV-THR) = [0.3]   expect ~0.30 (= 1-ratio)
+[3] 出厂参数下压缩器工作  OK
+[4] THR 抬到 2.0FS: gr=[0, 0, 0, 0]（应全 0）  OK
+[5] ATK=REL=0（无记忆）: env峰=[640230, 386713, 2717, 529] gr峰=[66221, 0, 0, 0]  峰比 0.30（应 ~0.30）  OK
+[6] stop: ply_ctl=0, ctrl=0, params restored
+
+DRC PLY PROBE PASS
+
+=== 4/5 双耳两套处方（同样会出声）
+[sudo] password for xilinx:   codec 模拟输入 0x400E/0x400F = 0xFF (35.25 dB)
+[1] same params: envL=[585613, 353574, 2100, 185] grL=[49845, 0, 0, 0]
+               envR=[585786, 353694, 2104, 187] grR=[49654, 0, 0, 0]
+[2] L/R identical (rel) max|dENV|=173 max|dGR|=191  OK
+[3] right only: envL=[584979, 353352, 2097, 180] grL=[49819, 0, 0, 0]
+               envR=[585527, 353520, 2100, 185] grR=[374868, 212534, 0, 0]
+[4] right GR > left GR  (374868 vs 49819)  OK
+[5] right +18dB: envL=[585539, 353544, 2102, 185]
+                 envR=[4654576, 2811416, 19369, 2999]
+[6] envR/envL = 7.95 (expect ~8 = +18dB)  OK
+
+DUAL PROBE PASS
+
+=== 5/5 抓取窗口 0x78/0x7C（会出声，约 3 秒）
+[sudo] password for xilinx: == 0. 前置：通路开着、抓取没冻、清一次计数器
+   ctrl=0x03  scope_ctl=0  ovf=0 und=0
+== 1. 打开测试音 1500 Hz / -20 dBFS
+== 2. 读一遍窗口（1024 点 = 21 ms）
+   耗时 46.3 ms  ptr=1023  out 不同取值 2 个  out 峰值 3277  in 峰值 1
+   [1] 窗口有数据（不是全 0 / 不是定值）  OK
+== 3. 频率对得上
+   [2] 零穿越法测得 1525.9 Hz（写入 1500 Hz）  OK
+== 4. 快照稳定（冻结期间连读两次）
+   [3] 冻结期间 ptr 不动(1599/1599) 数据一致  OK
+== 5. 读窗口不打扰音频（ovf/und 不涨）
+   [4] ovf 0→0  und 0→0  OK
+   测试音已关
+
+CAP WINDOW PASS
+
+=== 汇总
+  寄存器窗口        PASS
+  压缩器随参数动    PASS
+  双耳两套处方      PASS
+  抓取窗口          PASS
+
+  日志：D:/pynq-multiband-audio-accel/build/tmp/probes/acc_*.log
+  听音还剩三件事（要人）：+30 dB 说话听得清 / 拖增益不咔 / 左右处方不同能听出差别
+
+=== 恢复常驻服务（live + 网页）
+[sudo] password for xilinx: 6588 pgrep -f fir_pl_live
