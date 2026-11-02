@@ -8,7 +8,7 @@
 
 ---
 
-## 30 秒：三个可验证的数字
+## 30 秒：四个可验证的数字
 
 | 数字 | 含义 | 哪一颗位流 | 自己怎么验 |
 |---|---|---|---|
@@ -24,12 +24,21 @@
 
 | 级别 | 前提 | 命令 | 能证明什么 |
 |---|---|---|---|
-| ① 只验功能 | 一块 PYNQ-Z2 + 网线 | `bash board/probes/board_accept.sh` | 寄存器窗口、压缩器、双耳处方、抓取窗口全部正常 |
-| ② 只验设计 | 一台装了 xsim 的机器，**不需要板子** | `bash sim/run_all_checks.sh` | 五项：DRC 三组仿真、寄存器单测、RTL lint、后端自检、网页自检；任何一项挂返回非 0 |
-| ③ 全量重建 | 装 Vivado / Vitis 2020.2（约 30~50 GB） | `./rebuild.sh csim && ./rebuild.sh ip && ./rebuild.sh bit` | 从源码重建位流；详见 `BUILD_GUIDE.md` |
+| ① 只验功能 | 一块 PYNQ-Z2 + 网线（**不需要工具链**） | `bash board/probes/board_accept.sh` | 寄存器窗口、压缩器、双耳处方、抓取窗口全部正常 |
+| ② 只验设计 | 无板，但机器上要有 Vivado（`xvlog` / `xsim`） | `bash sim/run_all_checks.sh` | 五项：DRC 三组仿真、寄存器单测、RTL lint、后端自检、网页自检；任何一项挂返回非 0 |
+| ②′ 连工具链都没有 | 只要 Python 3.9+ | 见下面三条 | 后端自检、网页与三档预设自检、取舍图能从 68 份报告重画 |
+| ③ 全量重建 | Vivado / Vitis 2020.2 全套（约 30~50 GB） | `./rebuild.sh csim && ./rebuild.sh ip && ./rebuild.sh bit` | 从源码重建位流；详见 `BUILD_GUIDE.md` |
 
-**②级是给"不想装 30 GB 工具链"的人准备的**：核心主张（逐位正确、时序收敛、资源占用）
-在 ② 里能验到大部分，装不上工具链不影响判读。
+②′ 那三条（**不需要板子，也不需要 Vivado**）：
+
+```bash
+python board/scripts/fir_pl_live.py  --selftest      # 后端：搬样/对齐/直通 的自检
+python board/scripts/fir_pl_webui.py --selftest      # 网页协议 + 范围钳制 + 三档预设
+python src/python/plot_pareto.py                     # 重画报告 §4.0 的取舍图（现场解析综合报告）
+```
+
+说清边界：**"逐位正确"要靠 ②（xsim）或 ①（板上自检）才能验**，②′ 只覆盖软件侧协议与
+数据解析。装不上 30 GB 工具链也能验到的是"软件与数据链路没问题"，不是"硬件算对了"。
 
 ## 先读哪一份
 
