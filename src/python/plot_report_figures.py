@@ -6,7 +6,7 @@
   2-3  data/results/four_band_response_20261022.csv
   2-4  data/results/impl_metrics.md（拍数与资源，核级 v25，两条位流共用）
   3-1  board/overlay/fir_pl_util.rpt、fir_pl_timing.rpt（整机实现）
-  3-2  data/results/dma_pl_direct_20261025.md（延迟预算，推算非实测）
+  3-2  data/results/dma_pl_direct_20261025.md + pl_delay_20261102.md（核群实测 + 声学标定）
   3-3  data/results/soak600_20261023.md、live_dropout_recheck_20261024.md（块模式出货线回归）
   3-4  3-5  data/results/wdrc_curve_20261023.json
   3-5  data/results/soak_pl_20261102.json（PL 直连 600 s 逐次采样）
@@ -280,8 +280,9 @@ def fig_resources():
 def fig_latency():
     """PL 直连 fir_pl.bit 只有一条通路，不存在块模式的三档延迟。
 
-    1.97 ms 核群延迟 = FIFO 水位 + 核内 2048 拍；1.23 ms 声学往返 R。
-    两者均为预算推算，未实测、未做人耳验收。
+    1.97 ms 核群延迟 = 96 采样群延迟，2026-11-02 用抓取窗口互相关实测
+    （5 个有效窗口 94—96 采样，中位 96）；1.23 ms 声学往返 R 为前期标定。
+    两者相加，未做端到端单次环回实测，也未做人耳验收。
     """
     core, acou = 1.97, 1.23
     total = core + acou
@@ -292,7 +293,7 @@ def fig_latency():
             fontsize=10, color="white", weight="bold")
     ax.text(0, core + acou / 2, "声学 R %.2f ms" % acou, ha="center", va="center",
             fontsize=10, color=INK)
-    ax.text(0, total + 0.13, "%.1f ms（推算）" % total, ha="center", va="bottom",
+    ax.text(0, total + 0.13, "%.1f ms（两项相加）" % total, ha="center", va="bottom",
             fontsize=11.5, color=ACCENT, weight="bold")
     ax.set_xlim(-0.6, 0.6)
     ax.set_ylim(0, 4.1)
@@ -303,7 +304,8 @@ def fig_latency():
     ax.grid(axis="y", color="#dfe3e6", lw=0.6)
     ax.text(0.5, -0.20,
             "PL 直连没有「稳定 / 中间 / 低延迟」三档：延迟由 FIFO 水位、核内拍数与 codec 固定时延决定，\n"
-            "不随增益 / 门限改变。核群 1.97 ms + 声学 1.23 ms 为预算推算，未实测、未做人耳验收。",
+            "不随增益 / 门限改变。核群 1.97 ms 为 2026-11-02 抓取窗口互相关实测（96 采样），\n"
+            "声学 1.23 ms 为前期标定；两项相加，未做端到端单次环回实测，也未做人耳验收。",
             transform=ax.transAxes, ha="center", va="top", fontsize=8,
             color="#666666", linespacing=1.5)
     save(fig, "fig3_2_latency.png")
