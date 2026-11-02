@@ -8,17 +8,24 @@
 
 ---
 
-## 30 秒：四个可验证的数字
+## 30 秒：五个可验证的数字
 
 | 数字 | 含义 | 哪一颗位流 | 自己怎么验 |
 |---|---|---|---|
+| **160×** | 同一串输入、每采样同样 579 次乘加：ARM 6.20 µs/采样 vs PL 墙钟 0.0387 µs/采样（只算核内 207×） | `fir_rtl_dma.bit`（**与演示位流同一组 RTL**：`fir_mb_fe` + `fir_drc4`，只是外壳走 DMA） | `data/results/accel_demo_chain_20261102.md` |
 | **16.7×** | 同芯片 ARM 6.117 µs/采样 vs PL 核 0.367 µs/采样 | ⚠️ `fir.bit`（**上一代块模式**，不是演示通路） | `data/results/accel_cpu_vs_fpga.md` |
 | **960000 / 960000** | 麦克风 → PL → 耳机 40 秒逐位自检全过 | `fir_pl.bit` | `data/results/fir_live_run_20261015.txt` |
 | **0 丢块** | PL 直连 600 秒 ×2，溢出/欠载计数零增长 | `fir_pl.bit` | `data/results/soak_pl_600_20261029_1031.md` |
 | **WNS +0.090 ns** | 时序收敛，49,518 个端点 0 失败；DSP 213/220 | `fir_pl.bit` | `board/overlay/fir_pl_timing.rpt` |
 
-「哪一颗位流」这一列不是装饰：仓库里有 20 多颗位流，**同一个指标只对生成它的那一颗负责**。
-尤其是 16.7× —— 它来自上一代块模式，**不是当前演示通路**的加速比，两处别混着引用。
+「哪一颗位流」这一列不是装饰：仓库里入库 11 颗位流（`git ls-files "*.bit"`），
+**同一个指标只对生成它的那一颗负责**。
+
+两行加速比必须分开引，原因在**核**不在外壳：**160×** 的核是手写 RTL（3 拍/采样），
+与演示通路的计算链同一份源码，只是演示位流没有 PS ↔ PL 批量接口、量不到计算时间，
+所以改用同一组 RTL 的 DMA 外壳来计时（换算对演示通路**偏保守**）；**16.7×** 的核是
+HLS 的 36 拍版本，且在上一代块模式位流上量的。两个数**不能互相替代，也不能相乘**。
+
 
 ## 复现：分三级，按你手上有多少东西挑一级
 
@@ -28,6 +35,11 @@
 | ② 只验设计 | 无板，但机器上要有 Vivado（`xvlog` / `xsim`） | `bash sim/run_all_checks.sh` | 五项：DRC 三组仿真、寄存器单测、RTL lint、后端自检、网页自检；任何一项挂返回非 0 |
 | ②′ 连工具链都没有 | 只要 Python 3.9+ | 见下面三条 | 后端自检、网页与四档预设自检、取舍图能从 68 份报告重画 |
 | ③ 全量重建 | Vivado / Vitis 2020.2 全套（约 30~50 GB） | `./rebuild.sh csim && ./rebuild.sh ip && ./rebuild.sh bit` | 从源码重建位流；详见 `build_guide.md` |
+
+> ③ 有个坑要先说清：`rebuild.sh` 三步产的是**上一代块模式** `fir.bit`（HLS 那条线）。
+> **演示位流不在这条脚本里** —— `fir_pl.bit` 由 `board/overlay/build_audio_pl.tcl` 从空工程摆 BD
+> 编出来，流程在 `build_guide.md` §6。两条线的产物不通用（`fir.bit` 里没有 `fir_pl_regs`，
+> `fir_pl.bit` 里没有块模式的 DMA 环）。
 
 ②′ 那三条（**不需要板子，也不需要 Vivado**）：
 
@@ -78,6 +90,16 @@ MSYS_NO_PATHCONV=1 python board/probes/board_ssh.py --put board/overlay/fir_pl.h
 sudo env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u /home/xilinx/dma_exp/fir_pl_live.py &
 sudo env XILINX_XRT=/usr /usr/local/share/pynq-venv/bin/python3 -u /home/xilinx/dma_exp/fir_pl_webui.py --port 8080
 ```
+
+要开机自启、掉进程自动拉回，先装一次服务（换板 / 重刷 SD 卡后要重装；脚本会按同一套顺序
+起两个进程，并每 30 秒巡一次）：
+
+```bash
+sudo sh /home/xilinx/dma_exp/install_pl_webui_service.sh   # 装 fir-pl-webui.service
+```
+
+这三个文件要跟 `.bit` 一起落到板上（`board/scripts/` 下同名文件，用上面那条 `--put` 推）：
+`pl_supervise.sh`、`install_pl_webui_service.sh`、`fir-pl-webui.service`。
 
 日常开关用服务（`pl_supervise.sh` 每 30 秒会把掉的进程拉回来，所以停服务必须用 systemctl，
 只 `pkill` 最多管半分钟）：`systemctl start fir-pl-webui` / `systemctl stop fir-pl-webui`。
@@ -165,6 +187,13 @@ FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声�
 - Python 参考基线用 48 kHz、4 段相减式分频、193 抽头线性相位低通。最近一次本地运行记在 `data/results/baseline_metrics.md`。
 - 自研 HLS 核的单独综合与实现结果在 `data/results/impl_metrics.md`。
 - 核已经和 PYNQ 音频 codec 一起集成进整机 overlay。`board/overlay/fir.bit` 就是它，由 `board/overlay/build_fir.tcl` 构建；`board/scripts/fir_core.py` 走 AXI-Lite 驱动这个核。在板子上，核处理了 144,000 个采集采样（18 块），直通结果按 96 拍群延迟逐位对齐、错配 0 个；但那次采集电平近乎静音，不能作为可听的麦克风压缩 A/B 证据。合成信号压缩检查通过。麦克风 → 核 → 耳机「边录边放」的实时通路写好了（`board/scripts/fir_live.py`）：连续 8/10/24 秒全部 1.00 倍、一块不丢，24 秒那档 2401 块、960000/960000 采样逐位自检通过；核接口没改，`fir.bit` 没重跑。但 2026-10-13 记的「这条通路演不了：采集电平在约 0.7 秒里被推成满量程自激」**是错判** —— 那是低 24 位补码没做符号扩展的**读法假象**（数字零被读成 rms 46341 = 65535/√2），不是硬件、也不是通路问题。2026-10-15 话筒这一路查通、端到端跑成：麦克风 → 核 → 耳机 40 秒（4000 块 / 40.00 秒音频 / 40.19 秒墙钟 = 1.00 倍，逐位自检 960000/960000），进核 rms 中位 107 / 峰 24076，**操作者在耳机里听到了处理后的声音**。当时卡住的是 `HP + Mic` 口里那颗 U41（TI TS3A226AE 自动耳机开关，只在插头插入的上升沿检测一次并锁存）—— **演示前要先插拔到电平跳起来（实测要 18 秒）再开始，之后全程别碰插头**。注意那趟**四段增益全是 0.0 dB**（`LIVE_GAIN_DB` 的默认值），验的是通路成立。「四段各调各的、听感跟着变」当天晚上另外验了：一趟 66 秒的实时跑里用 `/dev/shm/fir_tune.json` 实时改单段增益六次（一段 0.0 ↔ −41.9 dB 交替），板上六次改动全接住、逐位自检在「增益变过 8 次」下仍 960000/960000、实时倍率 1.00 倍，**操作者当场确认听到了几次明显变化**（原始输出 `data/results/fir_gain_ab_run_20261015.txt`，复现脚本 `board/scripts/gain_ab_live.sh`）。⚠️ 但要记得：**对称设置（低频 +6 / 高频 −6）听不出来** —— 增益确实生效（电平比 1.00 → 1.23），可一升一降总响度几乎不变；**要让人听出来，得让单段的电平真的大幅改变。** 另：40 秒那趟墙钟多出 0.19 秒 ≈ 丢 18 块，耳机里会断续（搬样线程空转轮询占到 99% 预算）。
+- 演示通路的加速比：**160×**（2026-11-02 实测，`data/results/accel_demo_chain_20261102.md`，四次连跑 158.9—161.3）。
+  ARM 6.20 µs/采样 vs PL 墙钟 0.0387 µs/采样，只算核内是 207×。两侧每采样都是 579 次乘加，
+  输入是同一串数据。**这颗位流是 `fir_rtl_dma.bit` 而不是演示位流** —— `fir_pl.bit` 没有 PS ↔ PL
+  批量接口，在上面计时量到的是采样率（每 2048 拍固定消费一个采样），不是计算时间；所以用
+  **同一组 RTL 源文件**（`fir_mb_fe.v` + `fir_drc4.v`）、只是外壳换成 `fir_stream_shell` + `axi_dma`
+  的那颗来量。DMA 外壳每块另花 0.56—0.59 ms，演示通路没有这段开销，因此 160× 对演示通路**偏保守**。
+  和下面那条 16.7× 别混：**160× 的核是手写 RTL（3 拍），16.7× 的核是 HLS（36 拍）**，两者不能替代也不能相乘。
 - 同芯片 ARM vs PL 加速比：**16.7 倍**（2026-10-23 板上实测，测的是块模式位流 `v25_env_indep`（`fir.bit`），原始输出 `data/results/compare_cpu_fpga_run_20261023.txt`）。Zynq PS 侧的 ARM 每采样 **6.117 µs**（3.41× 实时），PL 里的核 **0.367 µs**（56.77× 实时；理论 0.360 µs = 36 拍 @ 100 MHz）。2026-10-22 那次的 **12.5 倍**是 `v21_wdrc`（49 拍）的数，2026-10-08 的 **19.5 倍**是 `v19`（31 拍）的数，都别和现在这颗混用。引用这个数必须带四条说明 —— 两边精度不同（float64 vs Q1.15）、CPU 那边是 scipy 的 C 实现、核的耗时里含每块约 60 µs 的 Python 开销（占长块实测不到 10%）、两边每采样都是 579 次有效乘法。全文见 `data/results/accel_cpu_vs_fpga.md`。
 - 早期还测过一个开源参考 overlay。结果在 `data/results/reference_overlay_metrics.md`，和自研核无关，别混着引用。
 - Python / HLS / RTL 三实现对比已经做完，同一负载、同一精度契约、同一 10 ns 约束，表在

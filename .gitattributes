@@ -8,3 +8,10 @@
 # 规则：这几类工件禁止做任何换行/编码转换。
 *.bit binary
 *.hwh -text
+
+# 同一条理由往下推一层：shell 脚本和 systemd unit 必须是 LF。
+# 本机 core.autocrlf=true，clone 到 Windows 时 .sh 会被写成 CRLF，再拷到板子上就死在
+# `/bin/sh^M: bad interpreter`（这类故障看起来像"脚本坏了"，其实一个字节的问题）。
+# 判据是"评委会 clone 之后拷上板能跑"，所以这里按 LF 钉死。
+*.sh text eol=lf
+*.service text eol=lf

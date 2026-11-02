@@ -1,0 +1,23 @@
+[Unit]
+Description=PYNQ audio tuning web UI, PL direct path (port 8080) + overlay holder
+Documentation=https://github.com/JR0425/pynq-multiband-audio-accel
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/xilinx/dma_exp
+Environment=PYTHONIOENCODING=utf-8
+Environment=XILINX_XRT=/usr
+Environment=PL_WEBUI_DIR=/home/xilinx/dma_exp
+Environment=PL_WEBUI_PORT=8080
+ExecStart=/usr/local/sbin/pl_supervise.sh
+Restart=always
+RestartSec=5
+# 停服务必须把两个 python 一起收掉：它们由 supervisor 用 setsid 起在同一个 cgroup 里，
+# 默认的 control-group 正好收干净；改成 process 就只杀 supervisor，两个 python 变孤儿
+# 继续占着 overlay 和 8080，下一次 start 会加载失败（看着像"服务起不来"）。
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

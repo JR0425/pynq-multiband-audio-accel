@@ -3,6 +3,9 @@
 > **当前演示通路（2026-10-31）是 PL 直连**：位流 `overlay/fir_pl.bit`，板上目录
 > `/home/xilinx/dma_exp/`，进程是 `fir_pl_live.py` + `fir_pl_webui.py`（服务名
 > `fir-pl-webui`）。启动与验收命令见仓库根 `README.md` 的「当前演示版」。
+> 服务本体在 `scripts/` 下：`pl_supervise.sh`（守护，30 秒巡检、先 live 后 webui 重拉）
+> + `fir-pl-webui.service`（unit），`scripts/install_pl_webui_service.sh` 一次装好；
+> 换板或重刷 SD 卡后要重装一遍。
 > 下面关于 `fir.bit` / `fir_live.py` / `/home/xilinx/jupyter_notebooks/` 的描述是
 > 上一代块模式线，保留作历史，别和演示线混用。
 

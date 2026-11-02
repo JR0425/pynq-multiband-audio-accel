@@ -4,7 +4,7 @@
 > §3.3 自主选题赛道逐条核。
 >
 > 状态标记：✅ 完成 ｜ ⚠️ 有缺口、已写明边界 ｜ ⬜ 待办（阻塞提交，必须先处理）
-> 最后核对：**2026-11-02 夜（第二轮）**（上一版 2026-11-02 晚）
+> 最后核对：**2026-11-02 夜（第三轮：提交前完整性核查）**（上两版：2026-11-02 夜、2026-11-02 晚）
 >
 > **11-02 晚这一轮改了什么**（对着指南逐条复核后的收口，全部可在仓库内验证）：
 > 8. 补参赛组别声明（**初级组**）；报告首页与本节同步。
@@ -36,6 +36,24 @@
 >    只有示例里的 `README.md` 与惯例名 `LICENSE` 属例外，原大写名严格读不合规。
 > 19. 新增 `board/notebooks/README.md`：四个 notebook 全部指向上一代 `fir.bit`，初级组推荐 PYNQ/Jupyter，
 >    评委很可能直接点开就走错通路 —— 该文件说明每个 notebook 对应哪颗位流、演示该用哪个入口。
+>
+> **11-02 夜第三轮：提交前完整性核查，改的全是"照文档做会卡住"的地方**
+> 20. 补 **`board/scripts/pl_supervise.sh` + `fir-pl-webui.service` + `install_pl_webui_service.sh`**。
+>    README 让评委 `systemctl start fir-pl-webui`，而这两个文件**从未入过库**
+>    （`git log --all -- board/scripts/pl_supervise.sh` 为空），照着做只会拿到 unit not found。
+>    仓库里原来只有上一代 `fir-webui.service`（指向 `fir_webui.py`）和一次性的 `pl_webui_up.sh`。
+> 21. **160× 补进 README「30 秒」表、报告 §0 / §3 通路表 / §8.9 / 附录、本节 §四。**
+>    原来这个数只活在 `data/results/` 里，三份主文档都只有 16.7× —— 而 16.7× 恰恰被自己
+>    标注"不是演示通路"，等于读者在入口处看不到演示通路最强的那条证据。
+> 22. 位流数量口径：README 与报告 §0 的"20 多颗"改成**入库 11 颗**（`git ls-files "*.bit"`，可当场验）；
+>    §八 加一条断言，多一颗少一颗都会在自检里露头。
+> 23. `data/results/accel_demo_chain_20261102.md` 里两处 `build/overlay/` 改成 `board/overlay/`
+>    （`build/overlay/` 这个目录不存在，照着找会扑空）。
+> 24. `dist/` 里的旧包整体移入 `dist/_stale/`；本节 §七 不再写死包名，判据改成
+>    "包名里的 short sha 必须等于 `git rev-parse --short HEAD`" —— 上一版写死了四个包名，
+>    八分钟后就因为又打了一个包而过期。
+> 25. `.gitattributes` 补 `*.sh` / `*.service` 为 `eol=lf`：本机 `autocrlf=true`，clone 到
+>    Windows 会把这些脚本写成 CRLF，拷上板就是 `/bin/sh^M`。
 >
 > **11-02 这次改了什么**（都是对着指南逐条复核后发现的真问题，不是润色）：
 > 1. 删掉工具链论证里一条**用错对象**的理由（`audio_codec_ctrl` 只属于上一代 `fir.bit`），
@@ -110,7 +128,7 @@
 
 | 要求 | 落实 | 状态 |
 |---|---|---|
-| 性能指标可测量，并与基线对比 | 同一颗芯片 ARM vs PL：16.7×；`data/results/accel_cpu_vs_fpga.md` 附四条必带说明（精度不同 / CPU 是 scipy C / 含 Python 开销 / 乘法对等 579 次） | ✅ |
+| 性能指标可测量，并与基线对比 | 同一颗芯片 ARM vs PL 两个数并报：**演示通路 160×**（`data/results/accel_demo_chain_20261102.md`，手写 RTL 核 3 拍，四次连跑 158.9—161.3）与**上一代 16.7×**（`data/results/accel_cpu_vs_fpga.md`，HLS 核 36 拍、块模式位流）。两个数不能替代也不能相乘；16.7× 附四条必带说明（精度不同 / CPU 是 scipy C / 含 Python 开销 / 乘法对等 579 次），160× 另带"用同源 RTL 的 DMA 外壳计时、对演示通路偏保守" | ✅ |
 | 不以显著资源代价换有限性能收益 | 限流对照实测：DSP 202→86 但 LUT 涨 2.6 倍、WNS 从 +1.624 崩到 −0.620，据此判定"不复用乘法器"；`report/design_report.md` §4.3 | ✅ |
 | 资源使用率结合性能、时序与扩展余量判断 | 不再只是"承认余量薄"：§4.0 用非支配前沿说明**相邻格为什么被放弃**（少 DSP 必吃 LUT、更少拍必加 DSP），并注明该图的两个轴表达不了功能，比较只在同功能集内成立 | ✅ |
 | 从零复现 | 三步构建 + 无板五项验收 + 上板一条命令 | ✅ |
@@ -141,7 +159,7 @@
 
 | 项 | 现状 | 状态 |
 |---|---|---|
-| 演示通路 | `board/overlay/fir_pl.bit`（全 PL 直连）+ 网页验配，启动命令见根 `README.md`「当前演示版」 | ✅ |
+| 演示通路 | `board/overlay/fir_pl.bit`（全 PL 直连）+ 网页验配，启动命令见根 `README.md`「当前演示版」。服务本体已入库：`board/scripts/pl_supervise.sh` + `fir-pl-webui.service` + `install_pl_webui_service.sh`，`sudo sh install_pl_webui_service.sh` 一次装好，之后 `systemctl start/stop fir-pl-webui` | ✅ |
 | 人耳验收 | 2026-10-15 端到端 40 秒跑通，操作者确认听到处理后的声音；四段增益实时改动 6 次全部接住 | ✅ |
 | 演示视频（全片） | [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101) 的 `demo_full_20261101.mp4`：59.5 MB / 1920×1080 / 2 分 59 秒，实机演示 + 验收过程；口径与报告 §3、§5 一致。**视频放 Release 不放 Git 历史**：59.5 MB 超过 GitHub 单文件建议体积，且历史里的大二进制删不掉。**11-02 夜定：视频经竞赛指定渠道单独提交，不进本仓库的 zip**（打包带 `--no-extras`） | ➖ 外部交付 |
 | 四档运行期预设 | `demo` / `show` / `soft` / `clean`，一条 `POST /api/preset` 切换，不重编位流。每档带着"测没测过"的标注一起返回：`demo` 实测 **0.09%**（压缩器未启动，响度来自 MPO 限幅）、**`show` 实测 2.36%（压缩器确认动作，现场 A/B 用这一档）**、`clean` 实测 0.07%、`soft` 谐波 −90 dBc 量级（总数未单独记，返回 `None`） | ✅ |
@@ -183,12 +201,15 @@ python tools/make_submission_package.py          # 产物落 dist/，文件名�
 - **工作区有未提交改动时默认拒绝打包**（退出码 3），避免打出一份与提交记录对不上的材料；
   确认无误再加 `--allow-dirty`。
 - 产物 `dist/` 已在 `.gitignore` 里，不会被自己打进去。
-- **2026-11-02 晚核查：`dist/` 下现有四个包（`a3a7d0d` / `2099200` / `133e772` / `7006c5d`）
-  逐个开箱，里面都没有 mp4。** 按上面"本仓库不收视频"的决定，缺 mp4 本身不再算缺陷；
-  真正的缺陷是**这四个包全部落后于 HEAD**（最新一个也落后 5 个提交，前三个更早），
-  所以**照样不能直接拿去提交**——必须对着当前 HEAD 重打一次。
-  同一次核查确认了退出码行为：缺视频时返回 **5**（拒绝出包），加 `--no-extras` 时返回 **0**
-  并复核两个关键工件的 md5。
+- **提交前必须按当前 HEAD 重打一次，不要把旧包拿去交。** 判据只有一条：包名里的 short sha
+  必须等于 `git rev-parse --short HEAD`（`pynq-multiband-audio-accel_<short-sha>_<日期>.zip`），
+  对不上就是上一版留下的。
+  2026-11-02 夜第三次核查时，`dist/` 下的旧包**全部落后于 HEAD**，其中三个包对应的 commit
+  已在历史重写中消失（`133e772`、`14e0dbb`、`a3a7d0d`），`7006c5d` 只剩一个 zip、连解包目录都没有；
+  这几份已整体移入 `dist/_stale/`，不再参与提交。**这个目录名不写死在文档里** ——
+  写死过一次（原来这行列了"四个包"和它们各自的 commit），八分钟后就因为又打了一个包而过期。
+- 退出码行为（2026-11-02 实测，不是推断）：缺视频时返回 **5**（拒绝出包），
+  加 `--no-extras` 时返回 **0** 并复核两个关键工件的 md5，工作区脏时返回 **3**。
 
 ---
 
@@ -216,6 +237,14 @@ python board/scripts/fir_pl_webui.py --selftest | tail -3
 
 # 3e. 通用 PYNQ Skill 骨架自检（纯标准库，不需要板子也不需要 pynq）
 python skill/templates/pynq_overlay_skeleton.py --selftest | tail -3
+
+# 3f. 演示启动链的三个文件必须在：README 让评委直接 systemctl start fir-pl-webui，
+#     少一个这条命令就报 unit not found（2026-11-02 之前就是缺的）
+ls board/scripts/pl_supervise.sh board/scripts/fir-pl-webui.service \
+   board/scripts/install_pl_webui_service.sh
+
+# 3g. 位流数量口径：README 与报告 §0 都写"入库 11 颗"，多一颗少一颗都要回来改文档
+test "$(git ls-files '*.bit' | wc -l)" -eq 11 && echo "11 颗，与文档一致"
 
 # 4. 断链自查：只查**带路径分隔符**的引用（裸文件名在正文里大量出现，查了全是噪声）
 grep -rhoE '`[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.(md|py|tcl|sh|v|txt|png|bit|hwh)`' \

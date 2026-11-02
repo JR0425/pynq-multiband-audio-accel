@@ -10,14 +10,16 @@
 
 ## 0. 一页速览
 
-「对应位流」这一列不是装饰：本仓库里有 20 多颗位流，**同一个指标只对生成它的那一颗负责**。
-把 16.7× 和演示通路并排写而不注明来源，是最容易被误读的一处，所以单列一栏。
+「对应位流」这一列不是装饰：本仓库入库 11 颗位流（`git ls-files "*.bit"`），**同一个指标只对生成它的那一颗负责**。
+两行加速比并排写而不注明来源，是最容易被误读的一处，所以单列一栏：**160×** 量的是手写 RTL 核
+（3 拍/采样），**16.7×** 量的是 HLS 核（36 拍/采样）且在上一代块模式位流上，两者不能互相替代、也不能相乘。
 
 | 项 | 值 | 对应位流 | 证据 |
 |---|---|---|---|
 | 功能 | 48 kHz 四频段动态范围压缩（助听器验配场景），运行期可调 | `fir_pl.bit`（演示通路） | §2 |
 | 算法 | 相减式分频：3 个 193 抽头线性相位低通 + 两两相减，段边界 500 / 1000 / 2000 Hz | 三套实现同源 | §2.2 |
 | 实现 | 同一算法三套实现：Python 参考 / HLS 综合核 / 手写 RTL | — | §4 |
+| 演示通路加速比 | **160×**（ARM 6.20 µs/采样 vs PL 墙钟 0.0387 µs/采样；只算核内 207×；四次连跑 158.9—161.3） | `fir_rtl_dma.bit`（与演示位流**同一组 RTL** `fir_mb_fe`+`fir_drc4`，外壳走 DMA） | `data/results/accel_demo_chain_20261102.md` |
 | 同芯片加速比 | **16.7×**（ARM 6.117 µs/采样 vs PL 核 0.367 µs/采样） | ⚠️ `fir.bit`（**上一代块模式**，不是演示通路） | `data/results/accel_cpu_vs_fpga.md` |
 | 端到端通路 | 麦克风 → PL（前端 + 压缩）→ 耳机，音频**全程不出 PL** | `fir_pl.bit` | `data/results/dma_pl_direct_20261025.md` §1 |
 | 延时 | 数字段 96 采样 = **2.00 ms**（群延迟，48 kHz；2026-11-02 抓取窗口互相关实测 96 采样 = 1.966 ms）+ 声学 **1.23 ms**（10-22 实测）。**两个分量分报，没有合并实测**（§10） | `fir_pl.bit` | `data/results/latency_*`、`data/results/pl_delay_20261102.md`、`acoustic_lat_20261022.npz` |
@@ -372,7 +374,7 @@ PS 只在控制面每 100 ms 写一次寄存器并读回状态。
 |---|---|---|---|---|
 | 块模式 + HLS 核（上一代出货） | `board/overlay/fir.bit` | codec ↔ 厂商音频 IP ↔ 核，PS 逐字搬 | 加速比 16.7× 就是在这颗上量的 | `notebooks/test_multiband.ipynb`、`notebooks/w5_tuning_ui.ipynb`、`scripts/fir_core.py` |
 | 块模式 + RTL 外壳 | `fir_rtl.bit` | AXI-Lite + BRAM，LOAD/RUN/DRAIN | 与 HLS 核同源对拍的载体 | 无 notebook，走 `probes/` 下 RTL 对拍脚本 |
-| DMA + AXI-Stream | `fir_rtl_dma.bit` | `axi_dma` ↔ `fir_stream_shell` | 连续流吞吐 25.7 M 采样/秒 | `scripts/` 下 DMA 系列 |
+| DMA + AXI-Stream | `fir_rtl_dma.bit` | `axi_dma` ↔ `fir_stream_shell` | 连续流吞吐 25.7 M 采样/秒；**演示通路的 160× 在这颗上量**（同一组 RTL，只有外壳换成 DMA 才掐得到计算时间） | `scripts/` 下 DMA 系列、`probes/accel_demo_chain.py` |
 | **全 PL 直连（当前演示）** | `fir_pl.bit` | codec ↔ I2S ↔ 前端 ↔ 压缩 ↔ codec，**音频不出 PL** | 延迟与抖动的主线 | **`scripts/fir_pl_live.py`、`fir_pl_webui.py`；`probes/board_accept.sh`** |
 
 > `notebooks/w2_audio_playback.ipynb` 与 `w3_own_overlay_audio.ipynb` 是 PYNQ 入门那两课
@@ -986,6 +988,7 @@ python board/probes/soak_pl_600.py --secs 600 --json soak_pl.json
 | 正文里的数 | 落在哪 |
 |---|---|
 | 16.7×、6.117 / 0.367 µs | `data/results/accel_cpu_vs_fpga.md` |
+| 160×、6.20 / 0.0387 µs、核内 207×（158.9—161.3 四次连跑） | `data/results/accel_demo_chain_20261102.md` |
 | LUT 20509 / FF 13556 / BRAM 10 / DSP 213 / WNS +0.090 | `data/results/impl_metrics.md`、`board/overlay/fir_pl_timing.rpt` |
 | 960000/960000、40.19 秒墙钟 | `data/results/fir_live_run_20261015.txt` |
 | 600 秒 ×3 溢出/欠载零增长 | `data/results/soak_pl_600_20261029_1031.md`、`soak_pl_20261102.json` |
@@ -1091,7 +1094,7 @@ PYNQ 4.0，而 4.0 已经把 Z2 的 board 目录、BSP 与板级文档全部删�
 | **演示通路上的单点台阶** | 抓取窗口里 13%~69% 的 21 ms 窗口有一道台阶（典型 7055、最大 13759 计数），**已观测、未定位**。台阶出现在 `fe_din_q`（前端入口，PL 逻辑尚未介入），形态是"一段正弦挪了相位再接起来"；`soak_pl_deep_20261102.md` 里唯一一个异常窗口（出核峰值 10055）与一条 `PLAYLATE 0.021` 对得上。**当前判断：PS 送数侧重复了一小段，不是 PL 算术错** | 现场听感上是偶发轻微"咔"；判定实验不需要重编位流（`board/probes/ply_margin.py` 的 FIFO 余量与台阶按时间戳对齐；再换片内音源抓一组），记为后续工作。原始记录 `data/results/pop_steps_20261031.md` |
 | 全 PL 直连的端到端延时 | 只报分解（数字段 2.00 ms + 声学 1.23 ms），**没有一次合并的声学实测** | 不报单一合数；两个分量各有独立实测出处 |
 | 工具链版本 | 2020.2；2025.2 与 Z2 无官方组合，2024.1 存在但换镜像要作废整批数据（§9） | 已说明边界；PL 侧的版本无关性验证列为后续工作（用 2025.2 做 OOC，不需要 PYNQ 参与） |
-| 高精度 CPU 基线 | CPU 侧是 `scipy.lfilter`（未向量化）；手写 NEON 估计能快 3~5 倍（**估计，未试**） | 16.7× 会缩小，引用必须带这条 |
+| 高精度 CPU 基线 | CPU 侧是 `scipy.lfilter`（未向量化）；手写 NEON 估计能快 3~5 倍（**估计，未试**） | **16.7× 与 160× 都会缩小**（两侧用的是同一段 scipy 基线，6.117 / 6.20 µs 是同一台机器上的同一段代码），引用必须带这条 |
 | 演示通路的 CPU 占用 | **未实测**。已有 145.3% 那个数属上一代块模式 `fir.bit`（§2.3） | §2.3 的"确定性 + CPU 占用"立论目前只有块模式的数支撑；`perf_probe.py cpu 60` 可补，列为后续工作 |
 | 功耗实测 | 只有 Vivado 估算（PL 动态 0.746 W，置信度 Low，15.5 µJ/采样）；整机未测，板级无功耗计接入条件 | 本报告不以功耗或体积作为选型依据（§1.1） |
 
@@ -1110,6 +1113,7 @@ PYNQ 4.0，而 4.0 已经把 Z2 的 board 目录、BSP 与板级文档全部删�
 | 内容 | 文件 |
 |---|---|
 | 加速比与四条免责声明 | `data/results/accel_cpu_vs_fpga.md` |
+| 演示通路的加速比（160× / 核内 207×，与演示位流同源 RTL） | `data/results/accel_demo_chain_20261102.md` |
 | 布局布线实测资源与时序 | `data/results/impl_metrics.md` |
 | HLS 各版估算汇总（脚本生成） | `data/results/hls_synth_metrics.md` |
 | RTL 与 HLS 逐位对拍 | `data/results/rtl_vs_hls.md` |

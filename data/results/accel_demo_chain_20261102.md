@@ -35,7 +35,7 @@ PL 每 2048 拍（20.48 µs）固定消费一个采样，PS 插不进去。在 `
 
 | | 演示位流 | 本次测量用的位流 |
 |---|---|---|
-| 构建脚本 | `build/overlay/build_audio_pl.tcl` | `build/overlay/build_rtl_dma.tcl` |
+| 构建脚本 | `board/overlay/build_audio_pl.tcl` | `board/overlay/build_rtl_dma.tcl` |
 | 计算核 | `src/rtl/fir_mb_fe.v` + `src/rtl/fir_drc4.v` | 同一对文件 |
 | 外壳 | `fir_pl_direct`（I2S 直连，不碰 DDR） | `fir_stream_shell` + `axi_dma` |
 
