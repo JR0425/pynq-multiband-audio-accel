@@ -14,18 +14,18 @@ frontmatter 里一句能被检索到的描述、正文开头写明什么时候�
 ## 分档：换一个题目还能不能用
 
 判据是**不与该项目绑定、换项目换板卡仍可用**。
-按这个判据，本目录的 34 条分三档：
+按这个判据，本目录的 35 条分三档：
 
 | 档 | 含义 | 条目数 |
 |---|---|---|
-| A | 与题目、板卡都无关，任何 FPGA/嵌入式题目可用 | 20 |
+| A | 与题目、板卡都无关，任何 FPGA/嵌入式题目可用 | 21 |
 | B | 任意 PYNQ-Z2 题目可用（换板卡要改端口和 IP） | 8 |
 | C | 音频/信号处理类题目可用（依赖 PYNQ 出厂 base overlay 的音频通路） | 6 |
 
 没有第四档。**没有一篇是绑死在本项目的 DRC/FIR 设计上的**——即使 C 档那几篇，讲的也是
 base overlay 的音频通路怎么用，换个音频题目照样成立。
 
-A 档里有 8 条**提示词工作流**（`prompts/`）和 4 个**工具类**条目（脚本本体在 `checkers/` 与 `templates/` 下）：
+A 档里有 8 条**提示词工作流**（`prompts/`）和 5 条**工具/模板**条目（脚本本体在 `checkers/` 与 `templates/` 下）：
 把"优化前后的资源对比表""黄金参考比对""DMA 搬运""寄存器契约→驱动"这四件每人都要重做的事
 封装成了能直接跑的东西。判据和其余各篇一致：只依赖报告的字段名、黄金文件格式、
 寄存器表的排版和 AXI-Stream 语义，**不含本项目的任何算法**。
@@ -53,7 +53,7 @@ A 档里有 8 条**提示词工作流**（`prompts/`）和 4 个**工具类**条
 | **`golden-compare`**<br>`checkers/golden_compare.py` | 硬件/HLS 输出与参考"看着一样但对不上"；相关系数只有零点几 | `python golden_compare.py got.txt ref.txt --delay 96 --passthrough` | 用本项目的 `hw_output.txt` / `python_golden.txt` 跑通；直通检验与最佳位移两项能分别定位"结构错"和"延迟取错" | 两边精度不同却想逐位比（那只能报 SNR，且必须写明精度不同） |
 | **`axi-stream-dma-host`**<br>`templates/axi_stream_dma_host.py` | 自研 AXI-Stream 核第一次接 `axi_dma`；传输"成功"但点数变少；主机侧吞吐远低于核的拍数折算 | 拷 `DmaBlockXfer`，改 `IP_NAME` / `MAX_BYTES` | 本项目 DMA 线 65535 点连发十次拿到 25.7 M 采样/秒；长度截断、cache 顺序、计时窗口三个坑都是那轮踩出来的 | 块很小、次数很少（逐字 MMIO 更简单）；要连续流不断字（得在 PL 里加 FIFO） |
 | **`register-map-stub`**<br>`templates/register_map_stub.py` | 自研 AXI-Lite IP 的寄存器表写在设计文档里，驱动要跟着写；上板读回不对要排除"地址抄错" | `python register_map_stub.py spec.md -o regs.py` | 从 `report/hardware_interface_spec.md` 生成 14 个寄存器，偏移与契约逐项一致，生成物可直接编译 | 契约本身就是错的（生成器只会忠实复制错误）；位域语义复杂（读清零/写一触发，它只分 rw/ro/wo/rr） |
-
+| **`pynq-overlay-skeleton`**<br>`templates/pynq_overlay_skeleton.py` | 自研 AXI-Lite IP 要接 PYNQ，缺那层胶水：加载 overlay、确认 bit/hwh 配套、按名字读写寄存器、从抓取缓冲取波形 | `python pynq_overlay_skeleton.py --selftest`（不接板）；上板 `--bit/--hwh --probe` | `--selftest` 纯标准库通过（Python 3.9/3.13，无 pynq）；四步 `--probe` 对应本仓库 `board_accept.sh` 的"寄存器窗口 + 抓取窗口"判据 | 寄存器有位域语义（读清零/写一触发）；只有 AXI4-Stream 没有 AXI-Lite（改用 DMA 模板） |
 | **`hls-bottleneck-triage`**<br>`prompts/hls_bottleneck_triage.md` | II 卡在 2/4/N 不达标；`HLS 200-880 carried dependence` 报警；加 UNROLL 毫无反应 | 先用一段固定结构的提示词逼出"依赖 vs 资源"的判断，再动手改 | 本项目那条假依赖（`env` 数组 + 变量下标）一次问对，II 4→1、拍数 49→36、DSP 一个没多 | 还没跑过 csynth（先出报告）；瓶颈在搬数据不在算 |
 | **`hls-design-space-sweep`**<br>`prompts/hls_design_space_sweep.md` | 有几个候选配置（抽头/并行度/限流数），说不清该选哪个；要交"优化前后对比表" | 让模型写扫描脚本 + 非支配集，而不是自己抄数 | 本项目 68 版一次拉成表并画出取舍图（报告 §4.0） | 只有一两个候选；要的是实测值（csynth 会高估 LUT 约 2.5 倍） |
 | **`golden-mismatch-triage`**<br>`prompts/golden_mismatch_triage.md` | 硬件与参考"看着一样"却逐位不同；相关系数只有零点几；分不清结构错还是对齐错 | 按"只差延迟？→ 结构？→ 哪一级？"的顺序问，不许跳步 | 本项目靠这三问把直通恒等式变成整条验证链的支点 | 两边精度不同（只能报 SNR）；输入本身没激励被测功能 |
@@ -144,10 +144,11 @@ frontmatter 按官方 Agent Skill（`Xilinx/ross-ai-assistant` 里那套 `SKILL.
 | `csynth_report_table.py` | **通用**：一堆 HLS 报告 → 一张性能/资源对比表（拍数、II、DSP、LUT、FF、BRAM） |
 | `golden_compare.py` | **通用**：黄金参考比对（最佳位移 → 逐位 → SNR → 直通检验），带 0/1 退出码 |
 
-`templates/` 下有两件能直接拷走用的骨架：
+`templates/` 下有四个能直接拷走用的骨架：
 
 | 模板 | 用途 |
 |---|---|
 | `hls_testbench_template.md` | HLS C++ 测试台最小骨架 |
 | `axi_stream_dma_host.py` | **通用**：AXI DMA 整块往返，含 cache 维护与状态轮询的正确形状 |
 | `register_map_stub.py` | **通用**：markdown 寄存器表 → Python 访问器 + 读回自检 |
+| `pynq_overlay_skeleton.py` | **通用**：Overlay 加载 → `.bit`/`.hwh` 配套校验 → 寄存器访问器 → 抓取窗口 → `--probe` 四步自检；四个坑（bank 相对偏移、`SINGLE_PORT_BRAM` 读回恒 `0x8`、冻结读取自己造台阶、bit/hwh 配错不报错）写在正文与代码里 |

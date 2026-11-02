@@ -72,12 +72,12 @@ curl -sS -m 10 -o /dev/null -w "api    %{http_code}\n" https://api.github.com
 `api.github.com` 通的话，用 Git Data API 建 blob → tree → commit → 改 ref，
 效果等价于一次 push。
 
-工具：`tools/push_via_api.py`。先跑 `--dry-run`，它会验权限（`perms.push`）
+工具：`tools/push_via_api.py`（**未入库**：一次性调试脚本，2026-11 目录整理后没跟着搬，手法在下面几段）。先跑 `--dry-run`，它会验权限（`perms.push`）
 和远端状态（远端 main 必须和本地 origin/main 一致）。
 
 推完**必须对齐哈希**：API 建出来的 commit 和本地不是同一个对象（committer 日期不同），
 两边会分叉，下次 `pull --rebase` 会把同样的改动重放一遍。
-用 `tools/reconcile_api_push.sh` 改写本地 commit 对齐。
+用 `tools/reconcile_api_push.sh`（**未入库**，同上） 改写本地 commit 对齐。
 
 ## 认证
 
