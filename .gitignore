@@ -117,6 +117,5 @@ build/_probe/
 # 提交打包产物（tools/make_submission_package.py 生成）
 /dist/
 
-# 海报：已制作，按队伍决定不入库（可编辑源在 git 历史 e1e1d84 里仍可取回）
-# 提交包由 tools/make_submission_package.py 从本机目录收，不进 Git 历史
-/report/poster/
+# 海报（一页英文 A4，指南第六章）不归本仓库管：队伍自行通过竞赛指定渠道提交。
+# 2026-11-02 起 `report/poster/` 已连同历史一起从本仓库移除，不要在本仓库里重建该目录。

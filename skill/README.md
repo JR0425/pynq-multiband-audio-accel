@@ -14,21 +14,25 @@ frontmatter 里一句能被检索到的描述、正文开头写明什么时候�
 ## 分档：换一个题目还能不能用
 
 判据是**不与该项目绑定、换项目换板卡仍可用**。
-按这个判据，本目录的 27 篇分三档：
+按这个判据，本目录的 34 条分三档：
 
 | 档 | 含义 | 条目数 |
 |---|---|---|
-| A | 与题目、板卡都无关，任何 FPGA/嵌入式题目可用 | 13 |
+| A | 与题目、板卡都无关，任何 FPGA/嵌入式题目可用 | 20 |
 | B | 任意 PYNQ-Z2 题目可用（换板卡要改端口和 IP） | 8 |
 | C | 音频/信号处理类题目可用（依赖 PYNQ 出厂 base overlay 的音频通路） | 6 |
 
 没有第四档。**没有一篇是绑死在本项目的 DRC/FIR 设计上的**——即使 C 档那几篇，讲的也是
 base overlay 的音频通路怎么用，换个音频题目照样成立。
 
-A 档里有 4 篇是**工具类**（脚本本体在 `checkers/` 与 `templates/` 下，不是笔记）：
+A 档里有 8 条**提示词工作流**（`prompts/`）和 4 个**工具类**条目（脚本本体在 `checkers/` 与 `templates/` 下）：
 把"优化前后的资源对比表""黄金参考比对""DMA 搬运""寄存器契约→驱动"这四件每人都要重做的事
 封装成了能直接跑的东西。判据和其余各篇一致：只依赖报告的字段名、黄金文件格式、
 寄存器表的排版和 AXI-Stream 语义，**不含本项目的任何算法**。
+
+提示词工作流那 8 条是从 `report/llm_collab_log/` 的 49 篇里抽出来的**提问顺序**，
+不是话术模板 —— 每条都带「模型容易错在哪」的实证记录和「怎么知道它答对了」的验收判据，
+因为这些坑在本项目里各自都真实发生过一次。
 
 ## 索引
 
@@ -49,6 +53,14 @@ A 档里有 4 篇是**工具类**（脚本本体在 `checkers/` 与 `templates/`
 | **`golden-compare`**<br>`checkers/golden_compare.py` | 硬件/HLS 输出与参考"看着一样但对不上"；相关系数只有零点几 | `python golden_compare.py got.txt ref.txt --delay 96 --passthrough` | 用本项目的 `hw_output.txt` / `python_golden.txt` 跑通；直通检验与最佳位移两项能分别定位"结构错"和"延迟取错" | 两边精度不同却想逐位比（那只能报 SNR，且必须写明精度不同） |
 | **`axi-stream-dma-host`**<br>`templates/axi_stream_dma_host.py` | 自研 AXI-Stream 核第一次接 `axi_dma`；传输"成功"但点数变少；主机侧吞吐远低于核的拍数折算 | 拷 `DmaBlockXfer`，改 `IP_NAME` / `MAX_BYTES` | 本项目 DMA 线 65535 点连发十次拿到 25.7 M 采样/秒；长度截断、cache 顺序、计时窗口三个坑都是那轮踩出来的 | 块很小、次数很少（逐字 MMIO 更简单）；要连续流不断字（得在 PL 里加 FIFO） |
 | **`register-map-stub`**<br>`templates/register_map_stub.py` | 自研 AXI-Lite IP 的寄存器表写在设计文档里，驱动要跟着写；上板读回不对要排除"地址抄错" | `python register_map_stub.py spec.md -o regs.py` | 从 `report/hardware_interface_spec.md` 生成 14 个寄存器，偏移与契约逐项一致，生成物可直接编译 | 契约本身就是错的（生成器只会忠实复制错误）；位域语义复杂（读清零/写一触发，它只分 rw/ro/wo/rr） |
+
+| **`hls-bottleneck-triage`**<br>`prompts/hls_bottleneck_triage.md` | II 卡在 2/4/N 不达标；`HLS 200-880 carried dependence` 报警；加 UNROLL 毫无反应 | 先用一段固定结构的提示词逼出"依赖 vs 资源"的判断，再动手改 | 本项目那条假依赖（`env` 数组 + 变量下标）一次问对，II 4→1、拍数 49→36、DSP 一个没多 | 还没跑过 csynth（先出报告）；瓶颈在搬数据不在算 |
+| **`hls-design-space-sweep`**<br>`prompts/hls_design_space_sweep.md` | 有几个候选配置（抽头/并行度/限流数），说不清该选哪个；要交"优化前后对比表" | 让模型写扫描脚本 + 非支配集，而不是自己抄数 | 本项目 68 版一次拉成表并画出取舍图（报告 §4.0） | 只有一两个候选；要的是实测值（csynth 会高估 LUT 约 2.5 倍） |
+| **`golden-mismatch-triage`**<br>`prompts/golden_mismatch_triage.md` | 硬件与参考"看着一样"却逐位不同；相关系数只有零点几；分不清结构错还是对齐错 | 按"只差延迟？→ 结构？→ 哪一级？"的顺序问，不许跳步 | 本项目靠这三问把直通恒等式变成整条验证链的支点 | 两边精度不同（只能报 SNR）；输入本身没激励被测功能 |
+| **`board-fault-hypothesis-loop`**<br>`prompts/board_fault_hypothesis_loop.md` | 板子偶发死机/丢数据；"改了几样之后好了"但说不清是哪样；有个听着合理的机制想验 | 一次一个假设、一个实验、一个证伪条件；禁止同时动两个变量 | 本项目三段死机排查靠它收敛到 RCU stall 的根因，并留下六轮实验里自己造的错 | 故障能稳定复现（那是普通 bug）；起跑条件还没固定 |
+| **`measure-tool-before-subject`**<br>`prompts/measure_tool_first.md` | 读数贴满量程"像自激"；只在开探针时丢数据；同一量两种测法两个数 | 强制先列测量环节、再给单变量实验 | 三个晚上追的"自激"其实是 24 位补码没做符号扩展；丢块其实是探针自身开销 | 关掉所有探针仍稳定复现（那真是被测对象） |
+| **`dual-implementation-crosscheck`**<br>`prompts/dual_implementation_crosscheck.md` | 一套实现"过了自己的测试"，需要一个不自我指涉的证据 | 同一进程并排跑 + 直通恒等式 + 逐级比中间量 | 本项目 Python/HLS/RTL 三实现 4800 点 0 点不同 | 两套数值契约不同；只有一套实现 |
+| **`latency-budget-decomposition`**<br>`prompts/latency_budget_decomposition.md` | 被问"端到端延时多少"，手上是几个不同条件下的数 | 逐项标"实测/推算/假设"，给只测总延时的实验设计，再给措辞模板 | 本项目把"约 2.3 ms"改回分报 2.00 ms + 1.23 ms，并注明没有合并实测 | 已经做过真正的合并实测（那就可以报单一数） |
 
 ### B 档：任意 PYNQ-Z2 题目可用
 
