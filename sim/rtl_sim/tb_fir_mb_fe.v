@@ -86,6 +86,17 @@ module tb_fir_mb_fe;
             $finish;
         end
 
+        /* 报告要用的波形：默认不生成（4800 点全开会让 VCD 很大），
+         * 只有 xsim -testplusarg WAVE 时才写，见 run_xsim_wave.sh。
+         * 只挑出报告要讲的那几根，不整层次 dump。 */
+        if ($test$plusargs("WAVE")) begin
+            $dumpfile("wave.vcd");
+            $dumpvars(0, tb_fir_mb_fe.clk, tb_fir_mb_fe.rst,
+                         tb_fir_mb_fe.din_vld, tb_fir_mb_fe.din_ready,
+                         tb_fir_mb_fe.din, tb_fir_mb_fe.dut.ph,
+                         tb_fir_mb_fe.dout_vld, tb_fir_mb_fe.dout);
+        end
+
         din     = 16'sd0;
         din_vld = 1'b0;
         cyc = 0; cyc_first = 0; cyc_last = 0;

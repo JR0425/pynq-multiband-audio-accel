@@ -149,6 +149,13 @@ module tb_i2s_duplex;
     initial begin
         $display("=== tb_i2s_duplex ===");
 
+        /* 报告要的 I2S 帧时序波形：只 dump 四根协议线，默认不开 */
+        if ($test$plusargs("WAVE")) begin
+            $dumpfile("wave.vcd");
+            $dumpvars(0, tb_i2s_duplex.bclk, tb_i2s_duplex.lrclk,
+                         tb_i2s_duplex.sdata_o, tb_i2s_duplex.sdata_i);
+        end
+
         cap_exp_l = {{8{MIC_L[23]}}, MIC_L};
         cap_exp_r = {{8{MIC_R[23]}}, MIC_R};
 
