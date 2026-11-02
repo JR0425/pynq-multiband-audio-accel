@@ -8,7 +8,8 @@
   1. 出厂参数下（THR = 419456 ≈ −20 dBFS，信号约 0.24 FS）GR 必须 > 0，
      且 GR/(ENV-THR) ≈ RATIO = 0.7
   2. 把 THR 抬到满量程附近，GR 必须回到 0（阈值真的在比）
-  3. ATK=REL=0（无记忆压缩）时仍然压，数值和 WDRC 不同但同量级
+  3. ATK=REL=0（无记忆压缩）时仍然压。这一档 ENV/GR 寄存器里是每个采样的
+     瞬时值，不是平滑包络，必须密集采样取最大值 —— 见 [5] 的注释
 
 注意：板上 print 只能 ASCII。
 """
@@ -87,6 +88,25 @@ def stat(r, n=8, dt=0.05):
             [max(g[i]) for i in range(4)])
 
 
+def stat_dense(r, n=200, dt=0.00005):
+    """瞬时值档位用：密集读，返回每通道的 (env 峰, gr 峰)。
+
+    ATK=REL=0 时 ENV/GR 是逐采样值，慢读会跟测试音混叠（见 [5] 注释），
+    中位数没有意义，只能取峰。两路寄存器的流水深度不同，不能逐点相除。
+    """
+    emax = [0] * 4
+    gmax = [0] * 4
+    for _ in range(n):
+        env, gr = snap(r)
+        for i in range(4):
+            if env[i] > emax[i]:
+                emax[i] = env[i]
+            if gr[i] > gmax[i]:
+                gmax[i] = gr[i]
+        time.sleep(dt)
+    return emax, gmax
+
+
 def main():
     if not os.path.exists(BIT):
         print("ERROR: no %s" % BIT)
@@ -150,20 +170,22 @@ def main():
     print("[4] THR 抬到 2.0FS: gr=%s（应全 0）  %s" % (gr2, "OK" if ok else "FAIL"))
     wr4(r, OFF_THR, [D_THR] * 4)
 
-    # 无记忆压缩
+    # 无记忆压缩：ATK=REL=0 时 RTL 把包络直接写成 |a|（src/rtl/fir_drc4.v 级 5），
+    # 所以 ENV/GR 寄存器里是**逐采样**的瞬时值，不是平滑包络。
+    # 慢读会跟 440 Hz 混叠：50 ms 正好 22 个整周期，每次读到同一相位；那一片
+    # 恰好落在 |a| < THR 的半周里，GR 就恒 0 —— 是读法问题，不是压缩器没动
+    # （2026-11-02 第一次跑就栽在这）。改成 50 µs 密集读，相位每次漂 0.022 周期。
     wr4(r, OFF_ATK, [0] * 4)
     wr4(r, OFF_REL, [0] * 4)
     time.sleep(0.2)
-    env3, gr3, grmax3 = stat(r)
-    ratio3 = []
-    for i in range(4):
-        d = env3[i] - D_THR
-        if d > 0 and gr3[i] > 0:
-            ratio3.append(round(float(gr3[i]) / d, 2))
-    ok = max(gr3) > 0
+    env3, gr3 = stat_dense(r)
+    # GR 比 ENV 晚几拍出来，逐点相除没有意义；两个峰都对应同一个正弦的峰，
+    # 用峰值比看量级（出厂 ratio=0.7 → 0.30）。
+    q = max(gr3) / float(max(env3) - D_THR) if max(env3) > D_THR else 0.0
+    ok = max(gr3) > 0 and max(env3) > D_THR and 0.15 <= q <= 0.50
     bad += 0 if ok else 1
-    print("[5] ATK=REL=0（无记忆）: env=%s gr=%s  ratio=%s  %s"
-          % (env3, gr3, ratio3, "OK" if ok else "FAIL"))
+    print("[5] ATK=REL=0（无记忆）: env峰=%s gr峰=%s  峰比 %.2f（应 ~0.30）  %s"
+          % (env3, gr3, q, "OK" if ok else "FAIL"))
 
     # 收尾：停播放、参数复原、通路关掉
     r.write(0x024, 0)

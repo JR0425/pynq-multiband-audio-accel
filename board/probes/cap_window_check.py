@@ -149,7 +149,10 @@ def main():
     time.sleep(0.5)
     st1 = regs.read(OFF_STAT0)
     ovf1, und1 = st1 & 0xFFFF, st1 >> 16
-    ok = (ovf1 == ovf0) and (und1 == 0)
+    ok = (ovf1 == ovf0) and (und1 == und0)
+    # 判据是「读窗口期间不增长」，不是累计值为 0：前面的探针停过播放，
+    # 本探针 flush 后重开输出时会有一次启动欠载（2026-11-02 实测 und0=1），
+    # 拿绝对值 0 当门槛会把这个瞬态误判成读窗口的错。
     bad += 0 if ok else 1
     say("   [4] ovf %d→%d  und %d→%d  %s"
         % (ovf0, ovf1, und0, und1, "OK" if ok else "FAIL"))
