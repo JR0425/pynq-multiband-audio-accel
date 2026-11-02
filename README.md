@@ -203,13 +203,13 @@ FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声�
 **演示视频不在本仓库里。** 全片在 [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101) 的 `demo_full_20261101.mp4`（59.5 MB / 1920×1080 / 2 分 59 秒）。
 它不入库有两个原因：59.5 MB 超过 GitHub 单文件建议体积，且历史里的大二进制删不掉。所以
 `report/video/` 里只有一份 `README.md`（写着从哪下载），mp4 本身不入库；断网环境同样拿不到。
-提交或带走材料时用 `python tools/make_submission_package.py` 打包，它会把下载到
-`report/video/` 的 mp4 一并收进去 —— **视频是必带项，缺了脚本直接非 0 退出**，
-确实不要视频才加 `--no-extras`。
+**本仓库的提交包不收视频**：视频与海报一样经竞赛指定渠道单独提交，所以打包一律带
+`python tools/make_submission_package.py --no-extras`。脚本缺视频时非 0 退出的硬判据保留不变，
+它防的是"以为带了其实没带"。
 
 **海报不归这个仓库管。** 一页英文 A4 海报按指南第六章要求**不包含队伍信息**，
-由队伍通过竞赛指定渠道单独提交。2026-11-02 起 `report/poster/` 已连同 Git 历史一起移除，
-不在本仓库重建。
+由队伍通过竞赛指定渠道单独提交。2026-11-02 夜第三次清理后 `report/poster/` 已连同 Git 历史一起
+移除（`git rev-list --objects --all` 里已无任何 `*.pptx`），不在本仓库重建。
 
 **先读哪一份**（也在上面「先读哪一份」表里）：了解全貌看 `report/design_report.md`；
 核对合规看 `report/submission_checklist.md`；动手跑看本文件的「当前演示版」。
