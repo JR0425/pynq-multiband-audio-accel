@@ -26,14 +26,14 @@
 |---|---|---|---|
 | ① 只验功能 | 一块 PYNQ-Z2 + 网线（**不需要工具链**） | `bash board/probes/board_accept.sh` | 寄存器窗口、压缩器、双耳处方、抓取窗口全部正常 |
 | ② 只验设计 | 无板，但机器上要有 Vivado（`xvlog` / `xsim`） | `bash sim/run_all_checks.sh` | 五项：DRC 三组仿真、寄存器单测、RTL lint、后端自检、网页自检；任何一项挂返回非 0 |
-| ②′ 连工具链都没有 | 只要 Python 3.9+ | 见下面三条 | 后端自检、网页与三档预设自检、取舍图能从 68 份报告重画 |
+| ②′ 连工具链都没有 | 只要 Python 3.9+ | 见下面三条 | 后端自检、网页与四档预设自检、取舍图能从 68 份报告重画 |
 | ③ 全量重建 | Vivado / Vitis 2020.2 全套（约 30~50 GB） | `./rebuild.sh csim && ./rebuild.sh ip && ./rebuild.sh bit` | 从源码重建位流；详见 `BUILD_GUIDE.md` |
 
 ②′ 那三条（**不需要板子，也不需要 Vivado**）：
 
 ```bash
 python board/scripts/fir_pl_live.py  --selftest      # 后端：搬样/对齐/直通 的自检
-python board/scripts/fir_pl_webui.py --selftest      # 网页协议 + 范围钳制 + 三档预设
+python board/scripts/fir_pl_webui.py --selftest      # 网页协议 + 范围钳制 + 四档预设
 python src/python/plot_pareto.py                     # 重画报告 §4.0 的取舍图（现场解析综合报告）
 ```
 
@@ -92,25 +92,30 @@ bash board/probes/board_accept.sh   # 上板：寄存器窗口、压缩器、双
 `board_accept.sh` 会自己停服务、跑完起回来，跑的时候板子不能有别人在用。
 各项的单独命令、期望输出和失败时看哪个日志，写在 `board/probes/` 各探针的文件头里。
 
-### 三档预设：演示用哪一档，要在汇报里说清楚
+### 四档预设：演示用哪一档，要在汇报里说清楚
 
 压缩深度和失真在同一条曲线上，所以运行期换档做成了预设，一条命令切换、不需要重编：
 
 ```bash
 curl -X POST http://192.168.2.99:8080/api/preset \
-  -H "Content-Type: application/json" -d '{"name":"clean"}'   # demo / soft / clean
+  -H "Content-Type: application/json" -d '{"name":"show"}'    # demo / show / soft / clean
 curl http://192.168.2.99:8080/api/presets                      # 列表，带每档的实测状态
 ```
 
 | 预设 | 参数 | THD+N | 什么时候用 |
 |---|---|---|---|
-| `demo` | +22 dB / −10 dBFS / MPO −6 | **0.09%**（11-02 实测，压缩器未启动） | 演示默认，压缩效果最强 |
-| `soft` | +14 dB / −20 dBFS / MPO 0 | 谐波 −90 dBc 量级 | 想压一点又不出粗糙感 |
+| `demo` | +22 dB / −10 dBFS / MPO −6 | **0.09%**（11-02 实测，压缩器未启动） | 开机默认；**响度优先，靠 MPO 限幅出声**，压缩器本身没动 |
+| `show` | +30 dB / −10 dBFS / MPO 0 | **2.36%**（11-02 实测，压缩器确认动作） | **现场 A/B 用这一档**：四档里唯一"压缩器确实在压"且失真仍可控的 |
+| `soft` | +14 dB / −20 dBFS / MPO 0 | 谐波 −90 dBc 量级（总数未单独记） | 想压一点又不出粗糙感 |
 | `clean` | +22 dB / 不压缩 / MPO 0 | **0.07%**（= 输入本底） | 音质优先，或作 A/B 的"未压缩"参照面 |
 
-⚠️ 默认档在 11-01 改参数后一度没重测；11-02 在交付位流上补测为 0.09%（与输入本底相同，
-因为默认参数下压缩器并未启动）。压得越深失真越明显：−20 dBFS 档 9.32%、深压 37.24%。
-机制与复测命令见 `report/design_report.md` §5.1 与 §8.4。**以音质为先的场合请切到 `clean`。**
+⚠️ **四档的听感来源不一样，混着说就会自相矛盾**：`demo` 的 0.09% 等于输入本底，因为默认参数下
+压缩器一次都没启动，那点"有效果"来自 `MPO −6` 的限幅器（该机制单独动作时 THD+N 48.4%，
+是另一回事）。**要让人听见"它在压缩"，用 `show`（+30 dB，压缩器确认动作，实测 2.36%）**，
+它的 2.36% 是在满幅音源、入核峰值 803 计数下量的，换现场语音素材后电平不同，
+**听感需要人耳确认一次**；若出现削顶，把 `mpo_db` 降到 −6 再听，那一档的 THD 要重测。
+压得越深失真越明显：−20 dBFS 档 9.32%、深压 37.24%。机制与复测命令见
+`report/design_report.md` §5.1 与 §8.4。**以音质为先的场合请切到 `clean`。**
 
 ### 演示素材与调参基线：这两个文件不在仓库里
 
@@ -191,7 +196,7 @@ FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声�
 | `data/audio/` | 测试音频与生成的音频 |
 | `data/figures/` | 生成的分析图 |
 | `data/results/` | 所有实测读数；**哪个文件是当前结论、哪些不能引用，见 `data/results/README.md`** |
-| `skill/` | 技能包：34 条索引条目（A/B/C 三档），含 8 条提示词工作流、7 个可直接跑的校验脚本、3 个模板、21 篇踩坑笔记；索引见 `skill/README.md` |
+| `skill/` | 技能包：35 条索引条目（A/B/C 三档），含 8 条提示词工作流、6 条通用工具/模板、21 篇踩坑笔记（`checkers/` 下共 7 个脚本、`templates/` 下共 4 个文件）；索引见 `skill/README.md` |
 | `report/` | **设计报告（`design_report.md`）**、合规对照与提交清单（`submission_checklist.md`）、寄存器级接口说明（`hardware_interface_spec.md`）、大模型协作日志（`llm_collab_log/`）、板端截图（`img/`） |
 | `tools/` | 提交打包脚本（`make_submission_package.py`）；产物落 `dist/`，不入库 |
 
