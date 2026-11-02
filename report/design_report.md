@@ -566,7 +566,7 @@ bash build/run_pl_build.sh
 
 上板验收执行 `bash board/probes/board_accept.sh`，检查寄存器窗口、压缩器、双耳处方与抓取窗口，逐项打印可判读的 PASS 行；脚本会自行停止常驻服务，跑完再启动。
 
-长跑执行下列命令，脚本每 2 秒读取一次 `/api/status` 与 `/api/health`，结束时按十项判据逐条打印 PASS 或 FAIL：采集 overrun 全程不增长、播放 underrun 全 0、running 全程为真、ramp_busy 最终归零、输入有起伏且未恒满、温度末值减首值小于 10 ℃、内存无泄漏等。
+长跑执行下列命令，脚本每 2 秒读取一次 `/api/status` 与 `/api/health`，结束时按十项判据逐条打印 PASS 或 FAIL：采集 overrun 全程不增长、播放 underrun 全 0、running 全程为真、ramp_busy 最终归零、peak_in 大于 0 且最小值小于 30000（非静音、非卡满）、温度末值减首值小于 10 ℃、内存无泄漏等。这组判据只证明通路与调度没有异常，不证明压缩器在工作：2026-11-02 那趟进出核峰值全程恒定、压缩器空闲，十项照样全 PASS。
 
 ```bash
 python board/probes/soak_pl_600.py --secs 600 --json soak_pl.json
