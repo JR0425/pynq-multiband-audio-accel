@@ -197,8 +197,8 @@ FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声�
 
 **演示视频不在本仓库里。** 全片在 [Release `demo-20261101`](https://github.com/JR0425/pynq-multiband-audio-accel/releases/tag/demo-20261101) 的 `demo_full_20261101.mp4`（59.5 MB / 1920×1080 / 2 分 59 秒）。
 它不入库有两个原因：59.5 MB 超过 GitHub 单文件建议体积，且历史里的大二进制删不掉。所以
-`report/video/` 在仓库里**是空目录、git 不跟踪**，clone 下来什么都没有；断网环境同样拿不到。
-提交或带走材料时用 `python tools/make_submission_package.py` 打包，它会把 Release 里下载到
+`report/video/` 里只有一份 `README.md`（写着从哪下载），mp4 本身不入库；断网环境同样拿不到。
+提交或带走材料时用 `python tools/make_submission_package.py` 打包，它会把下载到
 `report/video/` 的 mp4 一并收进去 —— **视频是必带项，缺了脚本直接非 0 退出**，
 确实不要视频才加 `--no-extras`。
 
