@@ -70,17 +70,24 @@ md5 929ce60f0ab41001c47a82d0e71fe0ae
 速度只有在算对的前提下才有意义。逐位比对的结论：
 
 - **重编位流的输出 = 当前 RTL 的 xsim 输出**。用 `in_q15.mem` 的 4800 点跑板上
-  `rtl_dma_probe.py --drc`，与 `sim/rtl_sim/xsim_work_long_4800_loud/shell_out.txt`
-  逐点相同：都只在 16 个点上偏离仓库里的黄金值，而且这 16 个点的数值完全一样
+  `rtl_dma_probe.py --drc`，先与 `sim/rtl_sim/xsim_work_long_4800_loud/shell_out.txt`
+  逐点相同：两边都只在同样 16 个点上偏离仓库里的旧黄金值，数值也完全一样
   （[317] 23080、[318] 23394、[321] 23573…）。硬件忠实实现了当前 RTL。
-- 那 16 个点不是硬件错，是**仓库里的参考模型没跟上 10-31 的软膝限幅**：
-  `run_xsim_long.sh` 里那个 Python 定点模型仍是"超过门限线性压"的写法。
-  数据上两边同向、同位置，差的是限幅那一段的算法。
+- 那 16 个点不是硬件错，是**生成黄金向量的模型没跟上 10-31 的软膝限幅**：
+  `run_xsim_long.sh` 里那个 Python 定点模型还是"超过门限线性压"的写法。
+  `run_xsim_drc4.sh` 里同一套规则 10-30 就改成软膝了，这份漏掉。
 
-这留下一个待办（不在本次测量范围内）：`sim/rtl_sim/golden_n4800_drc_loud/` 与
-`run_xsim_long.sh` 里的 DRC 参考模型还是 10-25 的，今天跑
-`run_xsim_stream.sh DRC=1` 或 `rtl_dma_probe.py --drc` 会报 16 点不同。
-要么把模型改成软膝，要么确认 RTL 该退回去——需要按设计意图定，不能靠测出来猜。
+  已修：`run_xsim_long.sh` 补上 `lim16()`，重新生成
+  `sim/rtl_sim/golden_n4800_drc_loud/rtl_fe_out.txt`（4800 点里改 16 行），
+  再跑板上 `rtl_dma_probe.py --drc`：
+
+  ```
+  [OK  ] run1 和 xsim 黄金向量逐位相同  4800 点全同
+  [OK  ] 每采样拍数 ≈ 3  3.005
+  [OK  ] 两次输出逐位相同  0 点不同
+  ```
+
+  限幅沿用 RTL 的软膝写法（硬削顶会让 16% 的窗顶变方波），没有把 RTL 退回去。
 
 ## 方法
 

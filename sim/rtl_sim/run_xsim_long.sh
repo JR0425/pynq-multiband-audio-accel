@@ -141,6 +141,32 @@ def sat16(v):
     return 32767 if v > 32767 else (-32768 if v < -32768 else v)
 
 
+# 2026-10-30 末级从"硬饱和"改成六段折线软膝限幅（见 fir_drc4.v）。
+# 和 run_xsim_drc4.sh 里那份是同一套规则；那边 10-30 就改了，这边漏了，
+# 导致黄金向量还是硬饱和的版本，凡过载的采样都会和硬件对不上。
+LIM_T = 22937
+
+
+def lim16(u):
+    if -LIM_T <= u <= LIM_T:
+        return u
+    e = abs(u) - LIM_T
+    if e < 6554:
+        c = e >> 1
+    elif e < 9831:
+        c = 3277 + ((e - 6554) >> 2)
+    elif e < 26215:
+        c = 4096 + ((e - 9831) >> 4)
+    elif e < 75311:
+        c = 5120 + ((e - 26215) >> 6)
+    elif e < 466615:
+        c = 5888 + ((e - 75311) >> 8)
+    else:
+        c = 7416 + ((e - 466615) >> 12)
+    y = LIM_T + c
+    return -y if u < 0 else y
+
+
 def s40(h):
     v = int(h.strip(), 16)
     return v - (1 << 40) if v >= (1 << 39) else v
@@ -173,7 +199,7 @@ with open("golden_drc.txt", "w") as fo:
                 a2 = 0
             yv = -a2 if gb < 0 else a2
             acc += yv << 10
-        fo.write("%d\n" % sat16(acc >> 17))
+        fo.write("%d\n" % lim16(acc >> 17))
 print("  黄金值已生成 golden_drc.txt（%d 点）" % L)
 PY
     GOLDEN="golden_drc.txt"
