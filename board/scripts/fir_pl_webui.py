@@ -82,7 +82,7 @@ DEFAULT_TUNE = {
 }
 
 
-# ---------------------------------------------------------------- 三档预设
+# ---------------------------------------------------------------- 四档预设
 # 为什么要有这个表：失真与压缩深度是同一条曲线上的两端，而"当前默认档到底测没测过"
 # 这件事必须能一眼查到。10-31 做 THD+N 定位时演示默认还是 −20 dBFS / MPO 0 dBFS；
 # 11-01 改成 −10 dBFS / MPO −6 dBFS；**11-02 已按新默认补测**（0.09%，压缩器未启动）。
@@ -96,8 +96,21 @@ PRESETS = {
         "tune": dict(DEFAULT_TUNE),
         "thdn": 0.0009,
         "measured": "2026-11-02 实测 0.09%（+22 dB / −10 dBFS / 0.7，压缩器未启动）= 输入本底",
-        "note": "压缩最深、听感最「有效」的一档。11-02 复测说明默认参数下压缩器并未启动，"
-                "失真等于本底；真正压深（−20 dBFS 9.32%、−40 dBFS 37.24%）才会明显。",
+        "note": "开机默认。11-02 复测说明默认参数下压缩器并未启动，THD 等于本底；"
+                "这里的「效果」来自 MPO −6 的限幅（另一机制，单独动作时 48.4%），不是压缩本身。"
+                "要让人听见「它在压缩」请切 show 档。",
+    },
+    "show": {
+        "label": "压缩确认动作档（+30 dB）",
+        "tune": {"gain_db": [30.0] * 4, "thr_db": [-10.0] * 4, "ratio": [0.7] * 4,
+                 "attack_ms": [5.0] * 4, "release_ms": [100.0] * 4,
+                 "bypass": False, "mpo_db": 0.0},
+        "thdn": 0.0236,
+        "measured": "2026-11-02 实测 2.36%（+30 dB / −10 dBFS / 0.7，压缩器确认动作；"
+                    "满幅音源、入核峰值 803 计数）",
+        "note": "四档里唯一「压缩器确实在压」且失真仍可控的一档，现场 A/B 用它听压缩效果。"
+                "2.36% 是满幅音源下的读数，换语音素材电平不同，听感要人耳确认一次；"
+                "若出现削顶，把 mpo_db 降到 −6 再听，那一档的 THD 需重测（thdn.py）。",
     },
     "soft": {
         "label": "轻压（10-31 边界档）",
@@ -371,7 +384,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True,
                                    "tune": _read_json(TUNE_PATH) or dict(DEFAULT_TUNE)})
             if p == "/api/presets":
-                # 三档预设连同「哪一档测过、哪一档没测」一起给页面。
+                # 四档预设连同「哪一档测过、哪一档没测」一起给页面。
                 # 这里把 measured 原文带出去，是为了让人在切档之前就知道数字的可信度。
                 return self._json({"ok": True, "presets": [
                     {"name": k, "label": v["label"], "tune": sanitize_tune(v["tune"]),
@@ -619,10 +632,10 @@ def selftest():
     chk("b1 缺的字段继承左耳", tb.get("thr_db") == [-10.0] * 4, tb.get("thr_db"))
     chk("不带 b1 时文件里没有 b1", "b1" not in (post("/api/tune", {"gain_db": [30] * 4})[1].get("tune") or {}))
 
-    print("== 3c. 三档预设 ==")
+    print("== 3c. 四档预设 ==")
     j = get("/api/presets")[1]
     names = [q.get("name") for q in (j.get("presets") or [])]
-    chk("presets 三档齐全", j.get("ok") is True and names == ["demo", "soft", "clean"], names)
+    chk("presets 四档齐全", j.get("ok") is True and names == ["demo", "show", "soft", "clean"], names)
     code, j = post("/api/preset", {"name": "clean"})
     t = j.get("tune") or {}
     chk("clean 档 = 门限 0 dBFS + 限幅不动作", code == 200 and j.get("preset") == "clean"
@@ -632,6 +645,12 @@ def selftest():
     chk("demo 档带得住自己的实测 THD+N",
         code == 200 and abs((j.get("thdn") or 0) - 0.0009) < 1e-9
         and (j.get("tune") or {}).get("thr_db") == [-10.0] * 4, j.get("thdn"))
+    code, j = post("/api/preset", {"name": "show"})
+    t = j.get("tune") or {}
+    chk("show 档 = +30 dB 且压缩器门限 −10 dBFS", code == 200 and j.get("preset") == "show"
+        and t.get("gain_db") == [30.0] * 4 and t.get("thr_db") == [-10.0] * 4, t.get("gain_db"))
+    chk("show 档带得住自己的实测 THD+N",
+        abs((j.get("thdn") or 0) - 0.0236) < 1e-9, j.get("thdn"))
     code, j = post("/api/preset", {"name": "soft"})
     chk("soft 档 thdn 必须是 None（没实测就不许填数）",
         code == 200 and j.get("thdn") is None, j.get("thdn"))
