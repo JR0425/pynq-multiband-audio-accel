@@ -586,7 +586,7 @@ def fig_soak_pl():
         y, tt = series(key)
         if len(y):
             a1.plot(tt, y, lw=1.0, color=color, label=label)
-    a1.set_title("电平：输入有起伏且未恒满", fontsize=9.5)
+    a1.set_title("电平：进出核峰值全程不变（压缩器空闲）", fontsize=9.5)
     a1.set_ylabel("峰值（Q1.15 计数）")
     a1.legend(fontsize=7.5, loc="upper right", frameon=False)
 
