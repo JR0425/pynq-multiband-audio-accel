@@ -138,7 +138,7 @@ Python 侧"四段之和 = 原信号延迟 96 拍"这条恒等式，当前实测�
 
 **这两条数据的边界**：这是**拿仓库里存下的 HLS 输出**和重新生成的黄金数据做的复比，
 比对脚本是 `src/python/compare_golden_vs_hw.py`。要从当前源码重跑整条链路，
-用 `./rebuild.sh csim`（工具路径见 `BUILD_GUIDE.md` §2）。本节数字属于 2026-09 那一版核，
+用 `./rebuild.sh csim`（工具路径见 `build_guide.md` §2）。本节数字属于 2026-09 那一版核，
 不是出货核 `v25_env_indep` 的。
 
 产出：`data/figures/hls_golden_comparison.png`、`data/figures/spectrum_waterfall.png`、

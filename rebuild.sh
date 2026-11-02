@@ -13,7 +13,7 @@
 #   VIVADO_BIN      默认 E:/Xilinx/Vivado/2020.2/bin/vivado.bat
 #   VITIS_HLS_BIN   默认 E:/Xilinx/Vitis_HLS/2020.2/bin/vitis_hls.bat
 #
-# 在 Git Bash 里跑。详细说明见 BUILD_GUIDE.md。
+# 在 Git Bash 里跑。详细说明见 build_guide.md。
 set -e
 
 REPO=$(cd "$(dirname "$0")" && pwd)

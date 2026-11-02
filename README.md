@@ -27,7 +27,7 @@
 | ① 只验功能 | 一块 PYNQ-Z2 + 网线（**不需要工具链**） | `bash board/probes/board_accept.sh` | 寄存器窗口、压缩器、双耳处方、抓取窗口全部正常 |
 | ② 只验设计 | 无板，但机器上要有 Vivado（`xvlog` / `xsim`） | `bash sim/run_all_checks.sh` | 五项：DRC 三组仿真、寄存器单测、RTL lint、后端自检、网页自检；任何一项挂返回非 0 |
 | ②′ 连工具链都没有 | 只要 Python 3.9+ | 见下面三条 | 后端自检、网页与四档预设自检、取舍图能从 68 份报告重画 |
-| ③ 全量重建 | Vivado / Vitis 2020.2 全套（约 30~50 GB） | `./rebuild.sh csim && ./rebuild.sh ip && ./rebuild.sh bit` | 从源码重建位流；详见 `BUILD_GUIDE.md` |
+| ③ 全量重建 | Vivado / Vitis 2020.2 全套（约 30~50 GB） | `./rebuild.sh csim && ./rebuild.sh ip && ./rebuild.sh bit` | 从源码重建位流；详见 `build_guide.md` |
 
 ②′ 那三条（**不需要板子，也不需要 Vivado**）：
 
@@ -157,7 +157,7 @@ FIFO 余量（48828.12 Hz、`stall_n_ge_margin 0`），换任何 48 kHz 单声�
 
 复现不依赖工具的安装位置：`rebuild.sh` 用 `VIVADO_BIN` / `VITIS_HLS_BIN` 两个环境变量
 指定可执行文件，三步构建（C 仿真 → 导出 IP → 整机位流）全部脚本化，详见
-`BUILD_GUIDE.md`。换版本时需要同步改 `HLS_CFLAGS` 和 `build/hls/directives/`，
+`build_guide.md`。换版本时需要同步改 `HLS_CFLAGS` 和 `build/hls/directives/`，
 这两处就是全部与版本相关的配置。
 
 ## 项目现状
