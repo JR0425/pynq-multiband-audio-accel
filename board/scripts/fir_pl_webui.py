@@ -82,6 +82,47 @@ DEFAULT_TUNE = {
 }
 
 
+# ---------------------------------------------------------------- 三档预设
+# 为什么要有这个表：失真与压缩深度是同一条曲线上的两端，而"当前默认档到底测没测过"
+# 这件事必须能一眼查到。10-31 做 THD+N 定位时演示默认还是 −20 dBFS / MPO 0 dBFS；
+# 11-01 为了让限幅器参与，默认改成了 −10 dBFS / MPO −6 dBFS —— **改动之后没有重测**。
+# 所以 `demo` 这一档的 thdn 写 None，不许拿旧实测数字冒充（见 report/design_report.md §5.2）。
+#
+# 每一档的 thdn 字段只放**该档位自己的实测值**，测过的写数字，没测过的写 None + 原因。
+# 复测命令见 data/results/thdn_localization_20261031.md 末尾那段（换成对应参数即可）。
+PRESETS = {
+    "demo": {
+        "label": "演示默认（2026-11-01 起）",
+        "tune": dict(DEFAULT_TUNE),
+        "thdn": None,
+        "measured": "未实测：11-01 改了默认门限/限幅之后没有重测 THD+N",
+        "note": "压缩最深、听感最「有效」的一档，但 10-31 那张表第 2 行说明限幅器单独动作就有 7.72%，"
+                "本档 MPO −6 dBFS 会让限幅器频繁介入，失真风险未知。汇报时必须说「未测」。",
+    },
+    "soft": {
+        "label": "轻压（10-31 边界档）",
+        "tune": {"gain_db": [14.0] * 4, "thr_db": [-20.0] * 4, "ratio": [0.7] * 4,
+                 "attack_ms": [5.0] * 4, "release_ms": [100.0] * 4,
+                 "bypass": False, "mpo_db": 0.0},
+        "thdn": None,
+        "measured": "10-31 实测：段增益降到 14 dB、包络正好压在门限上，谐波回到 −90 dBc 量级；"
+                    "THD+N 总数未单独记",
+        "note": "想压一点又不想出粗糙感的中间档。14 dB 是当时量到的边界，不是随便取的数。",
+    },
+    "clean": {
+        "label": "低失真（压缩与限幅全关）",
+        "tune": {"gain_db": [22.0] * 4, "thr_db": [0.0] * 4, "ratio": [0.7] * 4,
+                 "attack_ms": [5.0] * 4, "release_ms": [100.0] * 4,
+                 "bypass": False, "mpo_db": 0.0},
+        "thdn": 0.0007,
+        "measured": "10-31 实测 0.07%（第 1 组：门限抬到 0 dBFS、限幅器不动作）= 输入本底，"
+                    "定点前端链不产生失真",
+        "note": "A/B 的「未压缩」参照面：四段分频与 +22 dB 增益都在，只是不压缩。"
+                "现场以音质优先时切这一档。",
+    },
+}
+
+
 # ---------------------------------------------------------------- 文件协议
 def _read_json(path):
     try:
@@ -329,6 +370,13 @@ class Handler(BaseHTTPRequestHandler):
                 # 文件不存在时也不要给 null，给「寄存器出厂值 + 演示增益」。
                 return self._json({"ok": True,
                                    "tune": _read_json(TUNE_PATH) or dict(DEFAULT_TUNE)})
+            if p == "/api/presets":
+                # 三档预设连同「哪一档测过、哪一档没测」一起给页面。
+                # 这里把 measured 原文带出去，是为了让人在切档之前就知道数字的可信度。
+                return self._json({"ok": True, "presets": [
+                    {"name": k, "label": v["label"], "tune": sanitize_tune(v["tune"]),
+                     "thdn": v["thdn"], "measured": v["measured"], "note": v["note"]}
+                    for k, v in PRESETS.items()]})
             if p == "/api/scope":
                 # C3：fir_pl_live.py 每秒把抓取缓冲写成 SCOPE_PATH。
                 # 文件不在 = 后端没跑/位流还是旧的，别编数据骗页面。
@@ -380,6 +428,18 @@ class Handler(BaseHTTPRequestHandler):
                 t = sanitize_tune(body)
                 _write_json(TUNE_PATH, t)
                 return self._json({"ok": True, "tune": t})
+            if p == "/api/preset":
+                # 切预设 = 整体替换 tune（不是打补丁）。给演示/答辩时一键换档用。
+                name = str(body.get("name") or "")
+                if name not in PRESETS:
+                    return self._json({"ok": False,
+                                       "msg": "没有这个预设：%s（可选：%s）"
+                                              % (name or "（空）", ", ".join(PRESETS))}, 400)
+                t = sanitize_tune(PRESETS[name]["tune"])
+                _write_json(TUNE_PATH, t)
+                return self._json({"ok": True, "preset": name,
+                                   "tune": t, "thdn": PRESETS[name]["thdn"],
+                                   "measured": PRESETS[name]["measured"]})
             if p == "/api/start":
                 # 页面的 src / l / nbuf / wav 在 PL 直连里没有意义，收下但不使用
                 write_run(True)
@@ -558,6 +618,22 @@ def selftest():
     chk("b1 保留并被钳制", tb.get("gain_db") == [0.0, 6.0, 12.0, 18.0], tb.get("gain_db"))
     chk("b1 缺的字段继承左耳", tb.get("thr_db") == [-10.0] * 4, tb.get("thr_db"))
     chk("不带 b1 时文件里没有 b1", "b1" not in (post("/api/tune", {"gain_db": [30] * 4})[1].get("tune") or {}))
+
+    print("== 3c. 三档预设 ==")
+    j = get("/api/presets")[1]
+    names = [q.get("name") for q in (j.get("presets") or [])]
+    chk("presets 三档齐全", j.get("ok") is True and names == ["demo", "soft", "clean"], names)
+    code, j = post("/api/preset", {"name": "clean"})
+    t = j.get("tune") or {}
+    chk("clean 档 = 门限 0 dBFS + 限幅不动作", code == 200 and j.get("preset") == "clean"
+        and t.get("thr_db") == [0.0] * 4 and t.get("mpo_db") == 0.0, t.get("thr_db"))
+    chk("clean 档带得住自己的实测 THD+N", abs((j.get("thdn") or 0) - 0.0007) < 1e-9, j.get("thdn"))
+    code, j = post("/api/preset", {"name": "demo"})
+    chk("demo 档 thdn 必须是 None（未实测就不许填数）",
+        code == 200 and j.get("thdn") is None
+        and (j.get("tune") or {}).get("thr_db") == [-10.0] * 4, j.get("thdn"))
+    code, j = post("/api/preset", {"name": "nope"})
+    chk("未知预设返回 400", code == 400 and j.get("ok") is False, code)
 
     print("== 4. 短列表会补齐 ==")
     code, j = post("/api/tune", {"gain_db": [12]})
