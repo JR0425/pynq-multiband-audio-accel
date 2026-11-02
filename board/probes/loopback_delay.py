@@ -288,7 +288,9 @@ def main():
         time.sleep(0.05)
 
     if a.probe_only:
-        print("\n--probe-only：不继续测延迟。")
+        out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "loopback_caps.npz")
+        np.savez(out, fs=FS, **caps)
+        print("\n--probe-only：不继续测延迟。原始窗口 -> %s" % out)
         return 0
 
     # 选一个 input 不削顶、又足够大的幅度
