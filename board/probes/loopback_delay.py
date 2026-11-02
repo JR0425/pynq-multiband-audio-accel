@@ -335,9 +335,13 @@ def main():
     print("  codec+线缆往返 %.3f ms" % (med * 1e3 / FS))
     fwd = (med + 96) * 1e3 / FS
     print("  + 核群 96 采样 => ADC->PL->DAC 前向电学延迟 %.3f ms" % fwd)
-    print("  + 声学 1.23 ms  => 嘴到耳约 %.3f ms（三项口径，非单次端到端）"
-          % (fwd + 1.23))
-    print("  注：DAC/ADC 各自的转换延迟各只算了一次；线缆延迟包含在内。")
+    # 声学那 1.23 ms 按 acoustic_lat.py 的定义是"DAC 模拟端 + 空气 + ADC 模拟端"，
+    # 已经含了 DAC/ADC 转换；再加 fwd 会把这一段算两遍，所以只加核的群延迟。
+    print("  + 声学 1.23 ms（已含 DAC/ADC）=> 嘴到耳 %.3f ms = 核群 %.3f + 1.23"
+          % (96 * 1e3 / FS + 1.23, 96 * 1e3 / FS))
+    print("  自洽性：1.23 减电学往返 %.3f = %.3f ms，是空气 + 换能器那一段"
+          % (med * 1e3 / FS, 1.23 - med * 1e3 / FS))
+    print("  注：DAC/ADC 各自只算一次；线缆延迟包含在电学往返里。")
 
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "loopback_caps.npz")
     np.savez(out, lags=np.array(lags), median=med, fs=FS,
