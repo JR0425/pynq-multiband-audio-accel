@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成提交用压缩包：git 跟踪的文件 + 本机附加材料（演示视频、海报），打包时复核关键工件 md5。
+"""生成提交用压缩包：git 跟踪的文件 + 本机附加材料（演示视频），打包时复核关键工件 md5。
 
 为什么不用 `git archive` / 直接压缩整个目录：
   * 直接压缩目录会把 pynq_venv/（本机 564 MB）、.chart-data-*/、dist/ 一起带进去；
@@ -8,13 +8,16 @@
 这个脚本的做法：
   1. 文件清单只取 `git ls-tree -r HEAD` —— 仓库外的东西（venv、临时目录、未提交的草稿）天然进不来；
   2. 内容按 `git cat-file` 取 blob 字节 —— 与 clone 得到的字节一致，不受本机 core.autocrlf 影响；
-  3. 演示视频与海报**故意不入库**（体积、版式会改），只从本机目录收，收没收到写进清单；
+  3. 演示视频**故意不入库**（59.5 MB 二进制，进历史删不干净），只从本机目录收；
+     它是指南「实测输出」这一项的主要证据，所以**缺了就非 0 退出**，要显式加 --no-extras 才放行；
   4. 打完包重新算 md5，与 README 记录的位流 / hwh 值逐项比对，不一致直接非 0 退出；
   5. 写 MANIFEST.txt（commit、文件数、每个文件的 sha256 与大小、附加材料的取舍）一并放进包内。
 
+海报不归本脚本管：2026-11-02 起海报已从本仓库（含历史）移除，由队伍按竞赛指定渠道单独提交。
+
 用法：
     python tools/make_submission_package.py                # 产物落 dist/
-    python tools/make_submission_package.py --no-extras    # 不带视频与海报
+    python tools/make_submission_package.py --no-extras    # 不带视频（明知不带才用）
     python tools/make_submission_package.py --out D:/tmp/pack.zip
 
 工作区有未提交改动时默认拒绝打包（避免打出一份和提交记录对不上的材料），
@@ -40,19 +43,14 @@ EXPECTED_MD5 = {
     "board/overlay/fir_pl.hwh": "7fa8e8b3b53aa8bcc9d7ecfac2f546a5",
 }
 
-# 故意不入库、但提交时要带上的本机材料。文件不存在时只警告，不静默跳过。
+# 故意不入库、但提交时必须带上的本机材料。文件不存在时按 required 决定是报警还是拒绝出包。
 EXTRAS = [
     {
         "name": "演示视频",
         "glob": "report/video/*.mp4",
+        "required": True,
         "missing": "report/video/ 下没有 mp4：视频在 Release demo-20261101"
-        "（demo_full_20261101.mp4），先下载再打包",
-    },
-    {
-        "name": "海报",
-        "glob": "report/poster/*.pptx",
-        "missing": "report/poster/ 下没有 pptx：海报源文件不入库，从本机成品目录取，"
-        "或从 git 历史 e1e1d84 取回",
+        "（demo_full_20261101.mp4），先下载再打包；确实不要视频请加 --no-extras",
     },
 ]
 
@@ -125,7 +123,7 @@ def main():
         "--no-video",
         dest="no_extras",
         action="store_true",
-        help="不打包视频与海报等本机附加材料（--no-video 是旧名，保留兼容）",
+        help="不打包视频等本机附加材料（明知不带才用；--no-video 是旧名，保留兼容）",
     )
     ap.add_argument("--allow-dirty", action="store_true", help="工作区有未提交改动也照打")
     args = ap.parse_args()
@@ -167,7 +165,9 @@ def main():
         total += len(data)
 
     # 附加材料：故意不入库，只从本机目录收。收没收到都写清楚，不静默跳过。
+    # required 的缺件直接拒绝出包 —— 视频是「实测输出」的主要证据，缺了等于交一份自证不完整的材料。
     extras = []
+    missing_required = []
     for spec in EXTRAS:
         got = sorted(ROOT.glob(spec["glob"]))
         if args.no_extras:
@@ -176,7 +176,14 @@ def main():
             extras.append((spec["name"], "已包含 %d 个" % len(got), got))
         else:
             extras.append((spec["name"], "未包含：" + spec["missing"], []))
+            if spec.get("required"):
+                missing_required.append(spec["name"])
             print("\n[警告] %s %s" % (spec["name"], spec["missing"]))
+
+    if missing_required:
+        print("\n上面这些是必带的附加材料，缺了不出包。补上文件，或显式加 --no-extras 表示确实不要。")
+        shutil.rmtree(stage, ignore_errors=True)
+        return 5
 
     for name, note, files in extras:
         for src in files:
